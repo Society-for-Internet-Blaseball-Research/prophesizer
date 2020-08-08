@@ -7,7 +7,7 @@ namespace SIBR {
 
         while (true) {
           await prophesizer.Poll();
-          await Task.Delay(60000);
+          await Task.Delay(60 * 60 * 1000);
         }
       }
   }

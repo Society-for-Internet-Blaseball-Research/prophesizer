@@ -24,7 +24,7 @@ namespace SIBR {
         .Builder()
         .AddContactPoints("localhost")
         .Build();
-      this.client = new AmazonS3Client("AKIAJ63B4FPNV7JIERKQ", "8ai9hfj/01Ro/GsHP9mIxK5Qn+x34FNjCzlBu39X", bucketRegion);
+      this.client = new AmazonS3Client(Environment.GetEnvironmentVariable("AWS_KEY"), Environment.GetEnvironmentVariable("AWS_SECRET"), bucketRegion);
     }
     
     public async Task Poll() {
