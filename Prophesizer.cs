@@ -1,9 +1,8 @@
 using Amazon;
 using Amazon.S3;
 using Amazon.S3.Model;
-using Cassandra;
-using Cassandra.Mapping;
 using Cauldron;
+using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,38 +13,34 @@ using System.Threading.Tasks;
 namespace SIBR {
   class Prophesizer {
     private static readonly RegionEndpoint bucketRegion = RegionEndpoint.USWest2;
+
+
     private IAmazonS3 client;
-    private Cluster cluster;
     private string bucketName;
 
     public Prophesizer(string bucketName) {
       this.bucketName = bucketName;
-      this.cluster = Cluster
-        .Builder()
-        .AddContactPoints("localhost")
-        .Build();
       this.client = new AmazonS3Client(Environment.GetEnvironmentVariable("AWS_KEY"), Environment.GetEnvironmentVariable("AWS_SECRET"), bucketRegion);
     }
     
     public async Task Poll() {
-      var unprocessedLogs = await GetUnprocessedLogs();
+      await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
+      await psqlConnection.OpenAsync();
+
+      var unprocessedLogs = await GetUnprocessedLogs(psqlConnection);
       
       Console.WriteLine($"Found {unprocessedLogs.Count()} unprocessed log(s).");
 
       long totalEvents = 0;
 
-      using(var session = cluster.Connect("blaseball")) {
-        PreparedStatement processedLogStatement = PrepareProcessedLogStatement(session);
-        PreparedStatement gameEventStatement = PrepareGameEventStatement(session);
-
-        foreach (S3Object logObject in unprocessedLogs) {
-          totalEvents += await FetchAndProcessObject(logObject.Key, session, processedLogStatement, gameEventStatement);
-        }
+      foreach (S3Object logObject in unprocessedLogs) {
+        totalEvents += await FetchAndProcessObject(logObject.Key, psqlConnection);
       }
+
       Console.WriteLine($"Finished poll at {DateTime.UtcNow.ToString()} UTC - inserted {totalEvents} event(s).");
     }
 
-    private async Task<IEnumerable<S3Object>> GetUnprocessedLogs() {
+    private async Task<IEnumerable<S3Object>> GetUnprocessedLogs(NpgsqlConnection psqlConnection) {
       Console.WriteLine("Fetching bucket keys...");
 
       List<S3Object> allLogs = new List<S3Object>();
@@ -75,21 +70,19 @@ namespace SIBR {
 
       Console.WriteLine("Determining which logs require processing...");
 
-      using(var session = cluster.Connect("blaseball")) {
-        var response = session.Execute("SELECT * FROM imported_logs;");
+      using (var importedLogsStatement = new NpgsqlCommand("SELECT key FROM imported_logs", psqlConnection))
+      using (var reader = await importedLogsStatement.ExecuteReaderAsync()) {
+        var processedLogs = new List<string>();
 
-        var processedLogs = response.GetRows().Select(row => row.GetValue<string>("key"));
+        while(await reader.ReadAsync()) {
+          processedLogs.Add(reader.GetString(0));
+        }
 
         return allLogs.Where(log => !processedLogs.Contains(log.Key));
       }
     }
 
-    private async Task<int> FetchAndProcessObject(
-      string keyName,
-      ISession cassandraSession,
-      PreparedStatement processedLogStatement,
-      PreparedStatement gameEventStatement
-    ) {
+    private async Task<int> FetchAndProcessObject(string keyName, NpgsqlConnection psqlConnection) {
       GetObjectRequest request = new GetObjectRequest {
         BucketName = bucketName,
         Key = keyName
@@ -101,9 +94,7 @@ namespace SIBR {
 
         IEnumerable<GameEvent> gameEvents = ProcessObject(keyName, responseStream);
 
-        await PersistGameEvents(keyName, gameEvents, cassandraSession, processedLogStatement, gameEventStatement);
-
-        return gameEvents.Count();
+        return await PersistGameEvents(keyName, gameEvents, psqlConnection);
       }
     }
 
@@ -131,80 +122,55 @@ namespace SIBR {
       }
     }
 
-    private async Task PersistGameEvents(
+    private async Task<int> PersistGameEvents(
       string keyName,
       IEnumerable<GameEvent> gameEvents,
-      ISession cassandraSession,
-      PreparedStatement processedLogStatement,
-      PreparedStatement gameEventStatement
+      NpgsqlConnection psqlConnection
     ) {
+      var transaction = psqlConnection.BeginTransaction();
+
       try {
-        DefineTypesForSession(cassandraSession);        
+        Console.WriteLine("Persisting game events...");
 
-        var tasks = gameEvents.Select(gameEvent =>
-          cassandraSession.ExecuteAsync(gameEventStatement.Bind(
-            DateTime.UtcNow, // todo
-            new Guid(gameEvent.gameId),
-            gameEvent.eventType,
-            gameEvent.eventIndex,
-            (sbyte) gameEvent.inning,
-            gameEvent.topOfInning,
-            (sbyte) gameEvent.outsBeforePlay,
-            gameEvent.batterId == null ? new Guid() : new Guid(gameEvent.batterId), // todo remove
-            new Guid(gameEvent.batterTeamId),
-            new Guid(gameEvent.pitcherId),
-            new Guid(gameEvent.pitcherTeamId),
-            (double) gameEvent.homeScore,
-            (double) gameEvent.awayScore,
-            (short) gameEvent.homeStrikeCount,
-            (short) gameEvent.awayStrikeCount,
-            gameEvent.batterCount,
-            gameEvent.pitchesList.Select(x => x.ToString()),
-            (short) gameEvent.totalStrikes,
-            (short) gameEvent.totalBalls,
-            (short) gameEvent.totalFouls,
-            gameEvent.isLeadoff,
-            gameEvent.isPinchHit,
-            (short) gameEvent.lineupPosition,
-            gameEvent.isLastEventForPlateAppearance,
-            (sbyte) gameEvent.basesHit,
-            (sbyte) gameEvent.runsBattedIn,
-            gameEvent.isSacrificeHit,
-            gameEvent.isSacrificeFly,
-            (sbyte) gameEvent.outsOnPlay,
-            gameEvent.isDoublePlay,
-            gameEvent.isTriplePlay,
-            gameEvent.isWildPitch,
-            gameEvent.battedBallType ?? "", // todo
-            gameEvent.isBunt,
-            (sbyte) gameEvent.errorsOnPlay,
-            (sbyte) gameEvent.batterBaseAfterPlay,
-            gameEvent.baseRunners,
-            gameEvent.isLastGameEvent,
-            new List<PlayerEventTemp>(), // todo
-            gameEvent.eventText,
-            gameEvent.additionalContext ?? ""
-          ))
-        );
+        foreach (var gameEvent in gameEvents) {
+          await PersistGame(psqlConnection, gameEvent);
+        }
 
-        await Task.WhenAll(tasks);
+        using(var logStatement = PersistLogRecord(psqlConnection, keyName)) {
+          await logStatement.ExecuteNonQueryAsync();
+        }
 
-        cassandraSession.Execute(processedLogStatement.Bind(keyName, DateTime.UtcNow));
+        transaction.Commit();
+        Console.WriteLine($"Inserted {gameEvents.Count()} game_events into Postgres from {keyName}.");
 
-        Console.WriteLine($"Inserted {gameEvents.Count()} game_events into Cassandra from {keyName}.");
+        return gameEvents.Count();
       } catch (Exception e) {
-        Console.WriteLine($"Failed to insert events from {keyName} into Cassandra:");
+        transaction.Rollback();
+
+        Console.WriteLine($"Failed to insert events from {keyName} into Postgres:");
         Console.WriteLine(e.Message);
+
+        return 0;
       }
     }
 
-    private PreparedStatement PrepareProcessedLogStatement(ISession cassandraSession) {
-      return cassandraSession.Prepare("INSERT INTO imported_logs(key, imported_at) VALUES (?, ?);");
+    private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent) {
+      using(var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent)) {
+        int id = (int) await gameEventStatement.ExecuteScalarAsync();
+        
+        foreach(var baseRunner in gameEvent.baseRunners) {
+          using (var baseRunnerStatement = PrepareGameEventBaseRunnerStatements(psqlConnection, id, baseRunner)) {
+            await baseRunnerStatement.ExecuteNonQueryAsync();
+          }
+        }
+
+        // TODO: Player events
+      }
     }
 
-    private PreparedStatement PrepareGameEventStatement(ISession cassandraSession) {
-      return cassandraSession.Prepare(@"
-        INSERT INTO blaseball.game_events(
+    private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent) {
+      var gameEventStatement = new NpgsqlCommand(@"
+        INSERT INTO game_events(
           perceived_at,
           game_id,
           event_type,
@@ -241,32 +207,165 @@ namespace SIBR {
           is_bunt,
           errors_on_play,
           batter_base_after_play,
-          base_runners,
           is_last_game_event,
-          player_events,
           event_text,
           additional_context
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-      ");
+        ) VALUES (
+          @perceived_at,
+          @game_id,
+          @event_type,
+          @event_index,
+          @inning,
+          @top_of_inning,
+          @outs_before_play,
+          @batter_id,
+          @batter_team_id,
+          @pitcher_id,
+          @pitcher_team_id,
+          @home_score,
+          @away_score,
+          @home_strike_count,
+          @away_strike_count,
+          @batter_count,
+          @pitches,
+          @total_strikes,
+          @total_balls,
+          @total_fouls,
+          @is_leadoff,
+          @is_pinch_hit,
+          @lineup_position,
+          @is_last_event_for_plate_appearance,
+          @bases_hit,
+          @runs_batted_in,
+          @is_sacrifice_hit,
+          @is_sacrifice_fly,
+          @outs_on_play,
+          @is_double_play,
+          @is_triple_play,
+          @is_wild_pitch,
+          @batted_ball_type,
+          @is_bunt,
+          @errors_on_play,
+          @batter_base_after_play,
+          @is_last_game_event,
+          @event_text,
+          @additional_context
+        ) RETURNING id;
+      ", psqlConnection);
+      
+      gameEventStatement.Parameters.AddWithValue("perceived_at", DateTime.UtcNow); // todo
+      gameEventStatement.Parameters.AddWithValue("game_id", gameEvent.gameId);
+      gameEventStatement.Parameters.AddWithValue("event_type", gameEvent.eventType); 
+      gameEventStatement.Parameters.AddWithValue("event_index", gameEvent.eventIndex);
+      gameEventStatement.Parameters.AddWithValue("inning", gameEvent.inning);
+      gameEventStatement.Parameters.AddWithValue("top_of_inning", gameEvent.topOfInning);
+      gameEventStatement.Parameters.AddWithValue("outs_before_play", gameEvent.outsBeforePlay);
+      gameEventStatement.Parameters.AddWithValue("batter_id", gameEvent.batterId ?? "");
+      gameEventStatement.Parameters.AddWithValue("batter_team_id", gameEvent.batterTeamId);
+      gameEventStatement.Parameters.AddWithValue("pitcher_id", gameEvent.pitcherId);
+      gameEventStatement.Parameters.AddWithValue("pitcher_team_id", gameEvent.pitcherTeamId);
+      gameEventStatement.Parameters.AddWithValue("home_score", gameEvent.homeScore);
+      gameEventStatement.Parameters.AddWithValue("away_score", gameEvent.awayScore);
+      gameEventStatement.Parameters.AddWithValue("home_strike_count", gameEvent.homeStrikeCount);
+      gameEventStatement.Parameters.AddWithValue("away_strike_count", gameEvent.awayStrikeCount);
+      gameEventStatement.Parameters.AddWithValue("batter_count", gameEvent.batterCount);
+      gameEventStatement.Parameters.AddWithValue("pitches", gameEvent.pitchesList);
+      gameEventStatement.Parameters.AddWithValue("total_strikes", gameEvent.totalStrikes);
+      gameEventStatement.Parameters.AddWithValue("total_balls", gameEvent.totalBalls);
+      gameEventStatement.Parameters.AddWithValue("total_fouls", gameEvent.totalFouls);
+      gameEventStatement.Parameters.AddWithValue("is_leadoff", gameEvent.isLeadoff);
+      gameEventStatement.Parameters.AddWithValue("is_pinch_hit", gameEvent.isPinchHit);
+      gameEventStatement.Parameters.AddWithValue("lineup_position", gameEvent.lineupPosition);
+      gameEventStatement.Parameters.AddWithValue("is_last_event_for_plate_appearance", gameEvent.isLastEventForPlateAppearance);  
+      gameEventStatement.Parameters.AddWithValue("bases_hit", gameEvent.basesHit);
+      gameEventStatement.Parameters.AddWithValue("runs_batted_in", gameEvent.runsBattedIn);
+      gameEventStatement.Parameters.AddWithValue("is_sacrifice_hit", gameEvent.isSacrificeHit);
+      gameEventStatement.Parameters.AddWithValue("is_sacrifice_fly", gameEvent.isSacrificeFly);
+      gameEventStatement.Parameters.AddWithValue("outs_on_play", gameEvent.outsOnPlay);
+      gameEventStatement.Parameters.AddWithValue("is_double_play", gameEvent.isDoublePlay);
+      gameEventStatement.Parameters.AddWithValue("is_triple_play", gameEvent.isTriplePlay);
+      gameEventStatement.Parameters.AddWithValue("is_wild_pitch", gameEvent.isWildPitch);
+      gameEventStatement.Parameters.AddWithValue("batted_ball_type", gameEvent.battedBallType ?? "");
+      gameEventStatement.Parameters.AddWithValue("is_bunt", gameEvent.isBunt);
+      gameEventStatement.Parameters.AddWithValue("errors_on_play", gameEvent.errorsOnPlay);
+      gameEventStatement.Parameters.AddWithValue("batter_base_after_play", gameEvent.batterBaseAfterPlay);
+      gameEventStatement.Parameters.AddWithValue("is_last_game_event", gameEvent.isLastGameEvent);
+      gameEventStatement.Parameters.AddWithValue("event_text", gameEvent.eventText);
+      gameEventStatement.Parameters.AddWithValue("additional_context", gameEvent.additionalContext ?? "");
+
+      return gameEventStatement;
+    }
+    
+   private NpgsqlCommand PrepareGameEventBaseRunnerStatements(NpgsqlConnection psqlConnection, int gameEventId, GameEventBaseRunner baseRunnerEvent) {
+      var baseRunnerStatement = new NpgsqlCommand(@"
+        INSERT INTO game_event_base_runners(
+          game_event_id,
+          runner_id,
+          responsible_pitcher_id,
+          base_before_play,
+          base_after_play,
+          was_base_stolen,
+          was_caught_stealing,
+          was_picked_off
+        ) VALUES (
+          @game_event_id,
+          @runner_id,
+          @responsible_pitcher_id,
+          @base_before_play,
+          @base_after_play,
+          @was_base_stolen,
+          @was_caught_stealing,
+          @was_picked_off
+        );
+      ", psqlConnection);
+
+      baseRunnerStatement.Parameters.AddWithValue("game_event_id", gameEventId);
+      baseRunnerStatement.Parameters.AddWithValue("runner_id", baseRunnerEvent.runnerId);
+      baseRunnerStatement.Parameters.AddWithValue("responsible_pitcher_id", baseRunnerEvent.responsiblePitcherId);
+      baseRunnerStatement.Parameters.AddWithValue("base_before_play", baseRunnerEvent.baseBeforePlay);
+      baseRunnerStatement.Parameters.AddWithValue("base_after_play", baseRunnerEvent.baseAfterPlay);
+      baseRunnerStatement.Parameters.AddWithValue("was_base_stolen", baseRunnerEvent.wasBaseStolen);
+      baseRunnerStatement.Parameters.AddWithValue("was_caught_stealing", baseRunnerEvent.wasCaughtStealing);
+      baseRunnerStatement.Parameters.AddWithValue("was_picked_off", baseRunnerEvent.wasPickedOff);
+
+      return baseRunnerStatement;
     }
 
-    private void DefineTypesForSession(ISession session) {
-      session.UserDefinedTypes.Define(
-        UdtMap.For<GameEventBaseRunner>("game_event_base_runner")
-          .Map(a => a.runnerId, "runner_id")
-          .Map(a => a.responsiblePitcherId, "responsible_pitcher_id")
-          .Map(a => a.baseBeforePlay, "base_before_play")
-          .Map(a => a.baseAfterPlay, "base_after_play")
-          .Map(a => a.wasBaseStolen, "was_base_stolen")
-          .Map(a => a.wasCaughtStealing, "was_caught_stealing")
-          .Map(a => a.wasPickedOff, "was_picked_off")
-      );
+   private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEventTemp playerEvent) {
+      var playerEventStatement = new NpgsqlCommand(@"
+        INSERT INTO player_event(
+          game_event_id
+          player_id
+          event_type
+        ) VALUES (
+          @game_event_id
+          @player_id
+          @event_type
+        );
+      ", psqlConnection);
 
-      session.UserDefinedTypes.Define(
-        UdtMap.For<PlayerEventTemp>("player_event")
-          .Map(a => a.PlayerId, "player_id")
-          .Map(a => a.EventType, "event_type")
-      );
+      playerEventStatement.Parameters.AddWithValue("game_event_id", gameEventId);
+      playerEventStatement.Parameters.AddWithValue("player_id", playerEvent.PlayerId);
+      playerEventStatement.Parameters.AddWithValue("event_type", playerEvent.EventType);
+
+      return playerEventStatement;
+    }
+
+   private NpgsqlCommand PersistLogRecord(NpgsqlConnection psqlConnection, string keyName) {
+      var persistLogStatement = new NpgsqlCommand(@"
+        INSERT INTO imported_logs(
+          key,
+          imported_at
+        ) VALUES (
+          @key,
+          @imported_at
+        );
+      ", psqlConnection);
+
+      persistLogStatement.Parameters.AddWithValue("key", keyName);
+      persistLogStatement.Parameters.AddWithValue("imported_at", DateTime.UtcNow);
+
+      return persistLogStatement;
     }
   }
 }

@@ -1,5 +1,5 @@
 # Prophesizer
 
-> The prophesizer grants insight to Cassandra.
+> The prophesizer grants insight.
 
-Tool for importing raw logs from S3 into Cassandra.
+Tool for importing raw logs from S3 into Postgres.
