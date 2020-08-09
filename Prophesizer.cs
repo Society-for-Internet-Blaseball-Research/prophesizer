@@ -164,7 +164,11 @@ namespace SIBR {
           }
         }
 
-        // TODO: Player events
+      foreach(var playerEvent in gameEvent.playerEvents) {
+          using (var playerEventStatement = PreparePlayerEventStatement(psqlConnection, id, playerEvent)) {
+            await playerEventStatement.ExecuteNonQueryAsync();
+          }
+        } 
       }
     }
 
@@ -260,7 +264,7 @@ namespace SIBR {
       gameEventStatement.Parameters.AddWithValue("inning", gameEvent.inning);
       gameEventStatement.Parameters.AddWithValue("top_of_inning", gameEvent.topOfInning);
       gameEventStatement.Parameters.AddWithValue("outs_before_play", gameEvent.outsBeforePlay);
-      gameEventStatement.Parameters.AddWithValue("batter_id", gameEvent.batterId ?? "");
+      gameEventStatement.Parameters.AddWithValue("batter_id", gameEvent.batterId ?? "UNKNOWN");
       gameEventStatement.Parameters.AddWithValue("batter_team_id", gameEvent.batterTeamId);
       gameEventStatement.Parameters.AddWithValue("pitcher_id", gameEvent.pitcherId);
       gameEventStatement.Parameters.AddWithValue("pitcher_team_id", gameEvent.pitcherTeamId);
@@ -331,22 +335,22 @@ namespace SIBR {
       return baseRunnerStatement;
     }
 
-   private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEventTemp playerEvent) {
+   private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEvent playerEvent) {
       var playerEventStatement = new NpgsqlCommand(@"
-        INSERT INTO player_event(
-          game_event_id
-          player_id
+        INSERT INTO player_events(
+          game_event_id,
+          player_id,
           event_type
         ) VALUES (
-          @game_event_id
-          @player_id
+          @game_event_id,
+          @player_id,
           @event_type
         );
       ", psqlConnection);
 
       playerEventStatement.Parameters.AddWithValue("game_event_id", gameEventId);
-      playerEventStatement.Parameters.AddWithValue("player_id", playerEvent.PlayerId);
-      playerEventStatement.Parameters.AddWithValue("event_type", playerEvent.EventType);
+      playerEventStatement.Parameters.AddWithValue("player_id", playerEvent.playerId ?? "UNKNOWN");
+      playerEventStatement.Parameters.AddWithValue("event_type", playerEvent.eventType);
 
       return playerEventStatement;
     }
