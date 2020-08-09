@@ -54,7 +54,7 @@ namespace SIBR {
         do {
           ListObjectsResponse response = await client.ListObjectsAsync(request);
 
-          allLogs.AddRange(response.S3Objects);
+          allLogs.AddRange(response.S3Objects.Where(item => item.Key.StartsWith("blaseball-log-")));
 
           if (response.IsTruncated) {
             request.Marker = response.NextMarker;
