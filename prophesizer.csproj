@@ -10,6 +10,6 @@
     <PackageReference Include="AWSSDK.S3" Version="3.3.111.38" />
     <PackageReference Include="AWSSDK.SecurityToken" Version="3.3.105.39" />
     <PackageReference Include="npgsql" Version="4.1.4" />
-    <PackageReference Include="SIBR.Cauldron" Version="1.0.3" />
+    <PackageReference Include="SIBR.Cauldron" Version="1.0.4" />
   </ItemGroup>
 </Project>
