@@ -117,6 +117,7 @@ namespace SIBR {
         }     
       } catch (Exception e) {
         Console.WriteLine($"Failed to process {keyName}: {e.Message}");
+        Console.WriteLine(e.StackTrace);
 
         return new List<GameEvent>();
       }
