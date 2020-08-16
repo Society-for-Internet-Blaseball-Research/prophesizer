@@ -16,38 +16,51 @@ namespace SIBR {
 
 
     private IAmazonS3 client;
-    private string bucketName;
+    private string locationName;
+    private bool local;
 
-    public Prophesizer(string bucketName) {
-      this.bucketName = bucketName;
-      this.client = new AmazonS3Client(Environment.GetEnvironmentVariable("AWS_KEY"), Environment.GetEnvironmentVariable("AWS_SECRET"), bucketRegion);
+    public Prophesizer(string locationName, bool local=false) {
+      this.locationName = locationName;
+      this.local = local;
+      if(!this.local){
+        this.client = new AmazonS3Client(Environment.GetEnvironmentVariable("AWS_KEY"), Environment.GetEnvironmentVariable("AWS_SECRET"), bucketRegion);
+      }
     }
     
     public async Task Poll() {
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
       await psqlConnection.OpenAsync();
 
-      var unprocessedLogs = await GetUnprocessedLogs(psqlConnection);
-      
-      Console.WriteLine($"Found {unprocessedLogs.Count()} unprocessed log(s).");
-
       long totalEvents = 0;
 
-      foreach (S3Object logObject in unprocessedLogs) {
-        totalEvents += await FetchAndProcessObject(logObject.Key, psqlConnection);
-      }
+      if(local) {
+        var unprocessedLogs = await GetUnprocessedFileLogs(psqlConnection);
+        Console.WriteLine($"Found {unprocessedLogs.Count()} unprocessed log(s).");
 
+        foreach (string fileName in unprocessedLogs)
+        {
+          totalEvents += await OpenAndProcessObject(fileName, psqlConnection);
+        }
+      } else {
+        var unprocessedLogs = await GetUnprocessedS3Logs(psqlConnection);
+        Console.WriteLine($"Found {unprocessedLogs.Count()} unprocessed log(s).");
+
+        foreach (S3Object logObject in unprocessedLogs) {
+          totalEvents += await FetchAndProcessObject(logObject.Key, psqlConnection);
+        }
+      }
+      
       Console.WriteLine($"Finished poll at {DateTime.UtcNow.ToString()} UTC - inserted {totalEvents} event(s).");
     }
 
-    private async Task<IEnumerable<S3Object>> GetUnprocessedLogs(NpgsqlConnection psqlConnection) {
+    private async Task<IEnumerable<S3Object>> GetUnprocessedS3Logs(NpgsqlConnection psqlConnection) {
       Console.WriteLine("Fetching bucket keys...");
 
       List<S3Object> allLogs = new List<S3Object>();
       
       try {
         ListObjectsRequest request = new ListObjectsRequest {
-          BucketName = bucketName,
+          BucketName = locationName,
           MaxKeys = 2
         };
 
@@ -82,9 +95,36 @@ namespace SIBR {
       }
     }
 
+    private async Task<IEnumerable<string>> GetUnprocessedFileLogs(NpgsqlConnection psqlConnection)
+    {
+      Console.WriteLine("Fetching file names...");
+
+      if(!Directory.Exists(locationName)) {
+        Console.WriteLine("Given location is not a valid directory: {0}", locationName);
+        return new List<string>();
+      }
+
+      List<string> allLogs = new List<string>(Directory.GetFiles(locationName));
+
+      Console.WriteLine("Determining which logs require processing...");
+
+      using (var importedLogsStatement = new NpgsqlCommand("SELECT key FROM imported_logs", psqlConnection))
+      using (var reader = await importedLogsStatement.ExecuteReaderAsync())
+      {
+        var processedLogs = new List<string>();
+
+        while (await reader.ReadAsync())
+        {
+          processedLogs.Add(reader.GetString(0));
+        }
+
+        return allLogs.Where(log => !processedLogs.Contains(log));
+      }
+    }
+
     private async Task<int> FetchAndProcessObject(string keyName, NpgsqlConnection psqlConnection) {
       GetObjectRequest request = new GetObjectRequest {
-        BucketName = bucketName,
+        BucketName = locationName,
         Key = keyName
       };
 
@@ -95,6 +135,19 @@ namespace SIBR {
         IEnumerable<GameEvent> gameEvents = ProcessObject(keyName, responseStream);
 
         return await PersistGameEvents(keyName, gameEvents, psqlConnection);
+      }
+    }
+
+    private async Task<int> OpenAndProcessObject(string fileName, NpgsqlConnection psqlConnection)
+    {
+      FileInfo fi = new FileInfo(fileName);
+      using (Stream responseStream = fi.OpenRead())
+      {
+        Console.WriteLine($"Processing document (File: {fileName}, Length: {fi.Length})...");
+
+        IEnumerable<GameEvent> gameEvents = ProcessObject(fileName, responseStream);
+
+        return await PersistGameEvents(fileName, gameEvents, psqlConnection);
       }
     }
 
