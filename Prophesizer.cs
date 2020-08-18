@@ -325,8 +325,8 @@ namespace SIBR {
       ", psqlConnection);
 
       baseRunnerStatement.Parameters.AddWithValue("game_event_id", gameEventId);
-      baseRunnerStatement.Parameters.AddWithValue("runner_id", baseRunnerEvent.runnerId);
-      baseRunnerStatement.Parameters.AddWithValue("responsible_pitcher_id", baseRunnerEvent.responsiblePitcherId);
+      baseRunnerStatement.Parameters.AddWithValue("runner_id", baseRunnerEvent.runnerId ?? "UNKNOWN");
+      baseRunnerStatement.Parameters.AddWithValue("responsible_pitcher_id", baseRunnerEvent.responsiblePitcherId ?? "UNKNOWN");
       baseRunnerStatement.Parameters.AddWithValue("base_before_play", baseRunnerEvent.baseBeforePlay);
       baseRunnerStatement.Parameters.AddWithValue("base_after_play", baseRunnerEvent.baseAfterPlay);
       baseRunnerStatement.Parameters.AddWithValue("was_base_stolen", baseRunnerEvent.wasBaseStolen);
