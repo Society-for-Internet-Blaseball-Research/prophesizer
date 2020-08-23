@@ -17,12 +17,16 @@ namespace SIBR {
 
     private IAmazonS3 client;
     private string bucketName;
+    private Processor processor;
+    private Queue<IEnumerable<GameEvent>> gamesToInsert;
 
     public Prophesizer(string bucketName) {
       this.bucketName = bucketName;
       this.client = new AmazonS3Client(Environment.GetEnvironmentVariable("AWS_KEY"), Environment.GetEnvironmentVariable("AWS_SECRET"), bucketRegion);
+      processor = new Processor();
+      gamesToInsert = new Queue<IEnumerable<GameEvent>>();
     }
-    
+
     public async Task Poll() {
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
       await psqlConnection.OpenAsync();
@@ -33,12 +37,26 @@ namespace SIBR {
 
       long totalEvents = 0;
 
+      processor.GameComplete += Processor_GameComplete;
       foreach (S3Object logObject in unprocessedLogs) {
-        totalEvents += await FetchAndProcessObject(logObject.Key, psqlConnection);
+        await FetchAndProcessObject(logObject.Key, psqlConnection);
+        Console.WriteLine($"Found {gamesToInsert.Count} games to insert.");
+        while(gamesToInsert.Count > 0)
+        {
+          var gameEvents = gamesToInsert.Dequeue();
+          await PersistGameEvents(logObject.Key, gameEvents, psqlConnection);
+        }
       }
+      processor.GameComplete -= Processor_GameComplete;
 
       Console.WriteLine($"Finished poll at {DateTime.UtcNow.ToString()} UTC - inserted {totalEvents} event(s).");
     }
+
+    private void Processor_GameComplete(object sender, GameCompleteEventArgs e)
+    {
+      gamesToInsert.Enqueue(e.GameEvents);
+    }
+
 
     private async Task<IEnumerable<S3Object>> GetUnprocessedLogs(NpgsqlConnection psqlConnection) {
       Console.WriteLine("Fetching bucket keys...");
@@ -82,7 +100,7 @@ namespace SIBR {
       }
     }
 
-    private async Task<int> FetchAndProcessObject(string keyName, NpgsqlConnection psqlConnection) {
+    private async Task FetchAndProcessObject(string keyName, NpgsqlConnection psqlConnection) {
       GetObjectRequest request = new GetObjectRequest {
         BucketName = bucketName,
         Key = keyName
@@ -92,34 +110,27 @@ namespace SIBR {
       using (Stream responseStream = response.ResponseStream) {
         Console.WriteLine($"Processing document (Key: {keyName}, Length: {response.ContentLength})...");
 
-        IEnumerable<GameEvent> gameEvents = ProcessObject(keyName, responseStream);
+        ProcessObject(keyName, responseStream);
 
-        return await PersistGameEvents(keyName, gameEvents, psqlConnection);
+        return;
       }
     }
 
-    private IEnumerable<GameEvent> ProcessObject(string keyName, Stream responseStream) {
+    private void ProcessObject(string keyName, Stream responseStream) {
       try {
-        Processor processor = new Processor();
-
         using (GZipStream decompressionStream = new GZipStream(responseStream, CompressionMode.Decompress))
         using (MemoryStream decompressedStream = new MemoryStream()) {
           decompressionStream.CopyTo(decompressedStream);
           decompressedStream.Seek(0, SeekOrigin.Begin);
 
           using (StreamReader reader = new StreamReader(decompressedStream)) {
-            var output = processor.Process(reader);
-
-            Console.WriteLine($"Processed {output.Count()} game event(s)!");
-
-            return output;
+            processor.Process(reader);
           }
         }     
       } catch (Exception e) {
         Console.WriteLine($"Failed to process {keyName}: {e.Message}");
         Console.WriteLine(e.StackTrace);
-
-        return new List<GameEvent>();
+        return;
       }
     }
 
