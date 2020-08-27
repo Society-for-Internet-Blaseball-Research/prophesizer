@@ -8,6 +8,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace SIBR {
@@ -31,8 +34,11 @@ namespace SIBR {
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
       await psqlConnection.OpenAsync();
 
+
+      await FetchGameList(psqlConnection);
+
       var unprocessedLogs = await GetUnprocessedLogs(psqlConnection);
-      
+
       Console.WriteLine($"Found {unprocessedLogs.Count()} unprocessed log(s).");
 
       long totalEvents = 0;
@@ -41,8 +47,7 @@ namespace SIBR {
       foreach (S3Object logObject in unprocessedLogs) {
         await FetchAndProcessObject(logObject.Key, psqlConnection);
         Console.WriteLine($"Found {gamesToInsert.Count} games to insert.");
-        while(gamesToInsert.Count > 0)
-        {
+        while (gamesToInsert.Count > 0) {
           var gameEvents = gamesToInsert.Dequeue();
           await PersistGameEvents(logObject.Key, gameEvents, psqlConnection);
         }
@@ -52,8 +57,7 @@ namespace SIBR {
       Console.WriteLine($"Finished poll at {DateTime.UtcNow.ToString()} UTC - inserted {totalEvents} event(s).");
     }
 
-    private void Processor_GameComplete(object sender, GameCompleteEventArgs e)
-    {
+    private void Processor_GameComplete(object sender, GameCompleteEventArgs e) {
       gamesToInsert.Enqueue(e.GameEvents);
     }
 
@@ -62,7 +66,7 @@ namespace SIBR {
       Console.WriteLine("Fetching bucket keys...");
 
       List<S3Object> allLogs = new List<S3Object>();
-      
+
       try {
         ListObjectsRequest request = new ListObjectsRequest {
           BucketName = bucketName,
@@ -92,7 +96,7 @@ namespace SIBR {
       using (var reader = await importedLogsStatement.ExecuteReaderAsync()) {
         var processedLogs = new List<string>();
 
-        while(await reader.ReadAsync()) {
+        while (await reader.ReadAsync()) {
           processedLogs.Add(reader.GetString(0));
         }
 
@@ -126,7 +130,7 @@ namespace SIBR {
           using (StreamReader reader = new StreamReader(decompressedStream)) {
             processor.Process(reader);
           }
-        }     
+        }
       } catch (Exception e) {
         Console.WriteLine($"Failed to process {keyName}: {e.Message}");
         Console.WriteLine(e.StackTrace);
@@ -148,7 +152,7 @@ namespace SIBR {
           await PersistGame(psqlConnection, gameEvent);
         }
 
-        using(var logStatement = PersistLogRecord(psqlConnection, keyName)) {
+        using (var logStatement = PersistLogRecord(psqlConnection, keyName)) {
           await logStatement.ExecuteNonQueryAsync();
         }
 
@@ -167,20 +171,20 @@ namespace SIBR {
     }
 
     private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent) {
-      using(var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent)) {
-        int id = (int) await gameEventStatement.ExecuteScalarAsync();
-        
-        foreach(var baseRunner in gameEvent.baseRunners) {
+      using (var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent)) {
+        int id = (int)await gameEventStatement.ExecuteScalarAsync();
+
+        foreach (var baseRunner in gameEvent.baseRunners) {
           using (var baseRunnerStatement = PrepareGameEventBaseRunnerStatements(psqlConnection, id, baseRunner)) {
             await baseRunnerStatement.ExecuteNonQueryAsync();
           }
         }
 
-      foreach(var playerEvent in gameEvent.playerEvents) {
+        foreach (var playerEvent in gameEvent.playerEvents) {
           using (var playerEventStatement = PreparePlayerEventStatement(psqlConnection, id, playerEvent)) {
             await playerEventStatement.ExecuteNonQueryAsync();
           }
-        } 
+        }
       }
     }
 
@@ -268,10 +272,10 @@ namespace SIBR {
           @additional_context
         ) RETURNING id;
       ", psqlConnection);
-      
+
       gameEventStatement.Parameters.AddWithValue("perceived_at", DateTime.UtcNow); // todo
       gameEventStatement.Parameters.AddWithValue("game_id", gameEvent.gameId);
-      gameEventStatement.Parameters.AddWithValue("event_type", gameEvent.eventType); 
+      gameEventStatement.Parameters.AddWithValue("event_type", gameEvent.eventType);
       gameEventStatement.Parameters.AddWithValue("event_index", gameEvent.eventIndex);
       gameEventStatement.Parameters.AddWithValue("inning", gameEvent.inning);
       gameEventStatement.Parameters.AddWithValue("top_of_inning", gameEvent.topOfInning);
@@ -292,7 +296,7 @@ namespace SIBR {
       gameEventStatement.Parameters.AddWithValue("is_leadoff", gameEvent.isLeadoff);
       gameEventStatement.Parameters.AddWithValue("is_pinch_hit", gameEvent.isPinchHit);
       gameEventStatement.Parameters.AddWithValue("lineup_position", gameEvent.lineupPosition);
-      gameEventStatement.Parameters.AddWithValue("is_last_event_for_plate_appearance", gameEvent.isLastEventForPlateAppearance);  
+      gameEventStatement.Parameters.AddWithValue("is_last_event_for_plate_appearance", gameEvent.isLastEventForPlateAppearance);
       gameEventStatement.Parameters.AddWithValue("bases_hit", gameEvent.basesHit);
       gameEventStatement.Parameters.AddWithValue("runs_batted_in", gameEvent.runsBattedIn);
       gameEventStatement.Parameters.AddWithValue("is_sacrifice_hit", gameEvent.isSacrificeHit);
@@ -311,8 +315,8 @@ namespace SIBR {
 
       return gameEventStatement;
     }
-    
-   private NpgsqlCommand PrepareGameEventBaseRunnerStatements(NpgsqlConnection psqlConnection, int gameEventId, GameEventBaseRunner baseRunnerEvent) {
+
+    private NpgsqlCommand PrepareGameEventBaseRunnerStatements(NpgsqlConnection psqlConnection, int gameEventId, GameEventBaseRunner baseRunnerEvent) {
       var baseRunnerStatement = new NpgsqlCommand(@"
         INSERT INTO game_event_base_runners(
           game_event_id,
@@ -347,7 +351,7 @@ namespace SIBR {
       return baseRunnerStatement;
     }
 
-   private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEvent playerEvent) {
+    private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEvent playerEvent) {
       var playerEventStatement = new NpgsqlCommand(@"
         INSERT INTO player_events(
           game_event_id,
@@ -367,7 +371,7 @@ namespace SIBR {
       return playerEventStatement;
     }
 
-   private NpgsqlCommand PersistLogRecord(NpgsqlConnection psqlConnection, string keyName) {
+    private NpgsqlCommand PersistLogRecord(NpgsqlConnection psqlConnection, string keyName) {
       var persistLogStatement = new NpgsqlCommand(@"
         INSERT INTO imported_logs(
           key,
@@ -383,5 +387,107 @@ namespace SIBR {
 
       return persistLogStatement;
     }
+
+    private NpgsqlCommand InsertGameCommand(NpgsqlConnection psqlConnection, Game game) {
+      var insertGameStatement = new NpgsqlCommand(@"
+            INSERT INTO game
+            (
+                game_id, day, season, home_odds, away_odds, weather, is_postseason, series_index, series_length,
+                home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame,
+                terminology_id, rules_id, statsheet_id
+            )
+            VALUES
+            (
+                @game_id, @day, @season, @home_odds, @away_odds, @weather, @is_postseason, @series_index, @series_length,
+                @home_team, @away_team, @home_score, @away_score, @number_of_innings, @ended_on_top_of_inning, @ended_in_shame,
+                @terminology_id, @rules_id, @statsheet_id
+            );
+            ", psqlConnection);
+
+      insertGameStatement.Parameters.AddWithValue("game_id", game.gameId);
+      insertGameStatement.Parameters.AddWithValue("day", game.day);
+      insertGameStatement.Parameters.AddWithValue("season", game.season);
+      insertGameStatement.Parameters.AddWithValue("home_odds", game.homeOdds);
+      insertGameStatement.Parameters.AddWithValue("away_odds", game.awayOdds);
+      insertGameStatement.Parameters.AddWithValue("weather", game.weather.HasValue ? game.weather.Value : -1);
+      insertGameStatement.Parameters.AddWithValue("is_postseason", game.isPostseason);
+      insertGameStatement.Parameters.AddWithValue("series_index", game.seriesIndex);
+      insertGameStatement.Parameters.AddWithValue("series_length", game.seriesLength);
+      insertGameStatement.Parameters.AddWithValue("home_team", game.homeTeam);
+      insertGameStatement.Parameters.AddWithValue("away_team", game.awayTeam);
+      insertGameStatement.Parameters.AddWithValue("home_score", game.homeScore);
+      insertGameStatement.Parameters.AddWithValue("away_score", game.awayScore);
+      insertGameStatement.Parameters.AddWithValue("number_of_innings", game.inning);
+      insertGameStatement.Parameters.AddWithValue("ended_on_top_of_inning", game.topOfInning);
+      insertGameStatement.Parameters.AddWithValue("ended_in_shame", game.shame);
+      insertGameStatement.Parameters.AddWithValue("terminology_id", game.terminology);
+      insertGameStatement.Parameters.AddWithValue("rules_id", game.rules);
+      insertGameStatement.Parameters.AddWithValue("statsheet_id", game.statsheet);
+
+      return insertGameStatement;
+    }
+
+    private async Task FetchGameList(NpgsqlConnection psqlConnection) {
+      int season = 0;
+      int day = 0;
+
+      using (var gamesCommand = new NpgsqlCommand(@"
+                SELECT MAX(season), MAX(day) from game
+                INNER JOIN (SELECT MAX(season) AS max_season FROM game) b ON b.max_season = game.season",
+          psqlConnection))
+      using (var reader = await gamesCommand.ExecuteReaderAsync()) {
+
+        while (await reader.ReadAsync()) {
+          if (!reader.IsDBNull(0))
+            season = reader.GetInt32(0);
+          if (!reader.IsDBNull(1))
+            day = reader.GetInt32(1);
+        }
+      }
+
+      Console.WriteLine($"Found games through season {season}, day {day}.");
+      day++;
+
+      HttpClient client = new HttpClient();
+      client.BaseAddress = new Uri("https://www.blaseball.com/database/");
+      client.DefaultRequestHeaders.Accept.Clear();
+      client.DefaultRequestHeaders.Accept.Add(
+          new MediaTypeWithQualityHeaderValue("application/json"));
+
+      JsonSerializerOptions options = new JsonSerializerOptions();
+      options.IgnoreNullValues = true;
+
+      while (true) {
+        HttpResponseMessage response = await client.GetAsync($"games?day={day}&season={season}");
+
+        if (response.IsSuccessStatusCode) {
+          string strResponse = await response.Content.ReadAsStringAsync();
+
+          var gameList = JsonSerializer.Deserialize<IEnumerable<Game>>(strResponse, options);
+
+
+          if (gameList == null || gameList.Count() == 0 || gameList.First().gameComplete == false) {
+            if (day > 0) {
+              // Ran out of finished games this season, try the next
+              season++;
+              day = 0;
+              continue;
+            } else {
+              // season X day 0 had no complete games, stop looping
+              break;
+            }
+          }
+
+          Console.WriteLine($"Inserting games from season {season}, day {day}...");
+          foreach (var game in gameList) {
+            var cmd = InsertGameCommand(psqlConnection, game);
+            await cmd.ExecuteNonQueryAsync();
+          }
+
+          day++;
+        }
+      }
+    }
   }
+
 }
