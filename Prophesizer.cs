@@ -34,8 +34,8 @@ namespace SIBR {
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
       await psqlConnection.OpenAsync();
 
-
-      await FetchGameList(psqlConnection);
+      // Populate the `game` table first
+      await PopulateGameTable(psqlConnection);
 
       var unprocessedLogs = await GetUnprocessedLogs(psqlConnection);
 
@@ -388,6 +388,9 @@ namespace SIBR {
       return persistLogStatement;
     }
 
+    /// <summary>
+    /// Generate a command for inserting a Game into the `game` table
+    /// </summary>
     private NpgsqlCommand InsertGameCommand(NpgsqlConnection psqlConnection, Game game) {
       var insertGameStatement = new NpgsqlCommand(@"
             INSERT INTO game
@@ -427,10 +430,14 @@ namespace SIBR {
       return insertGameStatement;
     }
 
-    private async Task FetchGameList(NpgsqlConnection psqlConnection) {
+    /// <summary>
+    /// Get any completed games from the Blaseball API and insert them in the `game` table
+    /// </summary>
+    private async Task PopulateGameTable(NpgsqlConnection psqlConnection) {
+      
+      // Find the latest day already stored in the DB
       int season = 0;
       int day = 0;
-
       using (var gamesCommand = new NpgsqlCommand(@"
                 SELECT MAX(season), MAX(day) from game
                 INNER JOIN (SELECT MAX(season) AS max_season FROM game) b ON b.max_season = game.season",
@@ -446,8 +453,10 @@ namespace SIBR {
       }
 
       Console.WriteLine($"Found games through season {season}, day {day}.");
+      // Start on the next day
       day++;
 
+      // Talk to the blaseball API
       HttpClient client = new HttpClient();
       client.BaseAddress = new Uri("https://www.blaseball.com/database/");
       client.DefaultRequestHeaders.Accept.Clear();
@@ -457,14 +466,15 @@ namespace SIBR {
       JsonSerializerOptions options = new JsonSerializerOptions();
       options.IgnoreNullValues = true;
 
+      // Loop until we break out
       while (true) {
+        // Get games for this season & day
         HttpResponseMessage response = await client.GetAsync($"games?day={day}&season={season}");
 
         if (response.IsSuccessStatusCode) {
+          
           string strResponse = await response.Content.ReadAsStringAsync();
-
           var gameList = JsonSerializer.Deserialize<IEnumerable<Game>>(strResponse, options);
-
 
           if (gameList == null || gameList.Count() == 0 || gameList.First().gameComplete == false) {
             if (day > 0) {
