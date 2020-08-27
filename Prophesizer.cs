@@ -496,6 +496,10 @@ namespace SIBR {
 
           day++;
         }
+        else {
+          Console.WriteLine($"Got response {response.StatusCode} from {response.RequestMessage.RequestUri}!");
+          return;
+        }
       }
     }
   }
