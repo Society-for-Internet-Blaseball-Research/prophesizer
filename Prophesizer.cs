@@ -46,6 +46,11 @@ namespace SIBR {
       processor.GameComplete += Processor_GameComplete;
       foreach (S3Object logObject in unprocessedLogs) {
         await FetchAndProcessObject(logObject.Key, psqlConnection);
+
+        using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
+          await logStatement.ExecuteNonQueryAsync();
+        }
+
         Console.WriteLine($"Found {gamesToInsert.Count} games to insert.");
         while (gamesToInsert.Count > 0) {
           var gameEvents = gamesToInsert.Dequeue();
@@ -150,10 +155,6 @@ namespace SIBR {
 
         foreach (var gameEvent in gameEvents) {
           await PersistGame(psqlConnection, gameEvent);
-        }
-
-        using (var logStatement = PersistLogRecord(psqlConnection, keyName)) {
-          await logStatement.ExecuteNonQueryAsync();
         }
 
         transaction.Commit();
