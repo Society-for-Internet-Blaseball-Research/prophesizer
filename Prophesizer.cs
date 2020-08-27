@@ -55,6 +55,7 @@ namespace SIBR {
         while (gamesToInsert.Count > 0) {
           var gameEvents = gamesToInsert.Dequeue();
           await PersistGameEvents(logObject.Key, gameEvents, psqlConnection);
+          await PersistTimeMap(gameEvents, psqlConnection);
         }
       }
       processor.GameComplete -= Processor_GameComplete;
@@ -274,7 +275,7 @@ namespace SIBR {
         ) RETURNING id;
       ", psqlConnection);
 
-      gameEventStatement.Parameters.AddWithValue("perceived_at", DateTime.UtcNow); // todo
+      gameEventStatement.Parameters.AddWithValue("perceived_at", gameEvent.firstPerceivedAt);
       gameEventStatement.Parameters.AddWithValue("game_id", gameEvent.gameId);
       gameEventStatement.Parameters.AddWithValue("event_type", gameEvent.eventType);
       gameEventStatement.Parameters.AddWithValue("event_index", gameEvent.eventIndex);
@@ -389,12 +390,33 @@ namespace SIBR {
       return persistLogStatement;
     }
 
+    private async Task PersistTimeMap(IEnumerable<GameEvent> events, NpgsqlConnection psqlConnection) {
+
+      foreach(var e in events) {
+
+        // Record the first time seen for each season and day
+        var updateTimeMap = new NpgsqlCommand(@"
+        insert into time_map values(@season, @day, @first_time)
+        on conflict (season, day)  do
+        update set first_time = EXCLUDED.first_time
+        where time_map.first_time > EXCLUDED.first_time;
+        ", psqlConnection);
+
+        updateTimeMap.Parameters.AddWithValue("season", e.season);
+        updateTimeMap.Parameters.AddWithValue("day", e.day);
+        updateTimeMap.Parameters.AddWithValue("first_time", e.firstPerceivedAt);
+
+        await updateTimeMap.ExecuteNonQueryAsync();
+      }
+
+    }
+
     /// <summary>
     /// Generate a command for inserting a Game into the `game` table
     /// </summary>
     private NpgsqlCommand InsertGameCommand(NpgsqlConnection psqlConnection, Game game) {
       var insertGameStatement = new NpgsqlCommand(@"
-            INSERT INTO game
+            INSERT INTO games
             (
                 game_id, day, season, home_odds, away_odds, weather, is_postseason, series_index, series_length,
                 home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame,
@@ -440,8 +462,8 @@ namespace SIBR {
       int season = 0;
       int day = 0;
       using (var gamesCommand = new NpgsqlCommand(@"
-                SELECT MAX(season), MAX(day) from game
-                INNER JOIN (SELECT MAX(season) AS max_season FROM game) b ON b.max_season = game.season",
+                SELECT MAX(season), MAX(day) from games
+                INNER JOIN (SELECT MAX(season) AS max_season FROM games) b ON b.max_season = games.season",
           psqlConnection))
       using (var reader = await gamesCommand.ExecuteReaderAsync()) {
 
