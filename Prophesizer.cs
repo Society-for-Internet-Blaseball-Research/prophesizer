@@ -10,6 +10,8 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -441,7 +443,7 @@ namespace SIBR {
           decompressionStream.CopyTo(decompressedStream);
           decompressedStream.Seek(0, SeekOrigin.Begin);
 
-          
+
           using (StreamReader reader = new StreamReader(decompressedStream)) {
             while (!reader.EndOfStream) {
               string json = reader.ReadLine();
@@ -466,6 +468,29 @@ namespace SIBR {
         Console.WriteLine(e.StackTrace);
         return;
       }
+}
+
+    private void ProcessPlayers(HourlyArchive hourly, DateTime timestamp, NpgsqlConnection psqlConnection) {
+      string text = ((JsonElement)hourly.Data).GetRawText();
+
+      IEnumerable<string> playerIds = hourly.Params["ids"];
+
+
+    }
+
+    private Guid HashTeam(HashAlgorithm hashAlgorithm, Team team) {
+      StringBuilder sb = new StringBuilder();
+      sb.Append(team.Id);
+      sb.Append(team.Location);
+      sb.Append(team.Nickname);
+      sb.Append(team.FullName);
+      // ADD MORE FIELDS HERE
+      
+      // Convert the input string to a byte array and compute the hash.
+      byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
+
+      return new Guid(data);
+
     }
 
     private void ProcessAllTeams(JsonElement teamResponse, DateTime timestamp, NpgsqlConnection psqlConnection) {
@@ -473,40 +498,42 @@ namespace SIBR {
 
       var teams = JsonSerializer.Deserialize<IEnumerable<Team>>(text, serializerOptions);
 
-      foreach(var t in teams) {
-        NpgsqlCommand cmd = new NpgsqlCommand(@"select team_id, location, nickname, full_name from teams where team_id = @team_id and valid_until is null", psqlConnection);
-        cmd.Parameters.AddWithValue("team_id", t.Id);
-        bool needsUpdate = true;
-        using (var reader = cmd.ExecuteReader()) {
-          while(reader.Read()) {
-            string teamId = reader.GetString(0);
-            string location = reader.GetString(1);
-            string nickname = reader.GetString(2);
-            string fullName = reader.GetString(3);
-            // TODO other columns :/
+      using (MD5 md5 = MD5.Create()) {
 
-            if(teamId == t.Id && location == t.Location && nickname == t.Nickname && fullName == t.FullName) {
-              // no update needed!
-              needsUpdate = false;
-            }
+        foreach (var t in teams) {
+
+          var hash = HashTeam(md5, t);
+          NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from teams where hash=@hash and valid_until is null", psqlConnection);
+          cmd.Parameters.AddWithValue("hash", hash);
+          var count = (long)cmd.ExecuteScalar();
+
+          if(count == 1) {
+            // Record exists
           }
-        }
+          else {
+            // Update the old record
+            NpgsqlCommand update = new NpgsqlCommand(@"update teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
+            update.Parameters.AddWithValue("timestamp", timestamp);
+            update.Parameters.AddWithValue("team_id", t.Id);
+            int rows = update.ExecuteNonQuery();
+            if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
-        if(needsUpdate) {
-          NpgsqlCommand update = new NpgsqlCommand(@"update teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
-          update.Parameters.AddWithValue("timestamp", timestamp);
-          update.Parameters.AddWithValue("team_id", t.Id);
+            // Try to insert our current data
+            NpgsqlCommand insert = new NpgsqlCommand(@"
+              insert into teams(team_id, location, nickname, full_name, hash, valid_until) 
+              values(@team_id, @location, @nickname, @full_name, @hash, null) 
+              ", psqlConnection);
+            insert.Parameters.AddWithValue("team_id", t.Id);
+            insert.Parameters.AddWithValue("location", t.Location);
+            insert.Parameters.AddWithValue("nickname", t.Nickname);
+            insert.Parameters.AddWithValue("full_name", t.FullName);
+            insert.Parameters.AddWithValue("hash", hash);
+            rows = insert.ExecuteNonQuery();
+            if (rows != 1) throw new InvalidOperationException($"Couldn't insert team data with hash {hash}");
 
-          int rows = update.ExecuteNonQuery();
-          if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+          }
 
-          NpgsqlCommand insert = new NpgsqlCommand(@"insert into teams(team_id, location, nickname, full_name, valid_until) values(@team_id, @location, @nickname, @full_name, null)", psqlConnection);
-          insert.Parameters.AddWithValue("team_id", t.Id);
-          insert.Parameters.AddWithValue("location", t.Location);
-          insert.Parameters.AddWithValue("nickname", t.Nickname);
-          insert.Parameters.AddWithValue("full_name", t.FullName);
-          rows = insert.ExecuteNonQuery();
-          if (rows != 1) throw new InvalidOperationException($"Tried to insert a new team row but got {rows} rows affected!");
+
         }
       }
     }
