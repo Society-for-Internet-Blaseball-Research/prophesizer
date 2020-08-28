@@ -451,6 +451,7 @@ namespace SIBR {
 
               switch (hourly.Endpoint) {
                 case "players":
+                  ProcessPlayers(hourly, psqlConnection);
                   break;
                 case "allTeams":
                   ProcessAllTeams((JsonElement)hourly.Data, hourly?.ClientMeta?.timestamp ?? DateTime.UtcNow, psqlConnection);
@@ -468,14 +469,62 @@ namespace SIBR {
         Console.WriteLine(e.StackTrace);
         return;
       }
-}
+    }
 
-    private void ProcessPlayers(HourlyArchive hourly, DateTime timestamp, NpgsqlConnection psqlConnection) {
+    private Guid HashPlayer(HashAlgorithm hashAlgorithm, Player player) {
+      StringBuilder sb = new StringBuilder();
+      sb.Append(player.Id);
+      sb.Append(player.Name);
+      sb.Append(player.Deceased ? '1' : '0');
+      // ADD MORE FIELDS HERE
+
+      // Convert the input string to a byte array and compute the hash.
+      byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
+
+      return new Guid(data);
+    }
+
+    private void ProcessPlayers(HourlyArchive hourly, NpgsqlConnection psqlConnection) {
       string text = ((JsonElement)hourly.Data).GetRawText();
 
       IEnumerable<string> playerIds = hourly.Params["ids"];
 
+      using (MD5 md5 = MD5.Create()) {
 
+        var playerList = JsonSerializer.Deserialize<IEnumerable<Player>>(text, serializerOptions);
+
+        foreach(var p in playerList) {
+          var hash = HashPlayer(md5, p);
+
+          NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from players where hash=@hash and valid_until is null", psqlConnection);
+          cmd.Parameters.AddWithValue("hash", hash);
+          var count = (long)cmd.ExecuteScalar();
+
+          if (count == 1) {
+            // Record exists
+          } else {
+            // Update the old record
+            NpgsqlCommand update = new NpgsqlCommand(@"update players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
+            update.Parameters.AddWithValue("timestamp", hourly?.ClientMeta?.timestamp ?? DateTime.UtcNow);
+            update.Parameters.AddWithValue("player_id", p.Id);
+            int rows = update.ExecuteNonQuery();
+            if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+            // Try to insert our current data
+            NpgsqlCommand insert = new NpgsqlCommand(@"
+              insert into players(player_id, player_name, deceased, hash, valid_until) 
+              values(@player_id, @player_name, @deceased, @hash, null) 
+              ", psqlConnection);
+            insert.Parameters.AddWithValue("player_id", p.Id);
+            insert.Parameters.AddWithValue("player_name", p.Name);
+            insert.Parameters.AddWithValue("deceased", p.Deceased);
+            insert.Parameters.AddWithValue("hash", hash);
+            rows = insert.ExecuteNonQuery();
+            if (rows != 1) throw new InvalidOperationException($"Couldn't insert player data with hash {hash}");
+
+          }
+        }
+      }
     }
 
     private Guid HashTeam(HashAlgorithm hashAlgorithm, Team team) {

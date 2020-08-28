@@ -18,9 +18,13 @@ public class ClientMeta {
 }
 
 public class Player {
-  [JsonPropertyName("_id")]
-  public string Id { get; set; }
+  public string _id { get; set; }
+  public string id { get; set; }
+
+  [JsonIgnore]
+  public string Id => _id ?? id;
   public string Name { get; set; }
+  public bool Deceased { get; set; }
 
   //TODO: attrs
 }
