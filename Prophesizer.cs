@@ -14,6 +14,17 @@ using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace SIBR {
+
+  class Logs {
+    public List<S3Object> updateLogs { get; set; }
+    public List<S3Object> hourlyLogs { get; set; }
+
+    public Logs() {
+      updateLogs = new List<S3Object>();
+      hourlyLogs = new List<S3Object>();
+    }
+  }
+
   class Prophesizer {
     private static readonly RegionEndpoint bucketRegion = RegionEndpoint.USWest2;
 
@@ -23,11 +34,18 @@ namespace SIBR {
     private Processor processor;
     private Queue<IEnumerable<GameEvent>> gamesToInsert;
 
+    private JsonSerializerOptions serializerOptions;
+
     public Prophesizer(string bucketName) {
       this.bucketName = bucketName;
       this.client = new AmazonS3Client(Environment.GetEnvironmentVariable("AWS_KEY"), Environment.GetEnvironmentVariable("AWS_SECRET"), bucketRegion);
       processor = new Processor();
       gamesToInsert = new Queue<IEnumerable<GameEvent>>();
+
+      serializerOptions = new JsonSerializerOptions();
+      serializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+      serializerOptions.PropertyNameCaseInsensitive = true;
+
     }
 
     public async Task Poll() {
@@ -39,12 +57,19 @@ namespace SIBR {
 
       var unprocessedLogs = await GetUnprocessedLogs(psqlConnection);
 
-      Console.WriteLine($"Found {unprocessedLogs.Count()} unprocessed log(s).");
+      Console.WriteLine($"Found {unprocessedLogs.updateLogs.Count()} unprocessed game update log(s).");
+      Console.WriteLine($"Found {unprocessedLogs.hourlyLogs.Count()} unprocessed hourly log(s).");
 
-      long totalEvents = 0;
+      foreach (S3Object logObject in unprocessedLogs.hourlyLogs) {
+        await FetchAndProcessHourly(logObject.Key, psqlConnection);
+
+        using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
+          await logStatement.ExecuteNonQueryAsync();
+        }
+      }
 
       processor.GameComplete += Processor_GameComplete;
-      foreach (S3Object logObject in unprocessedLogs) {
+      foreach (S3Object logObject in unprocessedLogs.updateLogs) {
         await FetchAndProcessObject(logObject.Key, psqlConnection);
 
         using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
@@ -60,7 +85,7 @@ namespace SIBR {
       }
       processor.GameComplete -= Processor_GameComplete;
 
-      Console.WriteLine($"Finished poll at {DateTime.UtcNow.ToString()} UTC - inserted {totalEvents} event(s).");
+      Console.WriteLine($"Finished poll at {DateTime.UtcNow.ToString()} UTC.");
     }
 
     private void Processor_GameComplete(object sender, GameCompleteEventArgs e) {
@@ -68,10 +93,10 @@ namespace SIBR {
     }
 
 
-    private async Task<IEnumerable<S3Object>> GetUnprocessedLogs(NpgsqlConnection psqlConnection) {
+    private async Task<Logs> GetUnprocessedLogs(NpgsqlConnection psqlConnection) {
       Console.WriteLine("Fetching bucket keys...");
 
-      List<S3Object> allLogs = new List<S3Object>();
+      Logs logs = new Logs();
 
       try {
         ListObjectsRequest request = new ListObjectsRequest {
@@ -82,7 +107,8 @@ namespace SIBR {
         do {
           ListObjectsResponse response = await client.ListObjectsAsync(request);
 
-          allLogs.AddRange(response.S3Objects.Where(item => item.Key.StartsWith("blaseball-log-")));
+          logs.updateLogs.AddRange(response.S3Objects.Where(item => item.Key.StartsWith("blaseball-log-")));
+          logs.hourlyLogs.AddRange(response.S3Objects.Where(item => item.Key.StartsWith("compressed-hourly/blaseball-hourly-")));
 
           if (response.IsTruncated) {
             request.Marker = response.NextMarker;
@@ -106,7 +132,9 @@ namespace SIBR {
           processedLogs.Add(reader.GetString(0));
         }
 
-        return allLogs.Where(log => !processedLogs.Contains(log.Key));
+        logs.updateLogs = logs.updateLogs.Where(log => !processedLogs.Contains(log.Key)).ToList();
+        logs.hourlyLogs = logs.hourlyLogs.Where(log => !processedLogs.Contains(log.Key)).ToList();
+        return logs;
       }
     }
 
@@ -389,6 +417,101 @@ namespace SIBR {
 
       return persistLogStatement;
     }
+
+    private async Task FetchAndProcessHourly(string keyName, NpgsqlConnection psqlConnection) {
+      GetObjectRequest request = new GetObjectRequest {
+        BucketName = bucketName,
+        Key = keyName
+      };
+
+      using (GetObjectResponse response = await client.GetObjectAsync(request))
+      using (Stream responseStream = response.ResponseStream) {
+        Console.WriteLine($"Processing document (Key: {keyName}, Length: {response.ContentLength})...");
+
+        ProcessHourly(keyName, responseStream, psqlConnection);
+
+        return;
+      }
+    }
+
+    private void ProcessHourly(string keyName, Stream responseStream, NpgsqlConnection psqlConnection) {
+      try {
+        using (GZipStream decompressionStream = new GZipStream(responseStream, CompressionMode.Decompress))
+        using (MemoryStream decompressedStream = new MemoryStream()) {
+          decompressionStream.CopyTo(decompressedStream);
+          decompressedStream.Seek(0, SeekOrigin.Begin);
+
+          
+          using (StreamReader reader = new StreamReader(decompressedStream)) {
+            while (!reader.EndOfStream) {
+              string json = reader.ReadLine();
+              var hourly = JsonSerializer.Deserialize<HourlyArchive>(json, serializerOptions);
+
+              switch (hourly.Endpoint) {
+                case "players":
+                  break;
+                case "allTeams":
+                  ProcessAllTeams((JsonElement)hourly.Data, hourly?.ClientMeta?.timestamp ?? DateTime.UtcNow, psqlConnection);
+                  break;
+                case "offseasonSetup":
+                  break;
+                case "globalEvents":
+                  break;
+              }
+            }
+          }
+        }
+      } catch (Exception e) {
+        Console.WriteLine($"Failed to process {keyName}: {e.Message}");
+        Console.WriteLine(e.StackTrace);
+        return;
+      }
+    }
+
+    private void ProcessAllTeams(JsonElement teamResponse, DateTime timestamp, NpgsqlConnection psqlConnection) {
+      string text = teamResponse.GetRawText();
+
+      var teams = JsonSerializer.Deserialize<IEnumerable<Team>>(text, serializerOptions);
+
+      foreach(var t in teams) {
+        NpgsqlCommand cmd = new NpgsqlCommand(@"select team_id, location, nickname, full_name from teams where team_id = @team_id and valid_until is null", psqlConnection);
+        cmd.Parameters.AddWithValue("team_id", t.Id);
+        bool needsUpdate = true;
+        using (var reader = cmd.ExecuteReader()) {
+          while(reader.Read()) {
+            string teamId = reader.GetString(0);
+            string location = reader.GetString(1);
+            string nickname = reader.GetString(2);
+            string fullName = reader.GetString(3);
+            // TODO other columns :/
+
+            if(teamId == t.Id && location == t.Location && nickname == t.Nickname && fullName == t.FullName) {
+              // no update needed!
+              needsUpdate = false;
+            }
+          }
+        }
+
+        if(needsUpdate) {
+          NpgsqlCommand update = new NpgsqlCommand(@"update teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
+          update.Parameters.AddWithValue("timestamp", timestamp);
+          update.Parameters.AddWithValue("team_id", t.Id);
+
+          int rows = update.ExecuteNonQuery();
+          if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+          NpgsqlCommand insert = new NpgsqlCommand(@"insert into teams(team_id, location, nickname, full_name, valid_until) values(@team_id, @location, @nickname, @full_name, null)", psqlConnection);
+          insert.Parameters.AddWithValue("team_id", t.Id);
+          insert.Parameters.AddWithValue("location", t.Location);
+          insert.Parameters.AddWithValue("nickname", t.Nickname);
+          insert.Parameters.AddWithValue("full_name", t.FullName);
+          rows = insert.ExecuteNonQuery();
+          if (rows != 1) throw new InvalidOperationException($"Tried to insert a new team row but got {rows} rows affected!");
+        }
+      }
+    }
+
+   
 
     private async Task PersistTimeMap(IEnumerable<GameEvent> events, NpgsqlConnection psqlConnection) {
 
