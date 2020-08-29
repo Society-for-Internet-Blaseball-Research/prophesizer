@@ -182,8 +182,6 @@ namespace SIBR {
       var transaction = psqlConnection.BeginTransaction();
 
       try {
-        Console.WriteLine("Persisting game events...");
-
         foreach (var gameEvent in gameEvents) {
           await PersistGame(psqlConnection, gameEvent);
         }
@@ -221,166 +219,11 @@ namespace SIBR {
     }
 
     private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent) {
-      var gameEventStatement = new NpgsqlCommand(@"
-        INSERT INTO game_events(
-          perceived_at,
-          game_id,
-          event_type,
-          event_index,
-          inning,
-          top_of_inning,
-          outs_before_play,
-          batter_id,
-          batter_team_id,
-          pitcher_id,
-          pitcher_team_id,
-          home_score,
-          away_score,
-          home_strike_count,
-          away_strike_count,
-          batter_count,
-          pitches,
-          total_strikes,
-          total_balls,
-          total_fouls,
-          is_leadoff,
-          is_pinch_hit,
-          lineup_position,
-          is_last_event_for_plate_appearance,
-          bases_hit,
-          runs_batted_in,
-          is_sacrifice_hit,
-          is_sacrifice_fly,
-          outs_on_play,
-          is_double_play,
-          is_triple_play,
-          is_wild_pitch,
-          batted_ball_type,
-          is_bunt,
-          errors_on_play,
-          batter_base_after_play,
-          is_last_game_event,
-          event_text,
-          additional_context
-        ) VALUES (
-          @perceived_at,
-          @game_id,
-          @event_type,
-          @event_index,
-          @inning,
-          @top_of_inning,
-          @outs_before_play,
-          @batter_id,
-          @batter_team_id,
-          @pitcher_id,
-          @pitcher_team_id,
-          @home_score,
-          @away_score,
-          @home_strike_count,
-          @away_strike_count,
-          @batter_count,
-          @pitches,
-          @total_strikes,
-          @total_balls,
-          @total_fouls,
-          @is_leadoff,
-          @is_pinch_hit,
-          @lineup_position,
-          @is_last_event_for_plate_appearance,
-          @bases_hit,
-          @runs_batted_in,
-          @is_sacrifice_hit,
-          @is_sacrifice_fly,
-          @outs_on_play,
-          @is_double_play,
-          @is_triple_play,
-          @is_wild_pitch,
-          @batted_ball_type,
-          @is_bunt,
-          @errors_on_play,
-          @batter_base_after_play,
-          @is_last_game_event,
-          @event_text,
-          @additional_context
-        ) RETURNING id;
-      ", psqlConnection);
-
-      gameEventStatement.Parameters.AddWithValue("perceived_at", gameEvent.firstPerceivedAt);
-      gameEventStatement.Parameters.AddWithValue("game_id", gameEvent.gameId);
-      gameEventStatement.Parameters.AddWithValue("event_type", gameEvent.eventType);
-      gameEventStatement.Parameters.AddWithValue("event_index", gameEvent.eventIndex);
-      gameEventStatement.Parameters.AddWithValue("inning", gameEvent.inning);
-      gameEventStatement.Parameters.AddWithValue("top_of_inning", gameEvent.topOfInning);
-      gameEventStatement.Parameters.AddWithValue("outs_before_play", gameEvent.outsBeforePlay);
-      gameEventStatement.Parameters.AddWithValue("batter_id", gameEvent.batterId ?? "UNKNOWN");
-      gameEventStatement.Parameters.AddWithValue("batter_team_id", gameEvent.batterTeamId);
-      gameEventStatement.Parameters.AddWithValue("pitcher_id", gameEvent.pitcherId);
-      gameEventStatement.Parameters.AddWithValue("pitcher_team_id", gameEvent.pitcherTeamId);
-      gameEventStatement.Parameters.AddWithValue("home_score", gameEvent.homeScore);
-      gameEventStatement.Parameters.AddWithValue("away_score", gameEvent.awayScore);
-      gameEventStatement.Parameters.AddWithValue("home_strike_count", gameEvent.homeStrikeCount);
-      gameEventStatement.Parameters.AddWithValue("away_strike_count", gameEvent.awayStrikeCount);
-      gameEventStatement.Parameters.AddWithValue("batter_count", gameEvent.batterCount);
-      gameEventStatement.Parameters.AddWithValue("pitches", gameEvent.pitchesList);
-      gameEventStatement.Parameters.AddWithValue("total_strikes", gameEvent.totalStrikes);
-      gameEventStatement.Parameters.AddWithValue("total_balls", gameEvent.totalBalls);
-      gameEventStatement.Parameters.AddWithValue("total_fouls", gameEvent.totalFouls);
-      gameEventStatement.Parameters.AddWithValue("is_leadoff", gameEvent.isLeadoff);
-      gameEventStatement.Parameters.AddWithValue("is_pinch_hit", gameEvent.isPinchHit);
-      gameEventStatement.Parameters.AddWithValue("lineup_position", gameEvent.lineupPosition);
-      gameEventStatement.Parameters.AddWithValue("is_last_event_for_plate_appearance", gameEvent.isLastEventForPlateAppearance);
-      gameEventStatement.Parameters.AddWithValue("bases_hit", gameEvent.basesHit);
-      gameEventStatement.Parameters.AddWithValue("runs_batted_in", gameEvent.runsBattedIn);
-      gameEventStatement.Parameters.AddWithValue("is_sacrifice_hit", gameEvent.isSacrificeHit);
-      gameEventStatement.Parameters.AddWithValue("is_sacrifice_fly", gameEvent.isSacrificeFly);
-      gameEventStatement.Parameters.AddWithValue("outs_on_play", gameEvent.outsOnPlay);
-      gameEventStatement.Parameters.AddWithValue("is_double_play", gameEvent.isDoublePlay);
-      gameEventStatement.Parameters.AddWithValue("is_triple_play", gameEvent.isTriplePlay);
-      gameEventStatement.Parameters.AddWithValue("is_wild_pitch", gameEvent.isWildPitch);
-      gameEventStatement.Parameters.AddWithValue("batted_ball_type", gameEvent.battedBallType ?? "");
-      gameEventStatement.Parameters.AddWithValue("is_bunt", gameEvent.isBunt);
-      gameEventStatement.Parameters.AddWithValue("errors_on_play", gameEvent.errorsOnPlay);
-      gameEventStatement.Parameters.AddWithValue("batter_base_after_play", gameEvent.batterBaseAfterPlay);
-      gameEventStatement.Parameters.AddWithValue("is_last_game_event", gameEvent.isLastGameEvent);
-      gameEventStatement.Parameters.AddWithValue("event_text", gameEvent.eventText);
-      gameEventStatement.Parameters.AddWithValue("additional_context", gameEvent.additionalContext ?? "");
-
-      return gameEventStatement;
+      return new InsertCommand(psqlConnection, "game_events", gameEvent).Command;
     }
 
     private NpgsqlCommand PrepareGameEventBaseRunnerStatements(NpgsqlConnection psqlConnection, int gameEventId, GameEventBaseRunner baseRunnerEvent) {
-      var baseRunnerStatement = new NpgsqlCommand(@"
-        INSERT INTO game_event_base_runners(
-          game_event_id,
-          runner_id,
-          responsible_pitcher_id,
-          base_before_play,
-          base_after_play,
-          was_base_stolen,
-          was_caught_stealing,
-          was_picked_off
-        ) VALUES (
-          @game_event_id,
-          @runner_id,
-          @responsible_pitcher_id,
-          @base_before_play,
-          @base_after_play,
-          @was_base_stolen,
-          @was_caught_stealing,
-          @was_picked_off
-        );
-      ", psqlConnection);
-
-      baseRunnerStatement.Parameters.AddWithValue("game_event_id", gameEventId);
-      baseRunnerStatement.Parameters.AddWithValue("runner_id", baseRunnerEvent.runnerId ?? "UNKNOWN");
-      baseRunnerStatement.Parameters.AddWithValue("responsible_pitcher_id", baseRunnerEvent.responsiblePitcherId ?? "UNKNOWN");
-      baseRunnerStatement.Parameters.AddWithValue("base_before_play", baseRunnerEvent.baseBeforePlay);
-      baseRunnerStatement.Parameters.AddWithValue("base_after_play", baseRunnerEvent.baseAfterPlay);
-      baseRunnerStatement.Parameters.AddWithValue("was_base_stolen", baseRunnerEvent.wasBaseStolen);
-      baseRunnerStatement.Parameters.AddWithValue("was_caught_stealing", baseRunnerEvent.wasCaughtStealing);
-      baseRunnerStatement.Parameters.AddWithValue("was_picked_off", baseRunnerEvent.wasPickedOff);
-
-      return baseRunnerStatement;
+      return new InsertCommand(psqlConnection, "game_event_base_runners", baseRunnerEvent).Command;
     }
 
     private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEvent playerEvent) {
@@ -494,10 +337,11 @@ namespace SIBR {
         var playerList = JsonSerializer.Deserialize<IEnumerable<Player>>(text, serializerOptions);
 
         foreach(var p in playerList) {
-          var hash = HashPlayer(md5, p);
+          // TODO move hashing into Player
+          p.Hash = HashPlayer(md5, p);
 
           NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from players where hash=@hash and valid_until is null", psqlConnection);
-          cmd.Parameters.AddWithValue("hash", hash);
+          cmd.Parameters.AddWithValue("hash", p.Hash);
           var count = (long)cmd.ExecuteScalar();
 
           if (count == 1) {
@@ -511,16 +355,8 @@ namespace SIBR {
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
             // Try to insert our current data
-            NpgsqlCommand insert = new NpgsqlCommand(@"
-              insert into players(player_id, player_name, deceased, hash, valid_until) 
-              values(@player_id, @player_name, @deceased, @hash, null) 
-              ", psqlConnection);
-            insert.Parameters.AddWithValue("player_id", p.Id);
-            insert.Parameters.AddWithValue("player_name", p.Name);
-            insert.Parameters.AddWithValue("deceased", p.Deceased);
-            insert.Parameters.AddWithValue("hash", hash);
-            rows = insert.ExecuteNonQuery();
-            if (rows != 1) throw new InvalidOperationException($"Couldn't insert player data with hash {hash}");
+            InsertCommand insertCmd = new InsertCommand(psqlConnection, "players", p);
+            var newId = insertCmd.Command.ExecuteNonQuery();
 
           }
         }
@@ -568,17 +404,8 @@ namespace SIBR {
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
             // Try to insert our current data
-            NpgsqlCommand insert = new NpgsqlCommand(@"
-              insert into teams(team_id, location, nickname, full_name, hash, valid_until) 
-              values(@team_id, @location, @nickname, @full_name, @hash, null) 
-              ", psqlConnection);
-            insert.Parameters.AddWithValue("team_id", t.Id);
-            insert.Parameters.AddWithValue("location", t.Location);
-            insert.Parameters.AddWithValue("nickname", t.Nickname);
-            insert.Parameters.AddWithValue("full_name", t.FullName);
-            insert.Parameters.AddWithValue("hash", hash);
-            rows = insert.ExecuteNonQuery();
-            if (rows != 1) throw new InvalidOperationException($"Couldn't insert team data with hash {hash}");
+            InsertCommand insertCmd = new InsertCommand(psqlConnection, "teams", t);
+            var newId = insertCmd.Command.ExecuteNonQuery();
 
           }
 
@@ -688,8 +515,12 @@ namespace SIBR {
       JsonSerializerOptions options = new JsonSerializerOptions();
       options.IgnoreNullValues = true;
 
+      // Required because of busted /games entries starting at S3 day 79 - they're showing incomplete
+      int maxSeason = 4;
+
       // Loop until we break out
-      while (true) {
+      // TEMP: or until maxSeason
+      while (season < maxSeason) {
         // Get games for this season & day
         HttpResponseMessage response = await client.GetAsync($"games?day={day}&season={season}");
 
@@ -698,7 +529,7 @@ namespace SIBR {
           string strResponse = await response.Content.ReadAsStringAsync();
           var gameList = JsonSerializer.Deserialize<IEnumerable<Game>>(strResponse, options);
 
-          if (gameList == null || gameList.Count() == 0 || gameList.First().gameComplete == false) {
+          if (gameList == null || gameList.Count() == 0 ) {//|| gameList.First().gameComplete == false) {
             if (day > 0) {
               // Ran out of finished games this season, try the next
               season++;
@@ -706,7 +537,7 @@ namespace SIBR {
               continue;
             } else {
               // season X day 0 had no complete games, stop looping
-              break;
+              //break;
             }
           }
 

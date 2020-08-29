@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json.Serialization;
+using Cauldron.Serializable;
 
 public class ClientMeta {
   [JsonConverter(typeof(TimestampConverter))]
@@ -18,27 +19,40 @@ public class ClientMeta {
 }
 
 public class Player {
+  [DbIgnore]
   public string _id { get; set; }
+  [DbIgnore]
   public string id { get; set; }
 
   [JsonIgnore]
+  [DbAlias("player_id")]
   public string Id => _id ?? id;
+  
+  [DbAlias("player_name")]
   public string Name { get; set; }
   public bool Deceased { get; set; }
 
+  public Guid Hash { get; set; }
   //TODO: attrs
 }
    
 public class Team {
-
+  [DbIgnore]
   public string _id { get; set; }
+  [DbIgnore]
   public string id { get; set; }
 
   [JsonIgnore]
+  [DbAlias("team_id")]
   public string Id => _id ?? id;
+  public Guid Hash { get; set; }
+  [DbIgnore]
   public IEnumerable<string> Lineup { get; set; }
+  [DbIgnore]
   public IEnumerable<string> Rotation { get; set; }
+  [DbIgnore]
   public IEnumerable<string> Bullpen { get; set; }
+  [DbIgnore]
   public IEnumerable<string> Bench { get; set; }
 
   public string Location { get; set; }
