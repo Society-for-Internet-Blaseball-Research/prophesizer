@@ -387,9 +387,9 @@ namespace SIBR {
 
         foreach (var t in teams) {
 
-          var hash = HashTeam(md5, t);
+          t.Hash = HashTeam(md5, t);
           NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from teams where hash=@hash and valid_until is null", psqlConnection);
-          cmd.Parameters.AddWithValue("hash", hash);
+          cmd.Parameters.AddWithValue("hash", t.Hash);
           var count = (long)cmd.ExecuteScalar();
 
           if(count == 1) {
