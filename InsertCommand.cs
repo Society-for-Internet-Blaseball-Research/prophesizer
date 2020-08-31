@@ -18,9 +18,9 @@ internal class InsertCommand {
   /// <param name="connection">SQL connection</param>
   /// <param name="tableName">Name of table to insert into</param>
   /// <param name="obj">Object to insert</param>
-  public InsertCommand(NpgsqlConnection connection, string tableName, object obj) {
+  public InsertCommand(NpgsqlConnection connection, string tableName, object obj, Dictionary<string, object> extraFields = null) {
     m_command = new NpgsqlCommand();
-    Populate(tableName, obj);
+    Populate(tableName, obj, extraFields);
     m_command.Connection = connection;
   }
 
@@ -29,7 +29,7 @@ internal class InsertCommand {
   /// </summary>
   /// <param name="tableName">Name of table to insert into</param>
   /// <param name="obj">Object to insert</param>
-  private void Populate(string tableName, object obj) {
+  private void Populate(string tableName, object obj, Dictionary<string, object> extraFields) {
 
     StringBuilder query = new StringBuilder();
     query.Append($"INSERT INTO {tableName}(\n");
@@ -68,6 +68,15 @@ internal class InsertCommand {
         }
 
         m_command.Parameters.AddWithValue(colName, value);
+      }
+    }
+
+    if (extraFields != null) {
+      foreach (var field in extraFields) {
+        colText.Append($"{field.Key},\n");
+        varText.Append($"@{field.Key},\n");
+
+        m_command.Parameters.AddWithValue(field.Key, field.Value);
       }
     }
 
