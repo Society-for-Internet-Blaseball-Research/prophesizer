@@ -507,12 +507,8 @@ namespace SIBR {
       JsonSerializerOptions options = new JsonSerializerOptions();
       options.IgnoreNullValues = true;
 
-      // Required because of busted /games entries starting at S3 day 79 - they're showing incomplete
-      int maxSeason = 4;
-
       // Loop until we break out
-      // TEMP: or until maxSeason
-      while (season < maxSeason) {
+      while (true) {
         // Get games for this season & day
         HttpResponseMessage response = await client.GetAsync($"games?day={day}&season={season}");
 
@@ -529,7 +525,7 @@ namespace SIBR {
               continue;
             } else {
               // season X day 0 had no complete games, stop looping
-              //break;
+              break;
             }
           }
 
