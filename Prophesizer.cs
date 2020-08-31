@@ -223,27 +223,15 @@ namespace SIBR {
     }
 
     private NpgsqlCommand PrepareGameEventBaseRunnerStatements(NpgsqlConnection psqlConnection, int gameEventId, GameEventBaseRunner baseRunnerEvent) {
-      return new InsertCommand(psqlConnection, "game_event_base_runners", baseRunnerEvent).Command;
+      var extra = new Dictionary<string, object>();
+      extra["game_event_id"] = gameEventId;
+      return new InsertCommand(psqlConnection, "game_event_base_runners", baseRunnerEvent, extra).Command;
     }
 
     private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEvent playerEvent) {
-      var playerEventStatement = new NpgsqlCommand(@"
-        INSERT INTO player_events(
-          game_event_id,
-          player_id,
-          event_type
-        ) VALUES (
-          @game_event_id,
-          @player_id,
-          @event_type
-        );
-      ", psqlConnection);
-
-      playerEventStatement.Parameters.AddWithValue("game_event_id", gameEventId);
-      playerEventStatement.Parameters.AddWithValue("player_id", playerEvent.playerId ?? "UNKNOWN");
-      playerEventStatement.Parameters.AddWithValue("event_type", playerEvent.eventType);
-
-      return playerEventStatement;
+      var extra = new Dictionary<string, object>();
+      extra["game_event_id"] = gameEventId;
+      return new InsertCommand(psqlConnection, "player_events", playerEvent, extra).Command;
     }
 
     private NpgsqlCommand PersistLogRecord(NpgsqlConnection psqlConnection, string keyName) {
@@ -338,10 +326,10 @@ namespace SIBR {
 
         foreach(var p in playerList) {
           // TODO move hashing into Player
-          p.Hash = HashPlayer(md5, p);
+          var hash = HashPlayer(md5, p);
 
           NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from players where hash=@hash and valid_until is null", psqlConnection);
-          cmd.Parameters.AddWithValue("hash", p.Hash);
+          cmd.Parameters.AddWithValue("hash", hash);
           var count = (long)cmd.ExecuteScalar();
 
           if (count == 1) {
@@ -354,8 +342,10 @@ namespace SIBR {
             int rows = update.ExecuteNonQuery();
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
+            var extra = new Dictionary<string, object>();
+            extra["hash"] = hash;
             // Try to insert our current data
-            InsertCommand insertCmd = new InsertCommand(psqlConnection, "players", p);
+            InsertCommand insertCmd = new InsertCommand(psqlConnection, "players", p, extra);
             var newId = insertCmd.Command.ExecuteNonQuery();
 
           }
@@ -387,9 +377,9 @@ namespace SIBR {
 
         foreach (var t in teams) {
 
-          t.Hash = HashTeam(md5, t);
+          var hash = HashTeam(md5, t);
           NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from teams where hash=@hash and valid_until is null", psqlConnection);
-          cmd.Parameters.AddWithValue("hash", t.Hash);
+          cmd.Parameters.AddWithValue("hash", hash);
           var count = (long)cmd.ExecuteScalar();
 
           if(count == 1) {
@@ -403,8 +393,10 @@ namespace SIBR {
             int rows = update.ExecuteNonQuery();
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
+            var extra = new Dictionary<string, object>();
+            extra["hash"] = hash;
             // Try to insert our current data
-            InsertCommand insertCmd = new InsertCommand(psqlConnection, "teams", t);
+            InsertCommand insertCmd = new InsertCommand(psqlConnection, "teams", t, extra);
             var newId = insertCmd.Command.ExecuteNonQuery();
 
           }

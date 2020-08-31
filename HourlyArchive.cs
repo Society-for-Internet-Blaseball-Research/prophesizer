@@ -32,7 +32,6 @@ public class Player {
   public string Name { get; set; }
   public bool Deceased { get; set; }
 
-  public Guid Hash { get; set; }
   //TODO: attrs
 }
    
@@ -45,7 +44,6 @@ public class Team {
   [JsonIgnore]
   [DbAlias("team_id")]
   public string Id => _id ?? id;
-  public Guid Hash { get; set; }
   [DbIgnore]
   public IEnumerable<string> Lineup { get; set; }
   [DbIgnore]
