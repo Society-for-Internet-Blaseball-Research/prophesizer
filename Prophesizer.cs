@@ -51,6 +51,7 @@ namespace SIBR {
     }
 
     public async Task Poll() {
+      Console.WriteLine($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
       await psqlConnection.OpenAsync();
 
@@ -94,23 +95,19 @@ namespace SIBR {
       gamesToInsert.Enqueue(e.GameEvents);
     }
 
-
-    private async Task<Logs> GetUnprocessedLogs(NpgsqlConnection psqlConnection) {
-      Console.WriteLine("Fetching bucket keys...");
-
-      Logs logs = new Logs();
-
+    private async Task<IEnumerable<S3Object>> GetObjectsWithPrefix(string prefix) {
+      List<S3Object> objects = new List<S3Object>();
       try {
         ListObjectsRequest request = new ListObjectsRequest {
           BucketName = bucketName,
-          MaxKeys = 2
+          MaxKeys = 2,
+          Prefix = prefix
         };
 
         do {
           ListObjectsResponse response = await client.ListObjectsAsync(request);
 
-          logs.updateLogs.AddRange(response.S3Objects.Where(item => item.Key.StartsWith("blaseball-log-")));
-          logs.hourlyLogs.AddRange(response.S3Objects.Where(item => item.Key.StartsWith("compressed-hourly/blaseball-hourly-")));
+          objects.AddRange(response.S3Objects);
 
           if (response.IsTruncated) {
             request.Marker = response.NextMarker;
@@ -123,6 +120,16 @@ namespace SIBR {
       } catch (Exception e) {
         Console.WriteLine("ListObjects encounter an unexpected error: {0}", e.Message);
       }
+
+      return objects;
+    }
+
+    private async Task<Logs> GetUnprocessedLogs(NpgsqlConnection psqlConnection) {
+      Console.WriteLine("Fetching bucket keys...");
+
+      Logs logs = new Logs();
+      logs.updateLogs.AddRange(await GetObjectsWithPrefix("blaseball-log-"));
+      logs.hourlyLogs.AddRange(await GetObjectsWithPrefix("compressed-hourly/blaseball-hourly-"));
 
       Console.WriteLine("Determining which logs require processing...");
 
@@ -478,7 +485,7 @@ namespace SIBR {
       
       // Find the latest day already stored in the DB
       int season = 0;
-      int day = 0;
+      int day = -1;
       using (var gamesCommand = new NpgsqlCommand(@"
                 SELECT MAX(season), MAX(day) from games
                 INNER JOIN (SELECT MAX(season) AS max_season FROM games) b ON b.max_season = games.season",
