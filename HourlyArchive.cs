@@ -32,9 +32,53 @@ public class Player {
   public string Name { get; set; }
   public bool Deceased { get; set; }
 
-  //TODO: attrs
+  // Attributes
+  public double Anticapitalism { get; set; }
+  public double BaseThirst { get; set; }
+  public double Buoyancy { get; set; }
+  public double Chasiness { get; set; }
+  public double Coldness { get; set; }
+  public double Continuation { get; set; }
+  public double Divinity { get; set; }
+  public double GroundFriction { get; set; }
+  public double Indulgence { get; set; }
+  public double Laserlikeness { get; set; }
+  public double Martyrdom { get; set; }
+  public double Moxie { get; set; }
+  public double Musclitude { get; set; }
+  public double Omniscience { get; set; }
+  public double Overpowerment { get; set; }
+  public double Patheticism { get; set; }
+  public double Ruthlessness { get; set; }
+  public double Shakespearianism { get; set; }
+  public double Suppression { get; set; }
+  public double Tenaciousness { get; set; }
+  public double Thwackability { get; set; }
+  public double Tragicness { get; set; }
+  public double Unthwackability { get; set; }
+  public double Watchfulness { get; set; }
+  public double Pressurization { get; set; }
+  public double Cinnamon { get; set; }
+
+  // Other stuff
+
+  public int TotalFingers { get; set; }
+  public int Soul { get; set; }
+  public bool PeanutAllergy { get; set; }
+  public int Fate { get; set; }
+
+  [DbNullValue("")]
+  public string Bat { get; set; }
+  [DbNullValue("")]
+  public string Armor { get; set; }
+  [DbNullValue("")]
+  public string Ritual { get; set; }
+  public int Coffee { get; set; }
+  public int Blood { get; set; }
+
+  // TODO: Arrays of modifiers?
 }
-   
+
 public class Team {
   [DbIgnore]
   public string _id { get; set; }

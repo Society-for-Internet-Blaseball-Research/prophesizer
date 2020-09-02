@@ -309,12 +309,12 @@ namespace SIBR {
       }
     }
 
-    private Guid HashPlayer(HashAlgorithm hashAlgorithm, Player player) {
+    private Guid HashObject(HashAlgorithm hashAlgorithm, object obj) {
       StringBuilder sb = new StringBuilder();
-      sb.Append(player.Id);
-      sb.Append(player.Name);
-      sb.Append(player.Deceased ? '1' : '0');
-      // ADD MORE FIELDS HERE
+
+      foreach(var prop in obj.GetType().GetProperties()) {
+        sb.Append(prop.GetValue(obj)?.ToString());
+      }
 
       // Convert the input string to a byte array and compute the hash.
       byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
@@ -333,7 +333,7 @@ namespace SIBR {
 
         foreach(var p in playerList) {
           // TODO move hashing into Player
-          var hash = HashPlayer(md5, p);
+          var hash = HashObject(md5, p);
 
           NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from players where hash=@hash and valid_until is null", psqlConnection);
           cmd.Parameters.AddWithValue("hash", hash);
@@ -360,20 +360,6 @@ namespace SIBR {
       }
     }
 
-    private Guid HashTeam(HashAlgorithm hashAlgorithm, Team team) {
-      StringBuilder sb = new StringBuilder();
-      sb.Append(team.Id);
-      sb.Append(team.Location);
-      sb.Append(team.Nickname);
-      sb.Append(team.FullName);
-      // ADD MORE FIELDS HERE
-      
-      // Convert the input string to a byte array and compute the hash.
-      byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
-
-      return new Guid(data);
-
-    }
 
     private void ProcessAllTeams(JsonElement teamResponse, DateTime timestamp, NpgsqlConnection psqlConnection) {
       string text = teamResponse.GetRawText();
@@ -384,7 +370,7 @@ namespace SIBR {
 
         foreach (var t in teams) {
 
-          var hash = HashTeam(md5, t);
+          var hash = HashObject(md5, t);
           NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from teams where hash=@hash and valid_until is null", psqlConnection);
           cmd.Parameters.AddWithValue("hash", hash);
           var count = (long)cmd.ExecuteScalar();
