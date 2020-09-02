@@ -175,7 +175,11 @@ CREATE TABLE public.game_events (
     event_text text[],
     additional_context text,
     season integer,
-    day integer
+    day integer,
+    parsing_error boolean,
+    parsing_error_list text[],
+    fixed_error boolean,
+    fixed_error_list text[]
 );
 
 
@@ -300,7 +304,42 @@ CREATE TABLE public.players (
     valid_until timestamp without time zone,
     player_name character varying,
     deceased boolean,
-    hash uuid
+    hash uuid,
+    anticapitalism numeric,
+    base_thirst numeric,
+    buoyancy numeric,
+    chasiness numeric,
+    coldness numeric,
+    continuation numeric,
+    divinity numeric,
+    ground_friction numeric,
+    indulgence numeric,
+    laserlikeness numeric,
+    martyrdom numeric,
+    moxie numeric,
+    musclitude numeric,
+    omniscience numeric,
+    overpowerment numeric,
+    patheticism numeric,
+    ruthlessness numeric,
+    shakespearianism numeric,
+    suppression numeric,
+    tenaciousness numeric,
+    thwackability numeric,
+    tragicness numeric,
+    unthwackability numeric,
+    watchfulness numeric,
+    pressurization numeric,
+    cinnamon numeric,
+    total_fingers smallint,
+    soul smallint,
+    fate smallint,
+    peanut_allergy boolean,
+    armor text,
+    bat text,
+    ritual text,
+    coffee smallint,
+    blood smallint
 );
 
 
