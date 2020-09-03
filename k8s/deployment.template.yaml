@@ -23,6 +23,11 @@ spec:
             cpu: 1
             memory: "2G"
         env:
+        - name: PROPHESIZER_WEBHOOK
+          valueFrom:
+            secretKeyRef:
+              name: prophesizer-secrets
+              key: discordWebhook
         - name: PSQL_CONNECTION_STRING
           valueFrom:
             secretKeyRef:

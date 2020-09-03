@@ -60,6 +60,11 @@ namespace SIBR {
 
     public async Task Poll() {
       ConsoleOrWebhook($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
+      minSeason = int.MaxValue;
+      maxSeason = int.MinValue;
+      minDay = int.MaxValue;
+      maxDay = int.MinValue;
+      numEvents = 0;
 
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
       await psqlConnection.OpenAsync();
