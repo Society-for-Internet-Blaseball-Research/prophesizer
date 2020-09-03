@@ -104,7 +104,16 @@ namespace SIBR {
 
       string msg = $"Processed {unprocessedLogs.updateLogs.Count} game update logs and {unprocessedLogs.hourlyLogs.Count} hourly logs.\n";
       if (numEvents > 0) {
-        msg += $"Inserted {numEvents} game events (from Season {minSeason}, Day {minDay} to Season {maxSeason}, Day {maxDay}) into the Datablase.\n";
+        string rangeText = $"Season {minSeason + 1}, Day {minDay + 1} to Season {maxSeason + 1}, Day {maxDay + 1}";
+        if (minSeason == maxSeason) {
+          if (minDay == maxDay) {
+            rangeText = $"Season {minSeason + 1}, Day {minDay + 1}";
+          } else {
+            rangeText = $"Season {minSeason + 1}, Day {minDay + 1} - {maxDay + 1}";
+          }
+        }
+
+        msg += $"Inserted {numEvents} game events (from {rangeText}) into the Datablase.\n";
       }
       else {
         msg += $"No new game events found!\n";
