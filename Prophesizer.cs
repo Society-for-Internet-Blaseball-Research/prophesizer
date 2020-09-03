@@ -5,9 +5,11 @@ using Cauldron;
 using Npgsql;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -38,6 +40,12 @@ namespace SIBR {
 
     private JsonSerializerOptions serializerOptions;
 
+    private int minSeason = int.MaxValue;
+    private int maxSeason = int.MinValue;
+    private int minDay = int.MaxValue;
+    private int maxDay = int.MinValue;
+    private int numEvents = 0;
+
     public Prophesizer(string bucketName) {
       this.bucketName = bucketName;
       this.client = new AmazonS3Client(Environment.GetEnvironmentVariable("AWS_KEY"), Environment.GetEnvironmentVariable("AWS_SECRET"), bucketRegion);
@@ -51,7 +59,8 @@ namespace SIBR {
     }
 
     public async Task Poll() {
-      Console.WriteLine($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
+      ConsoleOrWebhook($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
+
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
       await psqlConnection.OpenAsync();
 
@@ -88,7 +97,15 @@ namespace SIBR {
       }
       processor.GameComplete -= Processor_GameComplete;
 
-      Console.WriteLine($"Finished poll at {DateTime.UtcNow.ToString()} UTC.");
+      string msg = $"Processed {unprocessedLogs.updateLogs.Count} game update logs and {unprocessedLogs.hourlyLogs.Count} hourly logs.\n";
+      if (numEvents > 0) {
+        msg += $"Inserted {numEvents} game events (from Season {minSeason}, Day {minDay} to Season {maxSeason}, Day {maxDay}) into the Datablase.\n";
+      }
+      else {
+        msg += $"No new game events found!\n";
+      }
+      msg += $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
+      ConsoleOrWebhook(msg);
     }
 
     private void Processor_GameComplete(object sender, GameCompleteEventArgs e) {
@@ -194,7 +211,13 @@ namespace SIBR {
         }
 
         transaction.Commit();
-        Console.WriteLine($"Inserted {gameEvents.Count()} game_events into Postgres from {keyName}.");
+
+        minSeason = Math.Min(minSeason, gameEvents.Min(x => x.season));
+        maxSeason = Math.Max(maxSeason, gameEvents.Max(x => x.season));
+        minDay = Math.Min(minDay, gameEvents.Min(x => x.day));
+        maxDay = Math.Max(maxDay, gameEvents.Max(x => x.day));
+        numEvents += gameEvents.Count();
+        Console.WriteLine($"Inserted {gameEvents.Count()} game_events (from S{minSeason}D{minDay} to S{maxSeason}D{maxDay}) into Postgres from {keyName}.");
 
         return gameEvents.Count();
       } catch (Exception e) {
@@ -536,6 +559,24 @@ namespace SIBR {
         }
       }
     }
+
+    static void ConsoleOrWebhook(string msg) {
+      Console.WriteLine(msg);
+
+      var webhookUri = Environment.GetEnvironmentVariable("PROPHESIZER_WEBHOOK");
+
+      if (webhookUri != null) {
+        WebClient webClient = new WebClient();
+        NameValueCollection values = new NameValueCollection();
+
+        values.Add("content", msg);
+        values.Add("username", "prophesizer");
+
+        webClient.UploadValuesAsync(new Uri(webhookUri), values);
+      }
+    }
+
+
   }
 
 }
