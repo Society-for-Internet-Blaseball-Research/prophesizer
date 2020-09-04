@@ -226,12 +226,16 @@ namespace SIBR {
 
         transaction.Commit();
 
+        var first = gameEvents.First();
+        var last = gameEvents.Last();
+
         minSeason = Math.Min(minSeason, gameEvents.Min(x => x.season));
         maxSeason = Math.Max(maxSeason, gameEvents.Max(x => x.season));
         minDay = Math.Min(minDay, gameEvents.Min(x => x.day));
         maxDay = Math.Max(maxDay, gameEvents.Max(x => x.day));
         numEvents += gameEvents.Count();
-        Console.WriteLine($"Inserted {gameEvents.Count()} game_events (from S{minSeason}D{minDay} to S{maxSeason}D{maxDay}) into Postgres from {keyName}.");
+
+        Console.WriteLine($"Inserted {gameEvents.Count()} game_events (from S{first.season}D{first.day} to S{last.season}D{last.day}) into Postgres from {keyName}.");
 
         return gameEvents.Count();
       } catch (Exception e) {
