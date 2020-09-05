@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.4
--- Dumped by pg_dump version 12.4
+-- Dumped from database version 12.3
+-- Dumped by pg_dump version 12.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -20,6 +20,7 @@ ALTER TABLE IF EXISTS ONLY public.player_events DROP CONSTRAINT IF EXISTS player
 ALTER TABLE IF EXISTS ONLY public.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_game_event_id_fkey;
 ALTER TABLE IF EXISTS ONLY public.time_map DROP CONSTRAINT IF EXISTS time_map_pkey;
 ALTER TABLE IF EXISTS ONLY public.teams DROP CONSTRAINT IF EXISTS teams_pkey;
+ALTER TABLE IF EXISTS ONLY public.time_map DROP CONSTRAINT IF EXISTS season_day_unique;
 ALTER TABLE IF EXISTS ONLY public.players DROP CONSTRAINT IF EXISTS players_pkey;
 ALTER TABLE IF EXISTS ONLY public.player_events DROP CONSTRAINT IF EXISTS player_events_pkey;
 ALTER TABLE IF EXISTS ONLY public.imported_logs DROP CONSTRAINT IF EXISTS imported_logs_pkey;
@@ -29,6 +30,9 @@ ALTER TABLE IF EXISTS ONLY public.game_event_base_runners DROP CONSTRAINT IF EXI
 ALTER TABLE IF EXISTS xref.team_positions ALTER COLUMN team_position_id DROP DEFAULT;
 ALTER TABLE IF EXISTS xref.team_division ALTER COLUMN team_division_id DROP DEFAULT;
 ALTER TABLE IF EXISTS xref.player_attributes ALTER COLUMN player_attributes_id DROP DEFAULT;
+ALTER TABLE IF EXISTS raw.game_events ALTER COLUMN game_event_raw_id DROP DEFAULT;
+ALTER TABLE IF EXISTS raw.all_teams ALTER COLUMN all_teams_raw_id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.time_map ALTER COLUMN time_map_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.teams ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.players ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.player_events ALTER COLUMN id DROP DEFAULT;
@@ -40,6 +44,12 @@ DROP SEQUENCE IF EXISTS xref.team_division_team_division_id_seq;
 DROP TABLE IF EXISTS xref.team_division;
 DROP SEQUENCE IF EXISTS xref.player_attributes_player_attributes_id_seq;
 DROP TABLE IF EXISTS xref.player_attributes;
+DROP SEQUENCE IF EXISTS raw.game_events_game_event_raw_id_seq;
+DROP TABLE IF EXISTS raw.game_events;
+DROP TABLE IF EXISTS raw.event_text;
+DROP SEQUENCE IF EXISTS raw.all_teams_raw_all_teams_raw_id_seq;
+DROP TABLE IF EXISTS raw.all_teams;
+DROP SEQUENCE IF EXISTS public.time_map_time_map_id_seq;
 DROP TABLE IF EXISTS public.time_map;
 DROP SEQUENCE IF EXISTS public.teams_id_seq;
 DROP VIEW IF EXISTS public.season_leaders_outs_defended;
@@ -62,6 +72,9 @@ DROP TABLE IF EXISTS public.game_events;
 DROP SEQUENCE IF EXISTS public.game_event_base_runners_id_seq;
 DROP TABLE IF EXISTS public.game_event_base_runners;
 DROP FUNCTION IF EXISTS xref.team_positions_raw_to_xref();
+DROP PROCEDURE IF EXISTS public.wipe_hourly();
+DROP PROCEDURE IF EXISTS public.wipe_events();
+DROP PROCEDURE IF EXISTS public.wipe_all();
 DROP FUNCTION IF EXISTS public.round_half_even(val numeric, prec integer);
 DROP FUNCTION IF EXISTS public.rating_to_star(in_rating numeric);
 DROP FUNCTION IF EXISTS public.pitching_rating(in_player_id character varying, valid_until timestamp without time zone);
@@ -71,6 +84,7 @@ DROP FUNCTION IF EXISTS public.current_season();
 DROP FUNCTION IF EXISTS public.batting_rating(in_player_id character varying, valid_until timestamp without time zone);
 DROP FUNCTION IF EXISTS public.baserunning_rating(in_player_id character varying, valid_until timestamp without time zone);
 DROP SCHEMA IF EXISTS xref;
+DROP SCHEMA IF EXISTS raw;
 DROP SCHEMA IF EXISTS public;
 --
 -- Name: public; Type: SCHEMA; Schema: -; Owner: -
@@ -87,6 +101,13 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
+-- Name: raw; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA raw;
+
+
+--
 -- Name: xref; Type: SCHEMA; Schema: -; Owner: -
 --
 
@@ -99,15 +120,15 @@ CREATE SCHEMA xref;
 
 CREATE FUNCTION public.baserunning_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-	power(p.laserlikeness,0.5) *
-   	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
-FROM players p
-WHERE 
---player_name = 'Jessica Telephone'
-player_id = in_player_id
-AND coalesce(valid_until::text,'') = '';
+    AS $$
+SELECT 
+	power(p.laserlikeness,0.5) *
+   	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
+FROM players p
+WHERE 
+--player_name = 'Jessica Telephone'
+player_id = in_player_id
+AND coalesce(valid_until::text,'') = '';
 $$;
 
 
@@ -117,18 +138,18 @@ $$;
 
 CREATE FUNCTION public.batting_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-power((1 - p.tragicness),0.01) * 
-	power((1 - p.patheticism),0.05) *
-   power((p.thwackability * p.divinity),0.35) *
-   power((p.moxie * p.musclitude),0.075) * 
-	power(p.martyrdom,0.02)
-FROM players p
-WHERE 
---player_name = 'Jessica Telephone'
-player_id = in_player_id
-AND coalesce(valid_until::text,'') = '';
+    AS $$
+SELECT 
+power((1 - p.tragicness),0.01) * 
+	power((1 - p.patheticism),0.05) *
+   power((p.thwackability * p.divinity),0.35) *
+   power((p.moxie * p.musclitude),0.075) * 
+	power(p.martyrdom,0.02)
+FROM players p
+WHERE 
+--player_name = 'Jessica Telephone'
+player_id = in_player_id
+AND coalesce(valid_until::text,'') = '';
 $$;
 
 
@@ -138,8 +159,8 @@ $$;
 
 CREATE FUNCTION public.current_season() RETURNS integer
     LANGUAGE sql
-    AS $$
-SELECT max(season) from games;
+    AS $$
+SELECT max(season) from games;
 $$;
 
 
@@ -149,15 +170,15 @@ $$;
 
 CREATE FUNCTION public.defense_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-	power((p.omniscience * p.tenaciousness),0.2) *
-   	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
-FROM players p
-WHERE 
---player_name = 'Jessica Telephone'
-player_id = in_player_id
-AND coalesce(valid_until::text,'') = '';
+    AS $$
+SELECT 
+	power((p.omniscience * p.tenaciousness),0.2) *
+   	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
+FROM players p
+WHERE 
+--player_name = 'Jessica Telephone'
+player_id = in_player_id
+AND coalesce(valid_until::text,'') = '';
 $$;
 
 
@@ -167,44 +188,44 @@ $$;
 
 CREATE FUNCTION public.get_player_star_ratings(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS TABLE(baserunning_rating numeric, batting_rating numeric, defense_rating numeric, pitching_rating numeric)
     LANGUAGE sql
-    AS $$
-SELECT 
-
-0.5 * round_half_even(( 
-(
-	power(p.laserlikeness,0.5) *
-   power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
-) * 10),0) AS baserunner_rating,
-
-0.5 * round_half_even((
-( 
-	power((1 - p.tragicness),0.01) * 
-	power((1 - p.patheticism),0.05) *
-   power((p.thwackability * p.divinity),0.35) *
-   power((p.moxie * p.musclitude),0.075) * 
-	power(p.martyrdom,0.02)
-) * 10),0) AS batter_rating,
-
-0.5 * round_half_even((
-(
-	power((p.omniscience * p.tenaciousness),0.2) *
-   power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
-) * 10),0) AS defense_rating,
-
-0.5 * round_half_even((
-(
-	power(p.unthwackability,0.5) * 
-	power(p.ruthlessness,0.4) *
-   power(p.overpowerment,0.15) * 
-	power(p.shakespearianism,0.1) * 
-	power(p.coldness,0.025)
-) * 10),0) AS pitching_rating
-
-FROM players p
-WHERE 
---player_name = 'Jessica Telephone'
-player_id = in_player_id
-AND coalesce(valid_until::text,'') = '';
+    AS $$
+SELECT 
+
+0.5 * round_half_even(( 
+(
+	power(p.laserlikeness,0.5) *
+   power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
+) * 10),0) AS baserunner_rating,
+
+0.5 * round_half_even((
+( 
+	power((1 - p.tragicness),0.01) * 
+	power((1 - p.patheticism),0.05) *
+   power((p.thwackability * p.divinity),0.35) *
+   power((p.moxie * p.musclitude),0.075) * 
+	power(p.martyrdom,0.02)
+) * 10),0) AS batter_rating,
+
+0.5 * round_half_even((
+(
+	power((p.omniscience * p.tenaciousness),0.2) *
+   power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
+) * 10),0) AS defense_rating,
+
+0.5 * round_half_even((
+(
+	power(p.unthwackability,0.5) * 
+	power(p.ruthlessness,0.4) *
+   power(p.overpowerment,0.15) * 
+	power(p.shakespearianism,0.1) * 
+	power(p.coldness,0.025)
+) * 10),0) AS pitching_rating
+
+FROM players p
+WHERE 
+--player_name = 'Jessica Telephone'
+player_id = in_player_id
+AND coalesce(valid_until::text,'') = '';
 $$;
 
 
@@ -214,18 +235,18 @@ $$;
 
 CREATE FUNCTION public.pitching_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-	power(p.unthwackability,0.5) * 
-	power(p.ruthlessness,0.4) *
-   	power(p.overpowerment,0.15) * 
-	power(p.shakespearianism,0.1) * 
-	power(p.coldness,0.025)
-FROM players p
-WHERE 
---player_name = 'Jessica Telephone'
-player_id = in_player_id
-AND coalesce(valid_until::text,'') = '';
+    AS $$
+SELECT 
+	power(p.unthwackability,0.5) * 
+	power(p.ruthlessness,0.4) *
+   	power(p.overpowerment,0.15) * 
+	power(p.shakespearianism,0.1) * 
+	power(p.coldness,0.025)
+FROM players p
+WHERE 
+--player_name = 'Jessica Telephone'
+player_id = in_player_id
+AND coalesce(valid_until::text,'') = '';
 $$;
 
 
@@ -235,9 +256,9 @@ $$;
 
 CREATE FUNCTION public.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 0.5 * round_half_even((
-(in_rating)* 10),0);
+    AS $$
+SELECT 0.5 * round_half_even((
+(in_rating)* 10),0);
 $$;
 
 
@@ -247,23 +268,62 @@ $$;
 
 CREATE FUNCTION public.round_half_even(val numeric, prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
-    AS $$
-declare
-    retval numeric;
-    difference numeric;
-    even boolean;
-begin
-    retval := round(val,prec);
-    difference := retval-val;
-    if abs(difference)*(10::numeric^prec) = 0.5::numeric then
-        even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
-        if not even then
-            retval := round(val-difference,prec);
-        end if;
-    end if;
-    return retval;
-end;
+    AS $$
+declare
+    retval numeric;
+    difference numeric;
+    even boolean;
+begin
+    retval := round(val,prec);
+    difference := retval-val;
+    if abs(difference)*(10::numeric^prec) = 0.5::numeric then
+        even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
+        if not even then
+            retval := round(val-difference,prec);
+        end if;
+    end if;
+    return retval;
+end;
 $$;
+
+
+--
+-- Name: wipe_all(); Type: PROCEDURE; Schema: public; Owner: -
+--
+
+CREATE PROCEDURE public.wipe_all()
+    LANGUAGE plpgsql
+    AS $$begin
+call wipe_events();
+call wipe_hourly();
+end;$$;
+
+
+--
+-- Name: wipe_events(); Type: PROCEDURE; Schema: public; Owner: -
+--
+
+CREATE PROCEDURE public.wipe_events()
+    LANGUAGE plpgsql
+    AS $$begin
+truncate game_events cascade;
+delete from imported_logs where key like 'blaseball-log%';
+truncate time_map;
+end;$$;
+
+
+--
+-- Name: wipe_hourly(); Type: PROCEDURE; Schema: public; Owner: -
+--
+
+CREATE PROCEDURE public.wipe_hourly()
+    LANGUAGE plpgsql
+    AS $$begin
+delete from imported_logs where key like 'compressed-hourly%';
+truncate players cascade;
+truncate teams cascade;
+truncate games cascade;
+end;$$;
 
 
 --
@@ -272,60 +332,60 @@ $$;
 
 CREATE FUNCTION xref.team_positions_raw_to_xref() RETURNS boolean
     LANGUAGE sql
-    AS $$
-
-UPDATE xref.team_positions SET valid_until = (SELECT MAX(download_time) FROM raw.all_teams) WHERE valid_until IS NULL;
-
-INSERT INTO xref.team_positions (position_id, player_id, team_id) 
-(
-SELECT 
-CASE
-	when mod(row_number() OVER (order BY NOW()),9) = 0 THEN 9 
-	ELSE mod(row_number() OVER (order BY NOW()),9)
-END AS row_number,
-lineup, b.team_id
-FROM
-(
-	SELECT json_array_elements_text(json_team_instance->'lineup') as lineup, 
-	download_time, json_team_instance->>'id' AS team_id
-	FROM
-	(
-		SELECT json_array_elements(json_data)::json AS json_team_instance, download_time
-		FROM raw.all_teams
-	) a
-	WHERE download_time = (SELECT MAX(download_time) FROM raw.all_teams)
-	--AND json_team_instance->>'id' = '7966eb04-efcc-499b-8f03-d13916330531'
-
-) b
-
-UNION
---/*
-SELECT 
-CASE
-	when mod(row_number() OVER (order BY NOW()),5) = 0 THEN 14 
-	ELSE 
-	mod(row_number() OVER (order BY NOW()),5) + 9
-END 
-AS row_number,
-lineup, b.team_id
-FROM
-(
-	SELECT json_array_elements_text(json_team_instance->'rotation') AS lineup, 
-	download_time, json_team_instance->>'id' AS team_id
-	FROM
-	(
-		SELECT json_array_elements(json_data)::json AS json_team_instance, download_time
-		FROM raw.all_teams
-	) a
-	WHERE download_time = (SELECT MAX(download_time) FROM raw.all_teams)
-	--AND json_team_instance->>'id' = '7966eb04-efcc-499b-8f03-d13916330531'
-
-) b
-ORDER BY team_id, row_number
-);
-
-select true;
-
+    AS $$
+
+UPDATE xref.team_positions SET valid_until = (SELECT MAX(download_time) FROM raw.all_teams) WHERE valid_until IS NULL;
+
+INSERT INTO xref.team_positions (position_id, player_id, team_id) 
+(
+SELECT 
+CASE
+	when mod(row_number() OVER (order BY NOW()),9) = 0 THEN 9 
+	ELSE mod(row_number() OVER (order BY NOW()),9)
+END AS row_number,
+lineup, b.team_id
+FROM
+(
+	SELECT json_array_elements_text(json_team_instance->'lineup') as lineup, 
+	download_time, json_team_instance->>'id' AS team_id
+	FROM
+	(
+		SELECT json_array_elements(json_data)::json AS json_team_instance, download_time
+		FROM raw.all_teams
+	) a
+	WHERE download_time = (SELECT MAX(download_time) FROM raw.all_teams)
+	--AND json_team_instance->>'id' = '7966eb04-efcc-499b-8f03-d13916330531'
+
+) b
+
+UNION
+--/*
+SELECT 
+CASE
+	when mod(row_number() OVER (order BY NOW()),5) = 0 THEN 14 
+	ELSE 
+	mod(row_number() OVER (order BY NOW()),5) + 9
+END 
+AS row_number,
+lineup, b.team_id
+FROM
+(
+	SELECT json_array_elements_text(json_team_instance->'rotation') AS lineup, 
+	download_time, json_team_instance->>'id' AS team_id
+	FROM
+	(
+		SELECT json_array_elements(json_data)::json AS json_team_instance, download_time
+		FROM raw.all_teams
+	) a
+	WHERE download_time = (SELECT MAX(download_time) FROM raw.all_teams)
+	--AND json_team_instance->>'id' = '7966eb04-efcc-499b-8f03-d13916330531'
+
+) b
+ORDER BY team_id, row_number
+);
+
+select true;
+
 $$;
 
 
@@ -891,8 +951,102 @@ ALTER SEQUENCE public.teams_id_seq OWNED BY public.teams.id;
 CREATE TABLE public.time_map (
     season integer NOT NULL,
     day integer NOT NULL,
-    first_time timestamp without time zone
+    first_time timestamp without time zone,
+    time_map_id integer NOT NULL
 );
+
+
+--
+-- Name: time_map_time_map_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.time_map_time_map_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: time_map_time_map_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.time_map_time_map_id_seq OWNED BY public.time_map.time_map_id;
+
+
+--
+-- Name: all_teams; Type: TABLE; Schema: raw; Owner: -
+--
+
+CREATE TABLE raw.all_teams (
+    all_teams_raw_id integer NOT NULL,
+    json_data json,
+    download_time timestamp without time zone DEFAULT now()
+);
+
+
+--
+-- Name: all_teams_raw_all_teams_raw_id_seq; Type: SEQUENCE; Schema: raw; Owner: -
+--
+
+CREATE SEQUENCE raw.all_teams_raw_all_teams_raw_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: all_teams_raw_all_teams_raw_id_seq; Type: SEQUENCE OWNED BY; Schema: raw; Owner: -
+--
+
+ALTER SEQUENCE raw.all_teams_raw_all_teams_raw_id_seq OWNED BY raw.all_teams.all_teams_raw_id;
+
+
+--
+-- Name: event_text; Type: TABLE; Schema: raw; Owner: -
+--
+
+CREATE TABLE raw.event_text (
+    event_text_raw_id bigint,
+    event_text_raw text,
+    game_id character varying(36)
+);
+
+
+--
+-- Name: game_events; Type: TABLE; Schema: raw; Owner: -
+--
+
+CREATE TABLE raw.game_events (
+    game_event_raw_id integer NOT NULL,
+    json_data json,
+    download_time timestamp without time zone DEFAULT now()
+);
+
+
+--
+-- Name: game_events_game_event_raw_id_seq; Type: SEQUENCE; Schema: raw; Owner: -
+--
+
+CREATE SEQUENCE raw.game_events_game_event_raw_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: game_events_game_event_raw_id_seq; Type: SEQUENCE OWNED BY; Schema: raw; Owner: -
+--
+
+ALTER SEQUENCE raw.game_events_game_event_raw_id_seq OWNED BY raw.game_events.game_event_raw_id;
 
 
 --
@@ -1024,6 +1178,27 @@ ALTER TABLE ONLY public.teams ALTER COLUMN id SET DEFAULT nextval('public.teams_
 
 
 --
+-- Name: time_map time_map_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.time_map ALTER COLUMN time_map_id SET DEFAULT nextval('public.time_map_time_map_id_seq'::regclass);
+
+
+--
+-- Name: all_teams all_teams_raw_id; Type: DEFAULT; Schema: raw; Owner: -
+--
+
+ALTER TABLE ONLY raw.all_teams ALTER COLUMN all_teams_raw_id SET DEFAULT nextval('raw.all_teams_raw_all_teams_raw_id_seq'::regclass);
+
+
+--
+-- Name: game_events game_event_raw_id; Type: DEFAULT; Schema: raw; Owner: -
+--
+
+ALTER TABLE ONLY raw.game_events ALTER COLUMN game_event_raw_id SET DEFAULT nextval('raw.game_events_game_event_raw_id_seq'::regclass);
+
+
+--
 -- Name: player_attributes player_attributes_id; Type: DEFAULT; Schema: xref; Owner: -
 --
 
@@ -1093,6 +1268,14 @@ ALTER TABLE ONLY public.players
 
 
 --
+-- Name: time_map season_day_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.time_map
+    ADD CONSTRAINT season_day_unique UNIQUE (season, day);
+
+
+--
 -- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1105,7 +1288,7 @@ ALTER TABLE ONLY public.teams
 --
 
 ALTER TABLE ONLY public.time_map
-    ADD CONSTRAINT time_map_pkey PRIMARY KEY (season, day);
+    ADD CONSTRAINT time_map_pkey PRIMARY KEY (time_map_id);
 
 
 --

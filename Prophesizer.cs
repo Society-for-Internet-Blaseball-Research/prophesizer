@@ -104,7 +104,16 @@ namespace SIBR {
 
       string msg = $"Processed {unprocessedLogs.updateLogs.Count} game update logs and {unprocessedLogs.hourlyLogs.Count} hourly logs.\n";
       if (numEvents > 0) {
-        msg += $"Inserted {numEvents} game events (from Season {minSeason}, Day {minDay} to Season {maxSeason}, Day {maxDay}) into the Datablase.\n";
+        string rangeText = $"Season {minSeason + 1}, Day {minDay + 1} to Season {maxSeason + 1}, Day {maxDay + 1}";
+        if (minSeason == maxSeason) {
+          if (minDay == maxDay) {
+            rangeText = $"Season {minSeason + 1}, Day {minDay + 1}";
+          } else {
+            rangeText = $"Season {minSeason + 1}, Day {minDay + 1} - {maxDay + 1}";
+          }
+        }
+
+        msg += $"Inserted {numEvents} game events (from {rangeText}) into the Datablase.\n";
       }
       else {
         msg += $"No new game events found!\n";
@@ -217,12 +226,16 @@ namespace SIBR {
 
         transaction.Commit();
 
+        var first = gameEvents.First();
+        var last = gameEvents.Last();
+
         minSeason = Math.Min(minSeason, gameEvents.Min(x => x.season));
         maxSeason = Math.Max(maxSeason, gameEvents.Max(x => x.season));
         minDay = Math.Min(minDay, gameEvents.Min(x => x.day));
         maxDay = Math.Max(maxDay, gameEvents.Max(x => x.day));
         numEvents += gameEvents.Count();
-        Console.WriteLine($"Inserted {gameEvents.Count()} game_events (from S{minSeason}D{minDay} to S{maxSeason}D{maxDay}) into Postgres from {keyName}.");
+
+        Console.WriteLine($"Inserted {gameEvents.Count()} game_events (from S{first.season}D{first.day} to S{last.season}D{last.day}) into Postgres from {keyName}.");
 
         return gameEvents.Count();
       } catch (Exception e) {
