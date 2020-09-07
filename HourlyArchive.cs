@@ -73,7 +73,10 @@ public class Player {
   public string Armor { get; set; }
   [DbNullValue("")]
   public string Ritual { get; set; }
+  
+  [DbAlias("coffee_id")]
   public int Coffee { get; set; }
+  [DbAlias("blood_id")]
   public int Blood { get; set; }
 
   // TODO: Arrays of modifiers?
