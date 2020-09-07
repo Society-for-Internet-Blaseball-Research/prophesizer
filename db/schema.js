@@ -36,18 +36,26 @@ async function execWithOutput(command) {
 
 	if(command === 'dump')
 	{
+		// -- Saving deprecated lines for confirmation --
 		// Dump schema (no data) for all public/raw/xref tables
-		if(!await execWithOutput(`pg_dump -U ${username} -d ${database} -c --if-exists -E UTF8 -O -s -n "(public|raw|xref)" > schema_clean.sql`)) process.exit(1);
+		// if(!await execWithOutput(`pg_dump -U ${username} -d ${database} -c --if-exists -E UTF8 -O -s -n "(public|xref)" > schema_clean.sql`)) process.exit(1);
+		
 		// Dump schema and data for taxa tables
-		if(!await execWithOutput(`pg_dump -U ${username} -d ${database} -c --if-exists -E UTF8 -O -n "taxa" > schema_data.sql`)) process.exit(1);
-		console.log(`DB schema dumped to schema_clean.sql and schema_data.sql`);
+		if(!await execWithOutput(`pg_dump -U ${username} -d ${database} -c --if-exists -E UTF8 -O -n "(public|xref|taxa)" > schema_data.sql`)) process.exit(1);
+		console.log(`DB schema dumped to schema_data.sql`);
 	}
 	else if(command === 'load')
 	{
 		// Then schema_data first
 		if(!await execWithOutput(`psql -U ${username} -d ${database} -f schema_data.sql`)) process.exit(1);
+		
+		// -- Saving deprecated lines for confirmation --
 		// Load schema from schema_clean first
-		if(!await execWithOutput(`psql -U ${username} -d ${database} -f schema_clean.sql`)) process.exit(1);
+		//if(!await execWithOutput(`psql -U ${username} -d ${database} -f schema_clean.sql`)) process.exit(1);		
+		
+		// Run wipe_all to clear out relevant tables
+		if(!await execWithOutput(`psql -U ${username} -d ${database} -c "CALL wipe_all();"`)) process.exit(1);
+		
 	}
 
 	process.exit(0);
