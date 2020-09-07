@@ -27,19 +27,18 @@ ALTER TABLE IF EXISTS ONLY public.imported_logs DROP CONSTRAINT IF EXISTS import
 ALTER TABLE IF EXISTS ONLY public.games DROP CONSTRAINT IF EXISTS game_pkey;
 ALTER TABLE IF EXISTS ONLY public.game_events DROP CONSTRAINT IF EXISTS game_events_pkey;
 ALTER TABLE IF EXISTS ONLY public.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_pkey;
-ALTER TABLE IF EXISTS xref.team_positions ALTER COLUMN team_position_id DROP DEFAULT;
 ALTER TABLE IF EXISTS xref.team_division ALTER COLUMN team_division_id DROP DEFAULT;
 ALTER TABLE IF EXISTS xref.player_attributes ALTER COLUMN player_attributes_id DROP DEFAULT;
 ALTER TABLE IF EXISTS raw.game_events ALTER COLUMN game_event_raw_id DROP DEFAULT;
 ALTER TABLE IF EXISTS raw.all_teams ALTER COLUMN all_teams_raw_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.time_map ALTER COLUMN time_map_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.teams ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.team_roster ALTER COLUMN team_roster_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.players ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.player_events ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.imported_logs ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.game_events ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.game_event_base_runners ALTER COLUMN id DROP DEFAULT;
-DROP SEQUENCE IF EXISTS xref.team_positions_team_position_id_seq;
 DROP SEQUENCE IF EXISTS xref.team_division_team_division_id_seq;
 DROP TABLE IF EXISTS xref.team_division;
 DROP SEQUENCE IF EXISTS xref.player_attributes_player_attributes_id_seq;
@@ -52,14 +51,15 @@ DROP TABLE IF EXISTS raw.all_teams;
 DROP SEQUENCE IF EXISTS public.time_map_time_map_id_seq;
 DROP TABLE IF EXISTS public.time_map;
 DROP SEQUENCE IF EXISTS public.teams_id_seq;
+DROP SEQUENCE IF EXISTS public.team_positions_team_position_id_seq;
 DROP VIEW IF EXISTS public.season_leaders_outs_defended;
 DROP VIEW IF EXISTS public.season_leaders_on_base_slugging;
 DROP VIEW IF EXISTS public.season_leaders_slugging;
 DROP VIEW IF EXISTS public.season_leaders_on_base_perecentage;
 DROP VIEW IF EXISTS public.season_leaders_batting_average_risp;
 DROP VIEW IF EXISTS public.season_leaders_batting_average;
-DROP TABLE IF EXISTS xref.team_positions;
 DROP TABLE IF EXISTS public.teams;
+DROP TABLE IF EXISTS public.team_roster;
 DROP SEQUENCE IF EXISTS public.players_id_seq;
 DROP TABLE IF EXISTS public.players;
 DROP SEQUENCE IF EXISTS public.player_events_id_seq;
@@ -323,6 +323,7 @@ delete from imported_logs where key like 'compressed-hourly%';
 truncate players cascade;
 truncate teams cascade;
 truncate games cascade;
+truncate team_roster cascade;
 end;$$;
 
 
@@ -665,6 +666,19 @@ ALTER SEQUENCE public.players_id_seq OWNED BY public.players.id;
 
 
 --
+-- Name: team_roster; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.team_roster (
+    team_roster_id integer NOT NULL,
+    team_id character varying,
+    position_id integer,
+    valid_until timestamp without time zone,
+    player_id character varying
+);
+
+
+--
 -- Name: teams; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -676,19 +690,6 @@ CREATE TABLE public.teams (
     full_name text,
     valid_until timestamp without time zone,
     hash uuid
-);
-
-
---
--- Name: team_positions; Type: TABLE; Schema: xref; Owner: -
---
-
-CREATE TABLE xref.team_positions (
-    team_position_id integer NOT NULL,
-    team_id character varying,
-    position_id integer,
-    valid_until timestamp without time zone,
-    player_id character varying
 );
 
 
@@ -719,7 +720,7 @@ CREATE VIEW public.season_leaders_batting_average AS
    FROM ((((public.game_events ge
      JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
      JOIN public.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN xref.team_positions tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
+     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
      JOIN public.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
   WHERE (ge.season = ( SELECT public.current_season() AS current_season))
   GROUP BY p.player_id, p.player_name, t.nickname
@@ -762,7 +763,7 @@ CREATE VIEW public.season_leaders_batting_average_risp AS
          HAVING ((2 = ANY (array_agg(game_event_base_runners.base_before_play))) OR (3 = ANY (array_agg(game_event_base_runners.base_before_play))))) br ON ((ge.id = br.game_event_id)))
      JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
      JOIN public.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN xref.team_positions tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
+     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
      JOIN public.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
   WHERE (ge.season = ( SELECT public.current_season() AS current_season))
   GROUP BY p.player_id, p.player_name, t.nickname
@@ -821,7 +822,7 @@ CREATE VIEW public.season_leaders_on_base_perecentage AS
    FROM ((((public.game_events ge
      JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
      JOIN public.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN xref.team_positions tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
+     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
      JOIN public.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
   WHERE (ge.season = ( SELECT public.current_season() AS current_season))
   GROUP BY p.player_id, p.player_name, t.nickname
@@ -867,7 +868,7 @@ CREATE VIEW public.season_leaders_slugging AS
    FROM ((((public.game_events ge
      JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
      JOIN public.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN xref.team_positions tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
+     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
      JOIN public.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
   WHERE (ge.season = ( SELECT public.current_season() AS current_season))
   GROUP BY p.player_id, p.player_name, t.nickname
@@ -918,10 +919,30 @@ CREATE VIEW public.season_leaders_outs_defended AS
           WHERE (("position"((a_1.event_text)::text, 'flyout to '::text) > 0) AND (a_1.season = ( SELECT public.current_season() AS current_season)))
           GROUP BY ("substring"((a_1.event_text)::text, ("position"((a_1.event_text)::text, 'flyout to '::text) + 9), "position"("right"((a_1.event_text)::text, ((length((a_1.event_text)::text) - "position"((a_1.event_text)::text, 'flyout to '::text)) - 9)), '.'::text)))) a
      JOIN public.players p ON (((btrim(a.defender) = (p.player_name)::text) AND (p.valid_until IS NULL))))
-     JOIN xref.team_positions tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (p.valid_until IS NULL) AND (tp.valid_until IS NULL))))
+     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (p.valid_until IS NULL) AND (tp.valid_until IS NULL))))
      JOIN public.teams t ON ((((tp.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   GROUP BY (btrim(a.defender)), p.player_id, t.nickname
   ORDER BY (sum(a.plays)) DESC;
+
+
+--
+-- Name: team_positions_team_position_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.team_positions_team_position_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: team_positions_team_position_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.team_positions_team_position_id_seq OWNED BY public.team_roster.team_roster_id;
 
 
 --
@@ -1116,26 +1137,6 @@ ALTER SEQUENCE xref.team_division_team_division_id_seq OWNED BY xref.team_divisi
 
 
 --
--- Name: team_positions_team_position_id_seq; Type: SEQUENCE; Schema: xref; Owner: -
---
-
-CREATE SEQUENCE xref.team_positions_team_position_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: team_positions_team_position_id_seq; Type: SEQUENCE OWNED BY; Schema: xref; Owner: -
---
-
-ALTER SEQUENCE xref.team_positions_team_position_id_seq OWNED BY xref.team_positions.team_position_id;
-
-
---
 -- Name: game_event_base_runners id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1168,6 +1169,13 @@ ALTER TABLE ONLY public.player_events ALTER COLUMN id SET DEFAULT nextval('publi
 --
 
 ALTER TABLE ONLY public.players ALTER COLUMN id SET DEFAULT nextval('public.players_id_seq'::regclass);
+
+
+--
+-- Name: team_roster team_roster_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_roster ALTER COLUMN team_roster_id SET DEFAULT nextval('public.team_positions_team_position_id_seq'::regclass);
 
 
 --
@@ -1210,13 +1218,6 @@ ALTER TABLE ONLY xref.player_attributes ALTER COLUMN player_attributes_id SET DE
 --
 
 ALTER TABLE ONLY xref.team_division ALTER COLUMN team_division_id SET DEFAULT nextval('xref.team_division_team_division_id_seq'::regclass);
-
-
---
--- Name: team_positions team_position_id; Type: DEFAULT; Schema: xref; Owner: -
---
-
-ALTER TABLE ONLY xref.team_positions ALTER COLUMN team_position_id SET DEFAULT nextval('xref.team_positions_team_position_id_seq'::regclass);
 
 
 --

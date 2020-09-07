@@ -29,7 +29,7 @@ internal class InsertCommand {
   /// </summary>
   /// <param name="tableName">Name of table to insert into</param>
   /// <param name="obj">Object to insert</param>
-  private void Populate(string tableName, object obj, Dictionary<string, object> extraFields) {
+  private void Populate(string tableName, object obj, Dictionary<string, object> extraFields, string returnColumn = "id") {
 
     StringBuilder query = new StringBuilder();
     query.Append($"INSERT INTO {tableName}(\n");
@@ -82,7 +82,7 @@ internal class InsertCommand {
 
     string columns = colText.ToString().TrimEnd(',','\n');
     string values = varText.ToString().TrimEnd(',','\n');
-    query.Append($"{columns}\n) VALUES (\n{values}) RETURNING ID;");
+    query.Append($"{columns}\n) VALUES (\n{values}) RETURNING {returnColumn};");
 
     m_command.CommandText = query.ToString();
   }
