@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.4
--- Dumped by pg_dump version 12.4
+-- Dumped from database version 12.3
+-- Dumped by pg_dump version 12.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -131,22 +131,118 @@ CREATE SCHEMA taxa;
 
 CREATE FUNCTION public.bankers_round(in_val numeric, in_prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
-    AS $$
-declare
-    retval numeric;
-    difference numeric;
-    even boolean;
-begin
-    retval := round(in_val,in_prec);
-    difference := retval-in_val;
-    if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
-        even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
-        if not even then
-            retval := round(val-difference,in_prec);
-        end if;
-    end if;
-    return retval;
-end;
+    AS $$
+
+
+
+
+
+
+declare
+
+
+
+
+
+
+    retval numeric;
+
+
+
+
+
+
+    difference numeric;
+
+
+
+
+
+
+    even boolean;
+
+
+
+
+
+
+begin
+
+
+
+
+
+
+    retval := round(in_val,in_prec);
+
+
+
+
+
+
+    difference := retval-in_val;
+
+
+
+
+
+
+    if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
+
+
+
+
+
+
+        even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
+
+
+
+
+
+
+        if not even then
+
+
+
+
+
+
+            retval := round(val-difference,in_prec);
+
+
+
+
+
+
+        end if;
+
+
+
+
+
+
+    end if;
+
+
+
+
+
+
+    return retval;
+
+
+
+
+
+
+end;
+
+
+
+
+
+
 $$;
 
 
@@ -156,24 +252,78 @@ $$;
 
 CREATE FUNCTION public.baserunning_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-SELECT 
-
-	power(p.laserlikeness,0.5) *
-
-   	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
-
-FROM players p
-
-WHERE 
-
---player_name = 'Jessica Telephone'
-
-player_id = in_player_id
-
-AND coalesce(valid_until::text,'') = '';
-
+    AS $$
+
+
+
+
+
+
+
+SELECT 
+
+
+
+
+
+
+
+	power(p.laserlikeness,0.5) *
+
+
+
+
+
+
+
+   	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
+
+
+
+
+
+
+
+FROM players p
+
+
+
+
+
+
+
+WHERE 
+
+
+
+
+
+
+
+--player_name = 'Jessica Telephone'
+
+
+
+
+
+
+
+player_id = in_player_id
+
+
+
+
+
+
+
+AND coalesce(valid_until::text,'') = '';
+
+
+
+
+
+
+
 $$;
 
 
@@ -183,30 +333,102 @@ $$;
 
 CREATE FUNCTION public.batting_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-SELECT 
-
-power((1 - p.tragicness),0.01) * 
-
-	power((1 - p.patheticism),0.05) *
-
-   power((p.thwackability * p.divinity),0.35) *
-
-   power((p.moxie * p.musclitude),0.075) * 
-
-	power(p.martyrdom,0.02)
-
-FROM players p
-
-WHERE 
-
---player_name = 'Jessica Telephone'
-
-player_id = in_player_id
-
-AND coalesce(valid_until::text,'') = '';
-
+    AS $$
+
+
+
+
+
+
+
+SELECT 
+
+
+
+
+
+
+
+power((1 - p.tragicness),0.01) * 
+
+
+
+
+
+
+
+	power((1 - p.patheticism),0.05) *
+
+
+
+
+
+
+
+   power((p.thwackability * p.divinity),0.35) *
+
+
+
+
+
+
+
+   power((p.moxie * p.musclitude),0.075) * 
+
+
+
+
+
+
+
+	power(p.martyrdom,0.02)
+
+
+
+
+
+
+
+FROM players p
+
+
+
+
+
+
+
+WHERE 
+
+
+
+
+
+
+
+--player_name = 'Jessica Telephone'
+
+
+
+
+
+
+
+player_id = in_player_id
+
+
+
+
+
+
+
+AND coalesce(valid_until::text,'') = '';
+
+
+
+
+
+
+
 $$;
 
 
@@ -216,10 +438,22 @@ $$;
 
 CREATE FUNCTION public.current_season() RETURNS integer
     LANGUAGE sql
-    AS $$
-
-SELECT max(season) from games;
-
+    AS $$
+
+
+
+
+
+
+
+SELECT max(season) from games;
+
+
+
+
+
+
+
 $$;
 
 
@@ -229,24 +463,78 @@ $$;
 
 CREATE FUNCTION public.defense_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-SELECT 
-
-	power((p.omniscience * p.tenaciousness),0.2) *
-
-   	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
-
-FROM players p
-
-WHERE 
-
---player_name = 'Jessica Telephone'
-
-player_id = in_player_id
-
-AND coalesce(valid_until::text,'') = '';
-
+    AS $$
+
+
+
+
+
+
+
+SELECT 
+
+
+
+
+
+
+
+	power((p.omniscience * p.tenaciousness),0.2) *
+
+
+
+
+
+
+
+   	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
+
+
+
+
+
+
+
+FROM players p
+
+
+
+
+
+
+
+WHERE 
+
+
+
+
+
+
+
+--player_name = 'Jessica Telephone'
+
+
+
+
+
+
+
+player_id = in_player_id
+
+
+
+
+
+
+
+AND coalesce(valid_until::text,'') = '';
+
+
+
+
+
+
+
 $$;
 
 
@@ -256,82 +544,310 @@ $$;
 
 CREATE FUNCTION public.get_player_star_ratings(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS TABLE(baserunning_rating numeric, batting_rating numeric, defense_rating numeric, pitching_rating numeric)
     LANGUAGE sql
-    AS $$
-
-SELECT 
-
-
-
-0.5 * round_half_even(( 
-
-(
-
-	power(p.laserlikeness,0.5) *
-
-   power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
-
-) * 10),0) AS baserunner_rating,
-
-
-
-0.5 * round_half_even((
-
-( 
-
-	power((1 - p.tragicness),0.01) * 
-
-	power((1 - p.patheticism),0.05) *
-
-   power((p.thwackability * p.divinity),0.35) *
-
-   power((p.moxie * p.musclitude),0.075) * 
-
-	power(p.martyrdom,0.02)
-
-) * 10),0) AS batter_rating,
-
-
-
-0.5 * round_half_even((
-
-(
-
-	power((p.omniscience * p.tenaciousness),0.2) *
-
-   power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
-
-) * 10),0) AS defense_rating,
-
-
-
-0.5 * round_half_even((
-
-(
-
-	power(p.unthwackability,0.5) * 
-
-	power(p.ruthlessness,0.4) *
-
-   power(p.overpowerment,0.15) * 
-
-	power(p.shakespearianism,0.1) * 
-
-	power(p.coldness,0.025)
-
-) * 10),0) AS pitching_rating
-
-
-
-FROM players p
-
-WHERE 
-
---player_name = 'Jessica Telephone'
-
-player_id = in_player_id
-
-AND coalesce(valid_until::text,'') = '';
-
+    AS $$
+
+
+
+
+
+
+
+SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0.5 * round_half_even(( 
+
+
+
+
+
+
+
+(
+
+
+
+
+
+
+
+	power(p.laserlikeness,0.5) *
+
+
+
+
+
+
+
+   power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
+
+
+
+
+
+
+
+) * 10),0) AS baserunner_rating,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0.5 * round_half_even((
+
+
+
+
+
+
+
+( 
+
+
+
+
+
+
+
+	power((1 - p.tragicness),0.01) * 
+
+
+
+
+
+
+
+	power((1 - p.patheticism),0.05) *
+
+
+
+
+
+
+
+   power((p.thwackability * p.divinity),0.35) *
+
+
+
+
+
+
+
+   power((p.moxie * p.musclitude),0.075) * 
+
+
+
+
+
+
+
+	power(p.martyrdom,0.02)
+
+
+
+
+
+
+
+) * 10),0) AS batter_rating,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0.5 * round_half_even((
+
+
+
+
+
+
+
+(
+
+
+
+
+
+
+
+	power((p.omniscience * p.tenaciousness),0.2) *
+
+
+
+
+
+
+
+   power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
+
+
+
+
+
+
+
+) * 10),0) AS defense_rating,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0.5 * round_half_even((
+
+
+
+
+
+
+
+(
+
+
+
+
+
+
+
+	power(p.unthwackability,0.5) * 
+
+
+
+
+
+
+
+	power(p.ruthlessness,0.4) *
+
+
+
+
+
+
+
+   power(p.overpowerment,0.15) * 
+
+
+
+
+
+
+
+	power(p.shakespearianism,0.1) * 
+
+
+
+
+
+
+
+	power(p.coldness,0.025)
+
+
+
+
+
+
+
+) * 10),0) AS pitching_rating
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+FROM players p
+
+
+
+
+
+
+
+WHERE 
+
+
+
+
+
+
+
+--player_name = 'Jessica Telephone'
+
+
+
+
+
+
+
+player_id = in_player_id
+
+
+
+
+
+
+
+AND coalesce(valid_until::text,'') = '';
+
+
+
+
+
+
+
 $$;
 
 
@@ -341,11 +857,41 @@ $$;
 
 CREATE FUNCTION public.last_position(in_string text, in_search text) RETURNS integer
     LANGUAGE sql
-    AS $$ 
-
-Select length(in_string) - 
-position(reverse(in_search) in reverse(in_string)) - length(in_search); 
-
+    AS $$ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+Select length(in_string) - 
+
+
+
+
+
+
+position(reverse(in_search) in reverse(in_string)) - length(in_search); 
+
+
+
+
+
+
+
+
+
+
+
+
+
 $$;
 
 
@@ -355,30 +901,102 @@ $$;
 
 CREATE FUNCTION public.pitching_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-SELECT 
-
-	power(p.unthwackability,0.5) * 
-
-	power(p.ruthlessness,0.4) *
-
-   	power(p.overpowerment,0.15) * 
-
-	power(p.shakespearianism,0.1) * 
-
-	power(p.coldness,0.025)
-
-FROM players p
-
-WHERE 
-
---player_name = 'Jessica Telephone'
-
-player_id = in_player_id
-
-AND coalesce(valid_until::text,'') = '';
-
+    AS $$
+
+
+
+
+
+
+
+SELECT 
+
+
+
+
+
+
+
+	power(p.unthwackability,0.5) * 
+
+
+
+
+
+
+
+	power(p.ruthlessness,0.4) *
+
+
+
+
+
+
+
+   	power(p.overpowerment,0.15) * 
+
+
+
+
+
+
+
+	power(p.shakespearianism,0.1) * 
+
+
+
+
+
+
+
+	power(p.coldness,0.025)
+
+
+
+
+
+
+
+FROM players p
+
+
+
+
+
+
+
+WHERE 
+
+
+
+
+
+
+
+--player_name = 'Jessica Telephone'
+
+
+
+
+
+
+
+player_id = in_player_id
+
+
+
+
+
+
+
+AND coalesce(valid_until::text,'') = '';
+
+
+
+
+
+
+
 $$;
 
 
@@ -388,16 +1006,76 @@ $$;
 
 CREATE FUNCTION public.player_day_vibe(in_player_id character varying, in_gameday integer DEFAULT 0, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-(0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
-	(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
-    * p.pressurization + .5 * p.cinnamon)::numeric
-FROM players p
-WHERE 
---player_name = 'Jessica Telephone'
-player_id = in_player_id
-AND coalesce(valid_until::text,'') = '';
+    AS $$
+
+
+
+
+
+
+SELECT 
+
+
+
+
+
+
+(0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
+
+
+
+
+
+
+	(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
+
+
+
+
+
+
+    * p.pressurization + .5 * p.cinnamon)::numeric
+
+
+
+
+
+
+FROM players p
+
+
+
+
+
+
+WHERE 
+
+
+
+
+
+
+--player_name = 'Jessica Telephone'
+
+
+
+
+
+
+player_id = in_player_id
+
+
+
+
+
+
+AND coalesce(valid_until::text,'') = '';
+
+
+
+
+
+
 $$;
 
 
@@ -407,18 +1085,90 @@ $$;
 
 CREATE FUNCTION public.player_from_gameday(in_player_id character varying, in_season integer, in_gameday integer) RETURNS integer
     LANGUAGE sql
-    AS $$
-	SELECT min(id)
-	FROM players
-	WHERE player_id = in_player_id
-	AND valid_until >
-	(
-		SELECT first_time
-		FROM time_map
-		WHERE season = in_season
-		AND DAY = in_gameday
-	)
-
+    AS $$
+
+
+
+
+
+
+	SELECT min(id)
+
+
+
+
+
+
+	FROM players
+
+
+
+
+
+
+	WHERE player_id = in_player_id
+
+
+
+
+
+
+	AND valid_until >
+
+
+
+
+
+
+	(
+
+
+
+
+
+
+		SELECT first_time
+
+
+
+
+
+
+		FROM time_map
+
+
+
+
+
+
+		WHERE season = in_season
+
+
+
+
+
+
+		AND DAY = in_gameday
+
+
+
+
+
+
+	)
+
+
+
+
+
+
+
+
+
+
+
+
+
 $$;
 
 
@@ -428,12 +1178,48 @@ $$;
 
 CREATE FUNCTION public.player_from_timestamp(in_player_id character varying, in_timestamp timestamp without time zone) RETURNS integer
     LANGUAGE sql
-    AS $$
-	SELECT min(id)
-	FROM players
-	WHERE player_id = in_player_id
-	AND valid_until > in_timestamp
-
+    AS $$
+
+
+
+
+
+
+	SELECT min(id)
+
+
+
+
+
+
+	FROM players
+
+
+
+
+
+
+	WHERE player_id = in_player_id
+
+
+
+
+
+
+	AND valid_until > in_timestamp
+
+
+
+
+
+
+
+
+
+
+
+
+
 $$;
 
 
@@ -443,12 +1229,30 @@ $$;
 
 CREATE FUNCTION public.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-SELECT 0.5 * round_half_even((
-
-(in_rating)* 10),0);
-
+    AS $$
+
+
+
+
+
+
+
+SELECT 0.5 * round_half_even((
+
+
+
+
+
+
+
+(in_rating)* 10),0);
+
+
+
+
+
+
+
 $$;
 
 
@@ -458,38 +1262,134 @@ $$;
 
 CREATE FUNCTION public.round_half_even(val numeric, prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
-    AS $$
-
-declare
-
-    retval numeric;
-
-    difference numeric;
-
-    even boolean;
-
-begin
-
-    retval := round(val,prec);
-
-    difference := retval-val;
-
-    if abs(difference)*(10::numeric^prec) = 0.5::numeric then
-
-        even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
-
-        if not even then
-
-            retval := round(val-difference,prec);
-
-        end if;
-
-    end if;
-
-    return retval;
-
-end;
-
+    AS $$
+
+
+
+
+
+
+
+declare
+
+
+
+
+
+
+
+    retval numeric;
+
+
+
+
+
+
+
+    difference numeric;
+
+
+
+
+
+
+
+    even boolean;
+
+
+
+
+
+
+
+begin
+
+
+
+
+
+
+
+    retval := round(val,prec);
+
+
+
+
+
+
+
+    difference := retval-val;
+
+
+
+
+
+
+
+    if abs(difference)*(10::numeric^prec) = 0.5::numeric then
+
+
+
+
+
+
+
+        even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
+
+
+
+
+
+
+
+        if not even then
+
+
+
+
+
+
+
+            retval := round(val-difference,prec);
+
+
+
+
+
+
+
+        end if;
+
+
+
+
+
+
+
+    end if;
+
+
+
+
+
+
+
+    return retval;
+
+
+
+
+
+
+
+end;
+
+
+
+
+
+
+
 $$;
 
 
@@ -499,18 +1399,90 @@ $$;
 
 CREATE FUNCTION public.season_timespan(in_season integer) RETURNS TABLE(season_start timestamp without time zone, season_end timestamp without time zone)
     LANGUAGE sql
-    AS $$
-SELECT
-(
-	SELECT first_time FROM time_map WHERE DAY = 0 AND season = in_season
-) AS season_start,
-COALESCE
-(
-	(
-		SELECT first_time - INTERVAL '1 SECOND' FROM time_map WHERE DAY = 0 AND season = 
-		(in_season + 1)
-	), NOW()::timestamp
-) AS season_end
+    AS $$
+
+
+
+
+
+
+SELECT
+
+
+
+
+
+
+(
+
+
+
+
+
+
+	SELECT first_time FROM time_map WHERE DAY = 0 AND season = in_season
+
+
+
+
+
+
+) AS season_start,
+
+
+
+
+
+
+COALESCE
+
+
+
+
+
+
+(
+
+
+
+
+
+
+	(
+
+
+
+
+
+
+		SELECT first_time - INTERVAL '1 SECOND' FROM time_map WHERE DAY = 0 AND season = 
+
+
+
+
+
+
+		(in_season + 1)
+
+
+
+
+
+
+	), NOW()::timestamp
+
+
+
+
+
+
+) AS season_end
+
+
+
+
+
+
 $$;
 
 
@@ -520,18 +1492,90 @@ $$;
 
 CREATE FUNCTION public.team_from_gameday(in_team_id character varying, in_season integer, in_gameday integer) RETURNS integer
     LANGUAGE sql
-    AS $$
-	SELECT min(id)
-	FROM teams
-	WHERE team_id = team_id
-	AND valid_until >
-	(
-		SELECT first_time
-		FROM time_map
-		WHERE season = in_season
-		AND DAY = in_gameday
-	)
-
+    AS $$
+
+
+
+
+
+
+	SELECT min(id)
+
+
+
+
+
+
+	FROM teams
+
+
+
+
+
+
+	WHERE team_id = team_id
+
+
+
+
+
+
+	AND valid_until >
+
+
+
+
+
+
+	(
+
+
+
+
+
+
+		SELECT first_time
+
+
+
+
+
+
+		FROM time_map
+
+
+
+
+
+
+		WHERE season = in_season
+
+
+
+
+
+
+		AND DAY = in_gameday
+
+
+
+
+
+
+	)
+
+
+
+
+
+
+
+
+
+
+
+
+
 $$;
 
 
@@ -541,12 +1585,48 @@ $$;
 
 CREATE FUNCTION public.team_from_timestamp(in_team_id character varying, in_timestamp timestamp without time zone) RETURNS integer
     LANGUAGE sql
-    AS $$
-	SELECT min(id)
-	FROM teams
-	WHERE team_id = in_team_id
-	AND valid_until > in_timestamp
-
+    AS $$
+
+
+
+
+
+
+	SELECT min(id)
+
+
+
+
+
+
+	FROM teams
+
+
+
+
+
+
+	WHERE team_id = in_team_id
+
+
+
+
+
+
+	AND valid_until > in_timestamp
+
+
+
+
+
+
+
+
+
+
+
+
+
 $$;
 
 
@@ -556,13 +1636,55 @@ $$;
 
 CREATE FUNCTION public.timestamp_to_gameday(in_timestamp timestamp without time zone) RETURNS TABLE(season integer, gameday integer)
     LANGUAGE sql
-    AS $$
-SELECT season, day
-FROM time_map
-WHERE first_time =
-(
-	SELECT max(first_time) FROM time_map WHERE first_time < in_timestamp
-)
+    AS $$
+
+
+
+
+
+
+SELECT season, day
+
+
+
+
+
+
+FROM time_map
+
+
+
+
+
+
+WHERE first_time =
+
+
+
+
+
+
+(
+
+
+
+
+
+
+	SELECT max(first_time) FROM time_map WHERE first_time < in_timestamp
+
+
+
+
+
+
+)
+
+
+
+
+
+
 $$;
 
 
@@ -572,9 +1694,18 @@ $$;
 
 CREATE PROCEDURE public.wipe_all()
     LANGUAGE plpgsql
-    AS $$begin
-call wipe_events();
-call wipe_hourly();
+    AS $$begin
+
+
+
+call wipe_events();
+
+
+
+call wipe_hourly();
+
+
+
 end;$$;
 
 
@@ -584,10 +1715,22 @@ end;$$;
 
 CREATE PROCEDURE public.wipe_events()
     LANGUAGE plpgsql
-    AS $$begin
-truncate game_events cascade;
-delete from imported_logs where key like 'blaseball-log%';
-truncate time_map;
+    AS $$begin
+
+
+
+truncate game_events cascade;
+
+
+
+delete from imported_logs where key like 'blaseball-log%';
+
+
+
+truncate time_map;
+
+
+
 end;$$;
 
 
@@ -597,12 +1740,30 @@ end;$$;
 
 CREATE PROCEDURE public.wipe_hourly()
     LANGUAGE plpgsql
-    AS $$begin
-delete from imported_logs where key like 'compressed-hourly%';
-truncate players cascade;
-truncate teams cascade;
-truncate games cascade;
-truncate team_roster cascade;
+    AS $$begin
+
+
+
+delete from imported_logs where key like 'compressed-hourly%';
+
+
+
+truncate players cascade;
+
+
+
+truncate teams cascade;
+
+
+
+truncate games cascade;
+
+
+
+truncate team_roster cascade;
+
+
+
 end;$$;
 
 
@@ -833,6 +1994,7 @@ CREATE TABLE public.player_idols (
 CREATE TABLE public.players (
     id integer NOT NULL,
     player_id character varying(36),
+    valid_from timestamp without time zone,
     valid_until timestamp without time zone,
     player_name character varying,
     deceased boolean,
@@ -903,6 +2065,7 @@ CREATE TABLE public.team_roster (
     team_roster_id integer NOT NULL,
     team_id character varying,
     position_id integer,
+    valid_from timestamp without time zone,
     valid_until timestamp without time zone,
     player_id character varying
 );
@@ -918,6 +2081,7 @@ CREATE TABLE public.teams (
     location text,
     nickname text,
     full_name text,
+    valid_from timestamp without time zone,
     valid_until timestamp without time zone,
     hash uuid
 );
@@ -1618,7 +2782,7 @@ COPY public.player_idols (player_idol_id, instance_id, player_id, idol_count, va
 -- Data for Name: players; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.players (id, player_id, valid_until, player_name, deceased, hash, anticapitalism, base_thirst, buoyancy, chasiness, coldness, continuation, divinity, ground_friction, indulgence, laserlikeness, martyrdom, moxie, musclitude, omniscience, overpowerment, patheticism, ruthlessness, shakespearianism, suppression, tenaciousness, thwackability, tragicness, unthwackability, watchfulness, pressurization, cinnamon, total_fingers, soul, fate, peanut_allergy, armor, bat, ritual, coffee, blood) FROM stdin;
+COPY public.players (id, player_id, valid_until, player_name, deceased, hash, anticapitalism, base_thirst, buoyancy, chasiness, coldness, continuation, divinity, ground_friction, indulgence, laserlikeness, martyrdom, moxie, musclitude, omniscience, overpowerment, patheticism, ruthlessness, shakespearianism, suppression, tenaciousness, thwackability, tragicness, unthwackability, watchfulness, pressurization, cinnamon, total_fingers, soul, fate, peanut_allergy, armor, bat, ritual, coffee, blood, valid_from) FROM stdin;
 \.
 
 
@@ -1626,7 +2790,7 @@ COPY public.players (id, player_id, valid_until, player_name, deceased, hash, an
 -- Data for Name: team_roster; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.team_roster (team_roster_id, team_id, position_id, valid_until, player_id) FROM stdin;
+COPY public.team_roster (team_roster_id, team_id, position_id, valid_until, player_id, valid_from) FROM stdin;
 \.
 
 
@@ -1634,7 +2798,7 @@ COPY public.team_roster (team_roster_id, team_id, position_id, valid_until, play
 -- Data for Name: teams; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.teams (id, team_id, location, nickname, full_name, valid_until, hash) FROM stdin;
+COPY public.teams (id, team_id, location, nickname, full_name, valid_until, hash, valid_from) FROM stdin;
 \.
 
 
@@ -1981,56 +3145,56 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 -- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.game_event_base_runners_id_seq', 213052, true);
+SELECT pg_catalog.setval('public.game_event_base_runners_id_seq', 476130, true);
 
 
 --
 -- Name: game_events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.game_events_id_seq', 240027, true);
+SELECT pg_catalog.setval('public.game_events_id_seq', 534261, true);
 
 
 --
 -- Name: imported_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.imported_logs_id_seq', 1500, true);
+SELECT pg_catalog.setval('public.imported_logs_id_seq', 4304, true);
 
 
 --
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.player_events_id_seq', 112, true);
+SELECT pg_catalog.setval('public.player_events_id_seq', 236, true);
 
 
 --
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.players_id_seq', 2576, true);
+SELECT pg_catalog.setval('public.players_id_seq', 9169, true);
 
 
 --
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.team_positions_team_position_id_seq', 492, true);
+SELECT pg_catalog.setval('public.team_positions_team_position_id_seq', 1782, true);
 
 
 --
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.teams_id_seq', 21, true);
+SELECT pg_catalog.setval('public.teams_id_seq', 83, true);
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.time_map_time_map_id_seq', 240027, true);
+SELECT pg_catalog.setval('public.time_map_time_map_id_seq', 534261, true);
 
 
 --
