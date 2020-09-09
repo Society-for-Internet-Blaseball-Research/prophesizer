@@ -328,12 +328,29 @@ namespace SIBR {
               string json = reader.ReadLine();
               var hourly = JsonSerializer.Deserialize<HourlyArchive>(json, serializerOptions);
 
+              DateTime timestamp;
+
+              if(hourly.ClientMeta == null || hourly.ClientMeta.timestamp == null) {
+                
+                var dash = keyName.LastIndexOf('-');
+                var dot = keyName.IndexOf('.');
+                
+                string timeStr = keyName.Substring(dash+1, dot-dash-1);
+                long timeNum = long.Parse(timeStr);
+                // TODO make this a utility function already
+                timestamp = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                timestamp = timestamp.AddMilliseconds(timeNum);
+              }
+              else {
+                timestamp = hourly.ClientMeta.timestamp;
+              }
+
               switch (hourly.Endpoint) {
                 case "players":
-                  ProcessPlayers(hourly, psqlConnection);
+                  ProcessPlayers(hourly, timestamp, psqlConnection);
                   break;
                 case "allTeams":
-                  ProcessAllTeams((JsonElement)hourly.Data, hourly?.ClientMeta?.timestamp, psqlConnection);
+                  ProcessAllTeams((JsonElement)hourly.Data, timestamp, psqlConnection);
                   break;
                 case "offseasonSetup":
                   break;
@@ -363,13 +380,10 @@ namespace SIBR {
       return new Guid(data);
     }
 
-    private void ProcessPlayers(HourlyArchive hourly, NpgsqlConnection psqlConnection) {
+    private void ProcessPlayers(HourlyArchive hourly, DateTime timestamp, NpgsqlConnection psqlConnection) {
       string text = ((JsonElement)hourly.Data).GetRawText();
 
       IEnumerable<string> playerIds = hourly.Params["ids"];
-
-      DateTime fromTimestamp = hourly?.ClientMeta?.timestamp ?? DateTime.MinValue;
-      DateTime toTimestamp = hourly?.ClientMeta?.timestamp ?? DateTime.UtcNow;
 
       using (MD5 md5 = MD5.Create()) {
 
@@ -388,14 +402,14 @@ namespace SIBR {
           } else {
             // Update the old record
             NpgsqlCommand update = new NpgsqlCommand(@"update players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
-            update.Parameters.AddWithValue("timestamp", toTimestamp);
+            update.Parameters.AddWithValue("timestamp", timestamp);
             update.Parameters.AddWithValue("player_id", p.Id);
             int rows = update.ExecuteNonQuery();
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
             var extra = new Dictionary<string, object>();
             extra["hash"] = hash;
-            extra["valid_from"] = fromTimestamp;
+            extra["valid_from"] = timestamp;
             // Try to insert our current data
             InsertCommand insertCmd = new InsertCommand(psqlConnection, "players", p, extra);
             var newId = insertCmd.Command.ExecuteNonQuery();
@@ -406,9 +420,7 @@ namespace SIBR {
     }
 
 
-    private void ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime? timestamp, string teamId, string playerId, int rosterPosition) {
-      DateTime fromTimestamp = timestamp ?? DateTime.MinValue;
-      DateTime toTimestamp = timestamp ?? DateTime.UtcNow;
+    private void ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime timestamp, string teamId, string playerId, int rosterPosition) {
 
       NpgsqlCommand cmd = new NpgsqlCommand(@"select player_id from team_roster where team_id=@team_id and position_id=@position_id and valid_until is null", psqlConnection);
       cmd.Parameters.AddWithValue("team_id", teamId);
@@ -420,7 +432,7 @@ namespace SIBR {
       } else {
         // Update the old record
         NpgsqlCommand update = new NpgsqlCommand(@"update team_roster set valid_until=@timestamp where team_id = @team_id and position_id = @position_id and valid_until is null", psqlConnection);
-        update.Parameters.AddWithValue("timestamp", toTimestamp);
+        update.Parameters.AddWithValue("timestamp", timestamp);
         update.Parameters.AddWithValue("team_id", teamId);
         update.Parameters.AddWithValue("position_id", rosterPosition);
         int rows = update.ExecuteNonQuery();
@@ -430,7 +442,7 @@ namespace SIBR {
         insert.Parameters.AddWithValue("team_id", teamId);
         insert.Parameters.AddWithValue("position_id", rosterPosition);
         insert.Parameters.AddWithValue("player_id", playerId);
-        insert.Parameters.AddWithValue("valid_from", fromTimestamp);
+        insert.Parameters.AddWithValue("valid_from", timestamp);
         // Try to insert our current data
         rows = insert.ExecuteNonQuery();
         if (rows == 0) throw new InvalidOperationException($"Failed to insert new team roster entry");
@@ -438,7 +450,7 @@ namespace SIBR {
 
     }
 
-    private void ProcessRoster(Team t, DateTime? timestamp, NpgsqlConnection psqlConnection) {
+    private void ProcessRoster(Team t, DateTime timestamp, NpgsqlConnection psqlConnection) {
 
       int rosterPosition = 0;
       foreach (var playerId in t.Lineup) {
@@ -466,11 +478,8 @@ namespace SIBR {
       return new Guid(data);
     }
 
-    private void ProcessAllTeams(JsonElement teamResponse, DateTime? timestamp, NpgsqlConnection psqlConnection) {
+    private void ProcessAllTeams(JsonElement teamResponse, DateTime timestamp, NpgsqlConnection psqlConnection) {
       string text = teamResponse.GetRawText();
-
-      DateTime fromTimestamp = timestamp ?? DateTime.MinValue;
-      DateTime toTimestamp = timestamp ?? DateTime.UtcNow;
 
       var teams = JsonSerializer.Deserialize<IEnumerable<Team>>(text, serializerOptions);
 
@@ -490,13 +499,13 @@ namespace SIBR {
           else {
             // Update the old record
             NpgsqlCommand update = new NpgsqlCommand(@"update teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
-            update.Parameters.AddWithValue("timestamp", toTimestamp);
+            update.Parameters.AddWithValue("timestamp", timestamp);
             update.Parameters.AddWithValue("team_id", t.Id);
             int rows = update.ExecuteNonQuery();
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
             var extra = new Dictionary<string, object>();
-            extra["valid_from"] = fromTimestamp;
+            extra["valid_from"] = timestamp;
             extra["hash"] = hash;
             // Try to insert our current data
             InsertCommand insertCmd = new InsertCommand(psqlConnection, "teams", t, extra);
