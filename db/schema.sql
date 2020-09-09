@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.4
--- Dumped by pg_dump version 12.4
+-- Dumped from database version 12.3
+-- Dumped by pg_dump version 12.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -133,30 +133,30 @@ CREATE SCHEMA taxa;
 
 CREATE FUNCTION data.bankers_round(in_val numeric, in_prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
-    AS $$
-
-
-
-
-
-
-declare
-    retval numeric;
-    difference numeric;
-    even boolean;
-	
-begin
-    retval := round(in_val,in_prec);
-    difference := retval-in_val;
-    if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
-        even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
-        if not even then
-            retval := round(val-difference,in_prec);
-        end if;
-    end if;
-    return retval;
-end;
-
+    AS $$
+
+
+
+
+
+
+declare
+    retval numeric;
+    difference numeric;
+    even boolean;
+	
+begin
+    retval := round(in_val,in_prec);
+    difference := retval-in_val;
+    if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
+        even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
+        if not even then
+            retval := round(val-difference,in_prec);
+        end if;
+    end if;
+    return retval;
+end;
+
 $$;
 
 
@@ -166,12 +166,12 @@ $$;
 
 CREATE FUNCTION data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-	power(p.laserlikeness,0.5) *
-   	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE p.player_id = in_player_id
+    AS $$
+SELECT 
+	power(p.laserlikeness,0.5) *
+   	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE p.player_id = in_player_id
 $$;
 
 
@@ -181,15 +181,15 @@ $$;
 
 CREATE FUNCTION data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-   power((1 - p.tragicness),0.01) * 
-   power((1 - p.patheticism),0.05) *
-   power((p.thwackability * p.divinity),0.35) *
-   power((p.moxie * p.musclitude),0.075) * 
-   power(p.martyrdom,0.02)
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE player_id = in_player_id;
+    AS $$
+SELECT 
+   power((1 - p.tragicness),0.01) * 
+   power((1 - p.patheticism),0.05) *
+   power((p.thwackability * p.divinity),0.35) *
+   power((p.moxie * p.musclitude),0.075) * 
+   power(p.martyrdom,0.02)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE player_id = in_player_id;
 $$;
 
 
@@ -199,10 +199,10 @@ $$;
 
 CREATE FUNCTION data.current_season() RETURNS integer
     LANGUAGE sql
-    AS $$
-
-SELECT max(season) from games;
-
+    AS $$
+
+SELECT max(season) from games;
+
 $$;
 
 
@@ -212,12 +212,12 @@ $$;
 
 CREATE FUNCTION data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-	power((p.omniscience * p.tenaciousness),0.2) *
-   	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE p.player_id = in_player_id;
+    AS $$
+SELECT 
+	power((p.omniscience * p.tenaciousness),0.2) *
+   	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE p.player_id = in_player_id;
 $$;
 
 
@@ -227,13 +227,13 @@ $$;
 
 CREATE FUNCTION data.gameday_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(season integer, gameday integer)
     LANGUAGE sql
-    AS $$
-SELECT season, day
-FROM data.time_map
-WHERE first_time =
-(
-	SELECT max(first_time) FROM data.time_map WHERE first_time < in_timestamp
-)
+    AS $$
+SELECT season, day
+FROM data.time_map
+WHERE first_time =
+(
+	SELECT max(first_time) FROM data.time_map WHERE first_time < in_timestamp
+)
 $$;
 
 
@@ -243,41 +243,41 @@ $$;
 
 CREATE FUNCTION data.last_position(in_string text, in_search text) RETURNS integer
     LANGUAGE sql
-    AS $$ 
-
-
-
-
-
-
-
-
-
-
-
-
-
-Select length(in_string) - 
-
-
-
-
-
-
-position(reverse(in_search) in reverse(in_string)) - length(in_search); 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    AS $$ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+Select length(in_string) - 
+
+
+
+
+
+
+position(reverse(in_search) in reverse(in_string)) - length(in_search); 
+
+
+
+
+
+
+
+
+
+
+
+
+
 $$;
 
 
@@ -287,16 +287,16 @@ $$;
 
 CREATE FUNCTION data.pitching_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-power(p.unthwackability,0.5) * 
-power(p.ruthlessness,0.4) *
-power(p.overpowerment,0.15) * 
-power(p.shakespearianism,0.1) * 
-power(p.coldness,0.025)
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE 
-p.player_id = in_player_id;
+    AS $$
+SELECT 
+power(p.unthwackability,0.5) * 
+power(p.ruthlessness,0.4) *
+power(p.overpowerment,0.15) * 
+power(p.shakespearianism,0.1) * 
+power(p.coldness,0.025)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE 
+p.player_id = in_player_id;
 $$;
 
 
@@ -306,14 +306,14 @@ $$;
 
 CREATE FUNCTION data.player_day_vibe(in_player_id character varying, in_gameday integer DEFAULT 0, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-(0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
-(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
-* p.pressurization + .5 * p.cinnamon)::numeric
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE 
-p.player_id = in_player_id;
+    AS $$
+SELECT 
+(0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
+(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
+* p.pressurization + .5 * p.cinnamon)::numeric
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE 
+p.player_id = in_player_id;
 $$;
 
 
@@ -323,12 +323,12 @@ $$;
 
 CREATE FUNCTION data.player_id_from_timestamp(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS integer
     LANGUAGE sql
-    AS $$
-	SELECT id
-	FROM players
-	WHERE player_id = in_player_id
-	AND in_timestamp + (INTERVAL '1 millisecond') 
-	BETWEEN valid_from AND coalesce(valid_until,NOW() + (INTERVAL '1 millisecond'));	
+    AS $$
+	SELECT id
+	FROM players
+	WHERE player_id = in_player_id
+	AND in_timestamp + (INTERVAL '1 millisecond') 
+	BETWEEN valid_from AND coalesce(valid_until,NOW() + (INTERVAL '1 millisecond'));	
 $$;
 
 
@@ -338,14 +338,14 @@ $$;
 
 CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric, pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint)
     LANGUAGE plpgsql
-    AS $$
-begin
-	return query 
-		select *
-		from data.teams t
-		where in_timestamp + (INTERVAL '1 millisecond') 
-		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
-		
+    AS $$
+begin
+	return query 
+		select *
+		from data.teams t
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
 end;$$;
 
 
@@ -355,30 +355,30 @@ end;$$;
 
 CREATE FUNCTION data.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-
-
-
-
-
-
-SELECT 0.5 * round_half_even((
-
-
-
-
-
-
-
-(in_rating)* 10),0);
-
-
-
-
-
-
-
+    AS $$
+
+
+
+
+
+
+
+SELECT 0.5 * round_half_even((
+
+
+
+
+
+
+
+(in_rating)* 10),0);
+
+
+
+
+
+
+
 $$;
 
 
@@ -388,134 +388,134 @@ $$;
 
 CREATE FUNCTION data.round_half_even(val numeric, prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
-    AS $$
-
-
-
-
-
-
-
-declare
-
-
-
-
-
-
-
-    retval numeric;
-
-
-
-
-
-
-
-    difference numeric;
-
-
-
-
-
-
-
-    even boolean;
-
-
-
-
-
-
-
-begin
-
-
-
-
-
-
-
-    retval := round(val,prec);
-
-
-
-
-
-
-
-    difference := retval-val;
-
-
-
-
-
-
-
-    if abs(difference)*(10::numeric^prec) = 0.5::numeric then
-
-
-
-
-
-
-
-        even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
-
-
-
-
-
-
-
-        if not even then
-
-
-
-
-
-
-
-            retval := round(val-difference,prec);
-
-
-
-
-
-
-
-        end if;
-
-
-
-
-
-
-
-    end if;
-
-
-
-
-
-
-
-    return retval;
-
-
-
-
-
-
-
-end;
-
-
-
-
-
-
-
+    AS $$
+
+
+
+
+
+
+
+declare
+
+
+
+
+
+
+
+    retval numeric;
+
+
+
+
+
+
+
+    difference numeric;
+
+
+
+
+
+
+
+    even boolean;
+
+
+
+
+
+
+
+begin
+
+
+
+
+
+
+
+    retval := round(val,prec);
+
+
+
+
+
+
+
+    difference := retval-val;
+
+
+
+
+
+
+
+    if abs(difference)*(10::numeric^prec) = 0.5::numeric then
+
+
+
+
+
+
+
+        even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
+
+
+
+
+
+
+
+        if not even then
+
+
+
+
+
+
+
+            retval := round(val-difference,prec);
+
+
+
+
+
+
+
+        end if;
+
+
+
+
+
+
+
+    end if;
+
+
+
+
+
+
+
+    return retval;
+
+
+
+
+
+
+
+end;
+
+
+
+
+
+
+
 $$;
 
 
@@ -525,90 +525,90 @@ $$;
 
 CREATE FUNCTION data.season_timespan(in_season integer) RETURNS TABLE(season_start timestamp without time zone, season_end timestamp without time zone)
     LANGUAGE sql
-    AS $$
-
-
-
-
-
-
-SELECT
-
-
-
-
-
-
-(
-
-
-
-
-
-
-	SELECT first_time FROM time_map WHERE DAY = 0 AND season = in_season
-
-
-
-
-
-
-) AS season_start,
-
-
-
-
-
-
-COALESCE
-
-
-
-
-
-
-(
-
-
-
-
-
-
-	(
-
-
-
-
-
-
-		SELECT first_time - INTERVAL '1 SECOND' FROM time_map WHERE DAY = 0 AND season = 
-
-
-
-
-
-
-		(in_season + 1)
-
-
-
-
-
-
-	), NOW()::timestamp
-
-
-
-
-
-
-) AS season_end
-
-
-
-
-
-
+    AS $$
+
+
+
+
+
+
+SELECT
+
+
+
+
+
+
+(
+
+
+
+
+
+
+	SELECT first_time FROM time_map WHERE DAY = 0 AND season = in_season
+
+
+
+
+
+
+) AS season_start,
+
+
+
+
+
+
+COALESCE
+
+
+
+
+
+
+(
+
+
+
+
+
+
+	(
+
+
+
+
+
+
+		SELECT first_time - INTERVAL '1 SECOND' FROM time_map WHERE DAY = 0 AND season = 
+
+
+
+
+
+
+		(in_season + 1)
+
+
+
+
+
+
+	), NOW()::timestamp
+
+
+
+
+
+
+) AS season_end
+
+
+
+
+
+
 $$;
 
 
@@ -618,15 +618,15 @@ $$;
 
 CREATE FUNCTION data.team_roster_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(team_roster_id integer, team_id character varying, position_id integer, valid_from timestamp without time zone, valid_until timestamp without time zone, player_id character varying)
     LANGUAGE plpgsql
-    AS $$
-begin
-	return query 
-		select *
-		--tr.team_roster_id, tr.team_id, tr.position_id, tr.valid_from, tr.valid_until, tr.player_id 
-		from data.team_roster tr
-		where in_timestamp + (INTERVAL '1 millisecond') 
-		BETWEEN tr.valid_from AND coalesce(tr.valid_until,NOW() + (INTERVAL '1 millisecond'));
-		
+    AS $$
+begin
+	return query 
+		select *
+		--tr.team_roster_id, tr.team_id, tr.position_id, tr.valid_from, tr.valid_until, tr.player_id 
+		from data.team_roster tr
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN tr.valid_from AND coalesce(tr.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
 end;$$;
 
 
@@ -636,14 +636,14 @@ end;$$;
 
 CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(id integer, team_id character varying, location text, nickname text, full_name text, valid_from timestamp without time zone, valid_until timestamp without time zone, hash uuid)
     LANGUAGE plpgsql
-    AS $$
-begin
-	return query 
-		select *
-		from data.teams t
-		where in_timestamp + (INTERVAL '1 millisecond') 
-		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
-		
+    AS $$
+begin
+	return query 
+		select *
+		from data.teams t
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
 end;$$;
 
 
@@ -654,17 +654,8 @@ end;$$;
 CREATE PROCEDURE data.wipe_all()
     LANGUAGE plpgsql
     AS $$begin
-
-
-
-call wipe_events();
-
-
-
-call wipe_hourly();
-
-
-
+call data.wipe_events();
+call data.wipe_hourly();
 end;$$;
 
 
@@ -675,21 +666,9 @@ end;$$;
 CREATE PROCEDURE data.wipe_events()
     LANGUAGE plpgsql
     AS $$begin
-
-
-
-truncate game_events cascade;
-
-
-
-delete from imported_logs where key like 'blaseball-log%';
-
-
-
-truncate time_map;
-
-
-
+truncate data.game_events cascade;
+delete from data.imported_logs where key like 'blaseball-log%';
+truncate data.time_map;
 end;$$;
 
 
@@ -700,29 +679,11 @@ end;$$;
 CREATE PROCEDURE data.wipe_hourly()
     LANGUAGE plpgsql
     AS $$begin
-
-
-
-delete from imported_logs where key like 'compressed-hourly%';
-
-
-
-truncate players cascade;
-
-
-
-truncate teams cascade;
-
-
-
-truncate games cascade;
-
-
-
-truncate team_roster cascade;
-
-
-
+delete from data.imported_logs where key like 'compressed-hourly%';
+truncate data.players cascade;
+truncate data.teams cascade;
+truncate data.games cascade;
+truncate data.team_roster cascade;
 end;$$;
 
 
@@ -2115,56 +2076,56 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 -- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 476130, true);
+SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 754370, true);
 
 
 --
 -- Name: game_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_events_id_seq', 534261, true);
+SELECT pg_catalog.setval('data.game_events_id_seq', 846489, true);
 
 
 --
 -- Name: imported_logs_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.imported_logs_id_seq', 4304, true);
+SELECT pg_catalog.setval('data.imported_logs_id_seq', 5911, true);
 
 
 --
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_events_id_seq', 236, true);
+SELECT pg_catalog.setval('data.player_events_id_seq', 369, true);
 
 
 --
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.players_id_seq', 9169, true);
+SELECT pg_catalog.setval('data.players_id_seq', 11771, true);
 
 
 --
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 1782, true);
+SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 2314, true);
 
 
 --
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.teams_id_seq', 83, true);
+SELECT pg_catalog.setval('data.teams_id_seq', 104, true);
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 534261, true);
+SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 846436, true);
 
 
 --

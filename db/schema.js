@@ -37,7 +37,7 @@ async function execWithOutput(command) {
 	if(command === 'dump')
 	{
 		// First run a wipe_all() to clear out non-taxa tables
-		await execWithOutput(`psql -U ${username} -d ${database} -c "CALL wipe_all();"`);
+		await execWithOutput(`psql -U ${username} -d ${database} -c "CALL data.wipe_all();"`);
 	
 		// Since we ran wipe_all() above, do a single dump of public & taxa
 		await execWithOutput(`pg_dump -U ${username} -d ${database} -c --if-exists -E UTF8 -O -n "(data|taxa)" > schema.sql`);
