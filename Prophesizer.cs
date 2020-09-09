@@ -40,10 +40,9 @@ namespace SIBR {
 
     private JsonSerializerOptions serializerOptions;
 
-    private int minSeason = int.MaxValue;
-    private int maxSeason = int.MinValue;
-    private int minDay = int.MaxValue;
-    private int maxDay = int.MinValue;
+    private int minSeasonDay = int.MaxValue;
+    private int maxSeasonDay = int.MinValue;
+
     private int numEvents = 0;
 
     public Prophesizer(string bucketName) {
@@ -58,12 +57,16 @@ namespace SIBR {
 
     }
 
+    private static int MakeSeasonDay(int season, int day) {
+      return season * 10000 + day;
+    }
+
     public async Task Poll() {
       ConsoleOrWebhook($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
-      minSeason = int.MaxValue;
-      maxSeason = int.MinValue;
-      minDay = int.MaxValue;
-      maxDay = int.MinValue;
+
+      minSeasonDay = int.MaxValue;
+      maxSeasonDay = int.MinValue;
+
       numEvents = 0;
 
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
@@ -104,6 +107,11 @@ namespace SIBR {
 
       string msg = $"Processed {unprocessedLogs.updateLogs.Count} game update logs and {unprocessedLogs.hourlyLogs.Count} hourly logs.\n";
       if (numEvents > 0) {
+        int minDay = minSeasonDay % 10000;
+        int minSeason = minSeasonDay / 10000;
+        int maxDay = maxSeasonDay % 10000;
+        int maxSeason = maxSeasonDay / 10000;
+
         string rangeText = $"Season {minSeason + 1}, Day {minDay + 1} to Season {maxSeason + 1}, Day {maxDay + 1}";
         if (minSeason == maxSeason) {
           if (minDay == maxDay) {
@@ -164,7 +172,7 @@ namespace SIBR {
 
       Console.WriteLine("Determining which logs require processing...");
 
-      using (var importedLogsStatement = new NpgsqlCommand("SELECT key FROM imported_logs", psqlConnection))
+      using (var importedLogsStatement = new NpgsqlCommand("SELECT key FROM data.imported_logs", psqlConnection))
       using (var reader = await importedLogsStatement.ExecuteReaderAsync()) {
         var processedLogs = new List<string>();
 
@@ -229,10 +237,9 @@ namespace SIBR {
         var first = gameEvents.First();
         var last = gameEvents.Last();
 
-        minSeason = Math.Min(minSeason, gameEvents.Min(x => x.season));
-        maxSeason = Math.Max(maxSeason, gameEvents.Max(x => x.season));
-        minDay = Math.Min(minDay, gameEvents.Min(x => x.day));
-        maxDay = Math.Max(maxDay, gameEvents.Max(x => x.day));
+        minSeasonDay = Math.Min(minSeasonDay, MakeSeasonDay(first.season, first.day));
+        maxSeasonDay = Math.Max(maxSeasonDay, MakeSeasonDay(last.season, last.day));
+
         numEvents += gameEvents.Count();
 
         //Console.WriteLine($"Inserted {gameEvents.Count()} game_events (from S{first.season}D{first.day} to S{last.season}D{last.day}) into Postgres from {keyName}.");
@@ -267,24 +274,24 @@ namespace SIBR {
     }
 
     private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent) {
-      return new InsertCommand(psqlConnection, "game_events", gameEvent).Command;
+      return new InsertCommand(psqlConnection, "data.game_events", gameEvent).Command;
     }
 
     private NpgsqlCommand PrepareGameEventBaseRunnerStatements(NpgsqlConnection psqlConnection, int gameEventId, GameEventBaseRunner baseRunnerEvent) {
       var extra = new Dictionary<string, object>();
       extra["game_event_id"] = gameEventId;
-      return new InsertCommand(psqlConnection, "game_event_base_runners", baseRunnerEvent, extra).Command;
+      return new InsertCommand(psqlConnection, "data.game_event_base_runners", baseRunnerEvent, extra).Command;
     }
 
     private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEvent playerEvent) {
       var extra = new Dictionary<string, object>();
       extra["game_event_id"] = gameEventId;
-      return new InsertCommand(psqlConnection, "player_events", playerEvent, extra).Command;
+      return new InsertCommand(psqlConnection, "data.player_events", playerEvent, extra).Command;
     }
 
     private NpgsqlCommand PersistLogRecord(NpgsqlConnection psqlConnection, string keyName) {
       var persistLogStatement = new NpgsqlCommand(@"
-        INSERT INTO imported_logs(
+        INSERT INTO data.imported_logs(
           key,
           imported_at
         ) VALUES (
@@ -328,12 +335,29 @@ namespace SIBR {
               string json = reader.ReadLine();
               var hourly = JsonSerializer.Deserialize<HourlyArchive>(json, serializerOptions);
 
+              DateTime timestamp;
+
+              if(hourly.ClientMeta == null || hourly.ClientMeta.timestamp == null) {
+                
+                var dash = keyName.LastIndexOf('-');
+                var dot = keyName.IndexOf('.');
+                
+                string timeStr = keyName.Substring(dash+1, dot-dash-1);
+                long timeNum = long.Parse(timeStr);
+                // TODO make this a utility function already
+                timestamp = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                timestamp = timestamp.AddMilliseconds(timeNum);
+              }
+              else {
+                timestamp = hourly.ClientMeta.timestamp;
+              }
+
               switch (hourly.Endpoint) {
                 case "players":
-                  ProcessPlayers(hourly, psqlConnection);
+                  ProcessPlayers(hourly, timestamp, psqlConnection);
                   break;
                 case "allTeams":
-                  ProcessAllTeams((JsonElement)hourly.Data, hourly?.ClientMeta?.timestamp, psqlConnection);
+                  ProcessAllTeams((JsonElement)hourly.Data, timestamp, psqlConnection);
                   break;
                 case "offseasonSetup":
                   break;
@@ -363,13 +387,10 @@ namespace SIBR {
       return new Guid(data);
     }
 
-    private void ProcessPlayers(HourlyArchive hourly, NpgsqlConnection psqlConnection) {
+    private void ProcessPlayers(HourlyArchive hourly, DateTime timestamp, NpgsqlConnection psqlConnection) {
       string text = ((JsonElement)hourly.Data).GetRawText();
 
       IEnumerable<string> playerIds = hourly.Params["ids"];
-
-      DateTime fromTimestamp = hourly?.ClientMeta?.timestamp ?? DateTime.MinValue;
-      DateTime toTimestamp = hourly?.ClientMeta?.timestamp ?? DateTime.UtcNow;
 
       using (MD5 md5 = MD5.Create()) {
 
@@ -379,7 +400,7 @@ namespace SIBR {
           // TODO move hashing into Player
           var hash = HashObject(md5, p);
 
-          NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from players where hash=@hash and valid_until is null", psqlConnection);
+          NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.players where hash=@hash and valid_until is null", psqlConnection);
           cmd.Parameters.AddWithValue("hash", hash);
           var count = (long)cmd.ExecuteScalar();
 
@@ -387,17 +408,17 @@ namespace SIBR {
             // Record exists
           } else {
             // Update the old record
-            NpgsqlCommand update = new NpgsqlCommand(@"update players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
-            update.Parameters.AddWithValue("timestamp", toTimestamp);
+            NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
+            update.Parameters.AddWithValue("timestamp", timestamp);
             update.Parameters.AddWithValue("player_id", p.Id);
             int rows = update.ExecuteNonQuery();
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
             var extra = new Dictionary<string, object>();
             extra["hash"] = hash;
-            extra["valid_from"] = fromTimestamp;
+            extra["valid_from"] = timestamp;
             // Try to insert our current data
-            InsertCommand insertCmd = new InsertCommand(psqlConnection, "players", p, extra);
+            InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.players", p, extra);
             var newId = insertCmd.Command.ExecuteNonQuery();
 
           }
@@ -406,11 +427,9 @@ namespace SIBR {
     }
 
 
-    private void ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime? timestamp, string teamId, string playerId, int rosterPosition) {
-      DateTime fromTimestamp = timestamp ?? DateTime.MinValue;
-      DateTime toTimestamp = timestamp ?? DateTime.UtcNow;
+    private void ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime timestamp, string teamId, string playerId, int rosterPosition) {
 
-      NpgsqlCommand cmd = new NpgsqlCommand(@"select player_id from team_roster where team_id=@team_id and position_id=@position_id and valid_until is null", psqlConnection);
+      NpgsqlCommand cmd = new NpgsqlCommand(@"select player_id from data.team_roster where team_id=@team_id and position_id=@position_id and valid_until is null", psqlConnection);
       cmd.Parameters.AddWithValue("team_id", teamId);
       cmd.Parameters.AddWithValue("position_id", rosterPosition);
       var oldPlayerId = (string)cmd.ExecuteScalar();
@@ -419,18 +438,18 @@ namespace SIBR {
         // No change
       } else {
         // Update the old record
-        NpgsqlCommand update = new NpgsqlCommand(@"update team_roster set valid_until=@timestamp where team_id = @team_id and position_id = @position_id and valid_until is null", psqlConnection);
-        update.Parameters.AddWithValue("timestamp", toTimestamp);
+        NpgsqlCommand update = new NpgsqlCommand(@"update data.team_roster set valid_until=@timestamp where team_id = @team_id and position_id = @position_id and valid_until is null", psqlConnection);
+        update.Parameters.AddWithValue("timestamp", timestamp);
         update.Parameters.AddWithValue("team_id", teamId);
         update.Parameters.AddWithValue("position_id", rosterPosition);
         int rows = update.ExecuteNonQuery();
         if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
-        NpgsqlCommand insert = new NpgsqlCommand(@"insert into team_roster(team_id, position_id, player_id, valid_from) values(@team_id, @position_id, @player_id, @valid_from)", psqlConnection);
+        NpgsqlCommand insert = new NpgsqlCommand(@"insert into data.team_roster(team_id, position_id, player_id, valid_from) values(@team_id, @position_id, @player_id, @valid_from)", psqlConnection);
         insert.Parameters.AddWithValue("team_id", teamId);
         insert.Parameters.AddWithValue("position_id", rosterPosition);
         insert.Parameters.AddWithValue("player_id", playerId);
-        insert.Parameters.AddWithValue("valid_from", fromTimestamp);
+        insert.Parameters.AddWithValue("valid_from", timestamp);
         // Try to insert our current data
         rows = insert.ExecuteNonQuery();
         if (rows == 0) throw new InvalidOperationException($"Failed to insert new team roster entry");
@@ -438,7 +457,7 @@ namespace SIBR {
 
     }
 
-    private void ProcessRoster(Team t, DateTime? timestamp, NpgsqlConnection psqlConnection) {
+    private void ProcessRoster(Team t, DateTime timestamp, NpgsqlConnection psqlConnection) {
 
       int rosterPosition = 0;
       foreach (var playerId in t.Lineup) {
@@ -466,11 +485,8 @@ namespace SIBR {
       return new Guid(data);
     }
 
-    private void ProcessAllTeams(JsonElement teamResponse, DateTime? timestamp, NpgsqlConnection psqlConnection) {
+    private void ProcessAllTeams(JsonElement teamResponse, DateTime timestamp, NpgsqlConnection psqlConnection) {
       string text = teamResponse.GetRawText();
-
-      DateTime fromTimestamp = timestamp ?? DateTime.MinValue;
-      DateTime toTimestamp = timestamp ?? DateTime.UtcNow;
 
       var teams = JsonSerializer.Deserialize<IEnumerable<Team>>(text, serializerOptions);
 
@@ -480,7 +496,7 @@ namespace SIBR {
           ProcessRoster(t, timestamp, psqlConnection);
 
           var hash = HashTeamAttrs(md5, t);
-          NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from teams where hash=@hash and valid_until is null", psqlConnection);
+          NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.teams where hash=@hash and valid_until is null", psqlConnection);
           cmd.Parameters.AddWithValue("hash", hash);
           var count = (long)cmd.ExecuteScalar();
 
@@ -489,17 +505,17 @@ namespace SIBR {
           }
           else {
             // Update the old record
-            NpgsqlCommand update = new NpgsqlCommand(@"update teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
-            update.Parameters.AddWithValue("timestamp", toTimestamp);
+            NpgsqlCommand update = new NpgsqlCommand(@"update data.teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
+            update.Parameters.AddWithValue("timestamp", timestamp);
             update.Parameters.AddWithValue("team_id", t.Id);
             int rows = update.ExecuteNonQuery();
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
             var extra = new Dictionary<string, object>();
-            extra["valid_from"] = fromTimestamp;
+            extra["valid_from"] = timestamp;
             extra["hash"] = hash;
             // Try to insert our current data
-            InsertCommand insertCmd = new InsertCommand(psqlConnection, "teams", t, extra);
+            InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.teams", t, extra);
             var newId = insertCmd.Command.ExecuteNonQuery();
 
           }
@@ -517,7 +533,7 @@ namespace SIBR {
 
         // Record the first time seen for each season and day
         var updateTimeMap = new NpgsqlCommand(@"
-        insert into time_map values(@season, @day, @first_time)
+        insert into data.time_map values(@season, @day, @first_time)
         on conflict (season, day)  do
         update set first_time = EXCLUDED.first_time
         where time_map.first_time > EXCLUDED.first_time;
@@ -537,7 +553,7 @@ namespace SIBR {
     /// </summary>
     private NpgsqlCommand InsertGameCommand(NpgsqlConnection psqlConnection, Game game) {
       var insertGameStatement = new NpgsqlCommand(@"
-            INSERT INTO games
+            INSERT INTO data.games
             (
                 game_id, day, season, home_odds, away_odds, weather, is_postseason, series_index, series_length,
                 home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame,
@@ -583,8 +599,8 @@ namespace SIBR {
       int season = 0;
       int day = -1;
       using (var gamesCommand = new NpgsqlCommand(@"
-                SELECT MAX(season), MAX(day) from games
-                INNER JOIN (SELECT MAX(season) AS max_season FROM games) b ON b.max_season = games.season",
+                SELECT MAX(season), MAX(day) from data.games
+                INNER JOIN (SELECT MAX(season) AS max_season FROM data.games) b ON b.max_season = games.season",
           psqlConnection))
       using (var reader = await gamesCommand.ExecuteReaderAsync()) {
 
