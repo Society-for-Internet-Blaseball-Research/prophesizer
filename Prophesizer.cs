@@ -469,6 +469,16 @@ namespace SIBR {
         ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition);
         rosterPosition++;
       }
+
+      foreach (var playerId in t.Bullpen) {
+        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition);
+        rosterPosition++;
+      }
+
+      foreach (var playerId in t.Bench) {
+        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition);
+        rosterPosition++;
+      }
     }
 
     // Hash just the basic attributes of a team, not including their player roster
