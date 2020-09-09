@@ -40,10 +40,9 @@ namespace SIBR {
 
     private JsonSerializerOptions serializerOptions;
 
-    private int minSeason = int.MaxValue;
-    private int maxSeason = int.MinValue;
-    private int minDay = int.MaxValue;
-    private int maxDay = int.MinValue;
+    private int minSeasonDay = int.MaxValue;
+    private int maxSeasonDay = int.MinValue;
+
     private int numEvents = 0;
 
     public Prophesizer(string bucketName) {
@@ -58,12 +57,16 @@ namespace SIBR {
 
     }
 
+    private static int MakeSeasonDay(int season, int day) {
+      return season * 10000 + day;
+    }
+
     public async Task Poll() {
       ConsoleOrWebhook($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
-      minSeason = int.MaxValue;
-      maxSeason = int.MinValue;
-      minDay = int.MaxValue;
-      maxDay = int.MinValue;
+
+      minSeasonDay = int.MaxValue;
+      maxSeasonDay = int.MinValue;
+
       numEvents = 0;
 
       await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
@@ -104,6 +107,11 @@ namespace SIBR {
 
       string msg = $"Processed {unprocessedLogs.updateLogs.Count} game update logs and {unprocessedLogs.hourlyLogs.Count} hourly logs.\n";
       if (numEvents > 0) {
+        int minDay = minSeasonDay % 10000;
+        int minSeason = minSeasonDay / 10000;
+        int maxDay = maxSeasonDay % 10000;
+        int maxSeason = maxSeasonDay / 10000;
+
         string rangeText = $"Season {minSeason + 1}, Day {minDay + 1} to Season {maxSeason + 1}, Day {maxDay + 1}";
         if (minSeason == maxSeason) {
           if (minDay == maxDay) {
@@ -229,10 +237,9 @@ namespace SIBR {
         var first = gameEvents.First();
         var last = gameEvents.Last();
 
-        minSeason = Math.Min(minSeason, gameEvents.Min(x => x.season));
-        maxSeason = Math.Max(maxSeason, gameEvents.Max(x => x.season));
-        minDay = Math.Min(minDay, gameEvents.Min(x => x.day));
-        maxDay = Math.Max(maxDay, gameEvents.Max(x => x.day));
+        minSeasonDay = Math.Min(minSeasonDay, MakeSeasonDay(first.season, first.day));
+        maxSeasonDay = Math.Max(maxSeasonDay, MakeSeasonDay(last.season, last.day));
+
         numEvents += gameEvents.Count();
 
         //Console.WriteLine($"Inserted {gameEvents.Count()} game_events (from S{first.season}D{first.day} to S{last.season}D{last.day}) into Postgres from {keyName}.");
