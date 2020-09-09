@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.3
--- Dumped by pg_dump version 12.3
+-- Dumped from database version 12.4
+-- Dumped by pg_dump version 12.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -16,35 +16,39 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-ALTER TABLE IF EXISTS ONLY public.player_events DROP CONSTRAINT IF EXISTS player_events_game_event_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_game_event_id_fkey;
+ALTER TABLE IF EXISTS ONLY data.player_events DROP CONSTRAINT IF EXISTS player_events_game_event_id_fkey;
+ALTER TABLE IF EXISTS ONLY data.game_events DROP CONSTRAINT IF EXISTS game_events_game_id_fkey;
+ALTER TABLE IF EXISTS ONLY data.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_game_event_id_fkey;
+ALTER TABLE IF EXISTS ONLY taxa.positions DROP CONSTRAINT IF EXISTS positions_pkey;
 ALTER TABLE IF EXISTS ONLY taxa.event_types DROP CONSTRAINT IF EXISTS event_types_pkey;
-ALTER TABLE IF EXISTS ONLY public.time_map DROP CONSTRAINT IF EXISTS time_map_pkey;
-ALTER TABLE IF EXISTS ONLY public.teams DROP CONSTRAINT IF EXISTS teams_pkey;
-ALTER TABLE IF EXISTS ONLY public.time_map DROP CONSTRAINT IF EXISTS season_day_unique;
-ALTER TABLE IF EXISTS ONLY public.players DROP CONSTRAINT IF EXISTS players_pkey;
-ALTER TABLE IF EXISTS ONLY public.player_events DROP CONSTRAINT IF EXISTS player_events_pkey;
-ALTER TABLE IF EXISTS ONLY public.imported_logs DROP CONSTRAINT IF EXISTS imported_logs_pkey;
-ALTER TABLE IF EXISTS ONLY public.games DROP CONSTRAINT IF EXISTS game_pkey;
-ALTER TABLE IF EXISTS ONLY public.game_events DROP CONSTRAINT IF EXISTS game_events_pkey;
-ALTER TABLE IF EXISTS ONLY public.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_pkey;
+ALTER TABLE IF EXISTS ONLY data.time_map DROP CONSTRAINT IF EXISTS time_map_pkey;
+ALTER TABLE IF EXISTS ONLY data.teams DROP CONSTRAINT IF EXISTS teams_pkey;
+ALTER TABLE IF EXISTS ONLY data.team_roster DROP CONSTRAINT IF EXISTS team_roster_pkey;
+ALTER TABLE IF EXISTS ONLY data.time_map DROP CONSTRAINT IF EXISTS season_day_unique;
+ALTER TABLE IF EXISTS ONLY data.players DROP CONSTRAINT IF EXISTS players_pkey;
+ALTER TABLE IF EXISTS ONLY data.player_events DROP CONSTRAINT IF EXISTS player_events_pkey;
+ALTER TABLE IF EXISTS ONLY data.imported_logs DROP CONSTRAINT IF EXISTS imported_logs_pkey;
+ALTER TABLE IF EXISTS ONLY data.games DROP CONSTRAINT IF EXISTS game_pkey;
+ALTER TABLE IF EXISTS ONLY data.game_events DROP CONSTRAINT IF EXISTS game_events_pkey;
+ALTER TABLE IF EXISTS ONLY data.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_pkey;
 ALTER TABLE IF EXISTS taxa.vibe_to_arrows ALTER COLUMN vibe_to_arrow_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.modifications ALTER COLUMN modification_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.leagues ALTER COLUMN league_db_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.event_types ALTER COLUMN event_type_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.divisions ALTER COLUMN division_db_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.attributes ALTER COLUMN attribute_id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.time_map ALTER COLUMN time_map_id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.teams ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.team_roster ALTER COLUMN team_roster_id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.players ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.player_events ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.imported_logs ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.game_events ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.game_event_base_runners ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS data.time_map ALTER COLUMN time_map_id DROP DEFAULT;
+ALTER TABLE IF EXISTS data.teams ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS data.team_roster ALTER COLUMN team_roster_id DROP DEFAULT;
+ALTER TABLE IF EXISTS data.players ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS data.player_events ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS data.imported_logs ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS data.game_events ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS data.game_event_base_runners ALTER COLUMN id DROP DEFAULT;
 DROP TABLE IF EXISTS taxa.weather;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq;
 DROP TABLE IF EXISTS taxa.vibe_to_arrows;
+DROP TABLE IF EXISTS taxa.positions;
 DROP TABLE IF EXISTS taxa.player_fk_attributes;
 DROP SEQUENCE IF EXISTS taxa.modifications_modification_id_seq;
 DROP TABLE IF EXISTS taxa.modifications;
@@ -57,65 +61,63 @@ DROP TABLE IF EXISTS taxa.coffee;
 DROP TABLE IF EXISTS taxa.blood;
 DROP SEQUENCE IF EXISTS taxa.attributes_attribute_id_seq;
 DROP TABLE IF EXISTS taxa.attributes;
-DROP SEQUENCE IF EXISTS public.time_map_time_map_id_seq;
-DROP TABLE IF EXISTS public.time_map;
-DROP SEQUENCE IF EXISTS public.teams_id_seq;
-DROP SEQUENCE IF EXISTS public.team_positions_team_position_id_seq;
-DROP VIEW IF EXISTS public.season_leaders_outs_defended;
-DROP VIEW IF EXISTS public.season_leaders_on_base_slugging;
-DROP VIEW IF EXISTS public.season_leaders_slugging;
-DROP VIEW IF EXISTS public.season_leaders_on_base_perecentage;
-DROP VIEW IF EXISTS public.season_leaders_batting_average_risp;
-DROP VIEW IF EXISTS public.season_leaders_batting_average;
+DROP SEQUENCE IF EXISTS data.time_map_time_map_id_seq;
+DROP TABLE IF EXISTS data.time_map;
+DROP SEQUENCE IF EXISTS data.teams_id_seq;
+DROP SEQUENCE IF EXISTS data.team_positions_team_position_id_seq;
+DROP VIEW IF EXISTS data.season_leaders_outs_defended;
+DROP VIEW IF EXISTS data.season_leaders_on_base_slugging;
+DROP VIEW IF EXISTS data.season_leaders_slugging;
+DROP VIEW IF EXISTS data.season_leaders_on_base_perecentage;
+DROP VIEW IF EXISTS data.season_leaders_batting_average_risp;
+DROP VIEW IF EXISTS data.season_leaders_batting_average;
 DROP TABLE IF EXISTS taxa.event_types;
-DROP TABLE IF EXISTS public.teams;
-DROP TABLE IF EXISTS public.team_roster;
-DROP SEQUENCE IF EXISTS public.players_id_seq;
-DROP TABLE IF EXISTS public.players;
-DROP TABLE IF EXISTS public.player_idols;
-DROP SEQUENCE IF EXISTS public.player_events_id_seq;
-DROP TABLE IF EXISTS public.player_events;
-DROP SEQUENCE IF EXISTS public.imported_logs_id_seq;
-DROP TABLE IF EXISTS public.imported_logs;
-DROP TABLE IF EXISTS public.games;
-DROP SEQUENCE IF EXISTS public.game_events_id_seq;
-DROP TABLE IF EXISTS public.game_events;
-DROP SEQUENCE IF EXISTS public.game_event_base_runners_id_seq;
-DROP TABLE IF EXISTS public.game_event_base_runners;
-DROP PROCEDURE IF EXISTS public.wipe_hourly();
-DROP PROCEDURE IF EXISTS public.wipe_events();
-DROP PROCEDURE IF EXISTS public.wipe_all();
-DROP FUNCTION IF EXISTS public.timestamp_to_gameday(in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS public.team_from_timestamp(in_team_id character varying, in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS public.team_from_gameday(in_team_id character varying, in_season integer, in_gameday integer);
-DROP FUNCTION IF EXISTS public.season_timespan(in_season integer);
-DROP FUNCTION IF EXISTS public.round_half_even(val numeric, prec integer);
-DROP FUNCTION IF EXISTS public.rating_to_star(in_rating numeric);
-DROP FUNCTION IF EXISTS public.player_from_timestamp(in_player_id character varying, in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS public.player_from_gameday(in_player_id character varying, in_season integer, in_gameday integer);
-DROP FUNCTION IF EXISTS public.player_day_vibe(in_player_id character varying, in_gameday integer, valid_until timestamp without time zone);
-DROP FUNCTION IF EXISTS public.pitching_rating(in_player_id character varying, valid_until timestamp without time zone);
-DROP FUNCTION IF EXISTS public.last_position(in_string text, in_search text);
-DROP FUNCTION IF EXISTS public.get_player_star_ratings(in_player_id character varying, valid_until timestamp without time zone);
-DROP FUNCTION IF EXISTS public.defense_rating(in_player_id character varying, valid_until timestamp without time zone);
-DROP FUNCTION IF EXISTS public.current_season();
-DROP FUNCTION IF EXISTS public.batting_rating(in_player_id character varying, valid_until timestamp without time zone);
-DROP FUNCTION IF EXISTS public.baserunning_rating(in_player_id character varying, valid_until timestamp without time zone);
-DROP FUNCTION IF EXISTS public.bankers_round(in_val numeric, in_prec integer);
+DROP TABLE IF EXISTS data.teams;
+DROP TABLE IF EXISTS data.team_roster;
+DROP SEQUENCE IF EXISTS data.players_id_seq;
+DROP TABLE IF EXISTS data.players;
+DROP SEQUENCE IF EXISTS data.player_events_id_seq;
+DROP TABLE IF EXISTS data.player_events;
+DROP SEQUENCE IF EXISTS data.imported_logs_id_seq;
+DROP TABLE IF EXISTS data.imported_logs;
+DROP TABLE IF EXISTS data.games;
+DROP SEQUENCE IF EXISTS data.game_events_id_seq;
+DROP TABLE IF EXISTS data.game_events;
+DROP SEQUENCE IF EXISTS data.game_event_base_runners_id_seq;
+DROP TABLE IF EXISTS data.game_event_base_runners;
+DROP PROCEDURE IF EXISTS data.wipe_hourly();
+DROP PROCEDURE IF EXISTS data.wipe_events();
+DROP PROCEDURE IF EXISTS data.wipe_all();
+DROP FUNCTION IF EXISTS data.teams_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.team_roster_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.season_timespan(in_season integer);
+DROP FUNCTION IF EXISTS data.round_half_even(val numeric, prec integer);
+DROP FUNCTION IF EXISTS data.rating_to_star(in_rating numeric);
+DROP FUNCTION IF EXISTS data.players_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.player_id_from_timestamp(in_player_id character varying, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.player_day_vibe(in_player_id character varying, in_gameday integer, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.pitching_rating(in_player_id character varying, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.last_position(in_string text, in_search text);
+DROP FUNCTION IF EXISTS data.gameday_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.current_season();
+DROP FUNCTION IF EXISTS data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.bankers_round(in_val numeric, in_prec integer);
 DROP SCHEMA IF EXISTS taxa;
-DROP SCHEMA IF EXISTS public;
+DROP SCHEMA IF EXISTS data;
 --
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA public;
-
-
---
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
+-- Name: data; Type: SCHEMA; Schema: -; Owner: -
 --
 
-COMMENT ON SCHEMA public IS 'standard public schema';
+CREATE SCHEMA data;
+
+
+--
+-- Name: SCHEMA data; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA data IS 'standard data schema';
 
 
 --
@@ -126,10 +128,10 @@ CREATE SCHEMA taxa;
 
 
 --
--- Name: bankers_round(numeric, integer); Type: FUNCTION; Schema: public; Owner: -
+-- Name: bankers_round(numeric, integer); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.bankers_round(in_val numeric, in_prec integer) RETURNS numeric
+CREATE FUNCTION data.bankers_round(in_val numeric, in_prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
     AS $$
 
@@ -139,723 +141,107 @@ CREATE FUNCTION public.bankers_round(in_val numeric, in_prec integer) RETURNS nu
 
 
 declare
-
-
-
-
-
-
     retval numeric;
-
-
-
-
-
-
     difference numeric;
-
-
-
-
-
-
     even boolean;
-
-
-
-
-
-
+	
 begin
-
-
-
-
-
-
     retval := round(in_val,in_prec);
-
-
-
-
-
-
     difference := retval-in_val;
-
-
-
-
-
-
     if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
-
-
-
-
-
-
         even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
-
-
-
-
-
-
         if not even then
-
-
-
-
-
-
             retval := round(val-difference,in_prec);
-
-
-
-
-
-
         end if;
-
-
-
-
-
-
     end if;
-
-
-
-
-
-
     return retval;
-
-
-
-
-
-
 end;
 
-
-
-
-
-
 $$;
 
 
 --
--- Name: baserunning_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: baserunning_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.baserunning_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
     AS $$
-
-
-
-
-
-
-
 SELECT 
-
-
-
-
-
-
-
 	power(p.laserlikeness,0.5) *
-
-
-
-
-
-
-
    	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
-
-
-
-
-
-
-
-FROM players p
-
-
-
-
-
-
-
-WHERE 
-
-
-
-
-
-
-
---player_name = 'Jessica Telephone'
-
-
-
-
-
-
-
-player_id = in_player_id
-
-
-
-
-
-
-
-AND coalesce(valid_until::text,'') = '';
-
-
-
-
-
-
-
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE p.player_id = in_player_id
 $$;
 
 
 --
--- Name: batting_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: batting_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.batting_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
     AS $$
-
-
-
-
-
-
-
 SELECT 
-
-
-
-
-
-
-
-power((1 - p.tragicness),0.01) * 
-
-
-
-
-
-
-
-	power((1 - p.patheticism),0.05) *
-
-
-
-
-
-
-
+   power((1 - p.tragicness),0.01) * 
+   power((1 - p.patheticism),0.05) *
    power((p.thwackability * p.divinity),0.35) *
-
-
-
-
-
-
-
    power((p.moxie * p.musclitude),0.075) * 
-
-
-
-
-
-
-
-	power(p.martyrdom,0.02)
-
-
-
-
-
-
-
-FROM players p
-
-
-
-
-
-
-
-WHERE 
-
-
-
-
-
-
-
---player_name = 'Jessica Telephone'
-
-
-
-
-
-
-
-player_id = in_player_id
-
-
-
-
-
-
-
-AND coalesce(valid_until::text,'') = '';
-
-
-
-
-
-
-
+   power(p.martyrdom,0.02)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE player_id = in_player_id;
 $$;
 
 
 --
--- Name: current_season(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: current_season(); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.current_season() RETURNS integer
+CREATE FUNCTION data.current_season() RETURNS integer
     LANGUAGE sql
     AS $$
-
-
-
-
-
-
 
 SELECT max(season) from games;
 
-
-
-
-
-
-
 $$;
 
 
 --
--- Name: defense_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: defense_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.defense_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
     AS $$
-
-
-
-
-
-
-
 SELECT 
-
-
-
-
-
-
-
 	power((p.omniscience * p.tenaciousness),0.2) *
-
-
-
-
-
-
-
    	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
-
-
-
-
-
-
-
-FROM players p
-
-
-
-
-
-
-
-WHERE 
-
-
-
-
-
-
-
---player_name = 'Jessica Telephone'
-
-
-
-
-
-
-
-player_id = in_player_id
-
-
-
-
-
-
-
-AND coalesce(valid_until::text,'') = '';
-
-
-
-
-
-
-
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE p.player_id = in_player_id;
 $$;
 
 
 --
--- Name: get_player_star_ratings(character varying, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: gameday_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.get_player_star_ratings(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS TABLE(baserunning_rating numeric, batting_rating numeric, defense_rating numeric, pitching_rating numeric)
+CREATE FUNCTION data.gameday_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(season integer, gameday integer)
     LANGUAGE sql
     AS $$
-
-
-
-
-
-
-
-SELECT 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0.5 * round_half_even(( 
-
-
-
-
-
-
-
+SELECT season, day
+FROM data.time_map
+WHERE first_time =
 (
-
-
-
-
-
-
-
-	power(p.laserlikeness,0.5) *
-
-
-
-
-
-
-
-   power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
-
-
-
-
-
-
-
-) * 10),0) AS baserunner_rating,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0.5 * round_half_even((
-
-
-
-
-
-
-
-( 
-
-
-
-
-
-
-
-	power((1 - p.tragicness),0.01) * 
-
-
-
-
-
-
-
-	power((1 - p.patheticism),0.05) *
-
-
-
-
-
-
-
-   power((p.thwackability * p.divinity),0.35) *
-
-
-
-
-
-
-
-   power((p.moxie * p.musclitude),0.075) * 
-
-
-
-
-
-
-
-	power(p.martyrdom,0.02)
-
-
-
-
-
-
-
-) * 10),0) AS batter_rating,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0.5 * round_half_even((
-
-
-
-
-
-
-
-(
-
-
-
-
-
-
-
-	power((p.omniscience * p.tenaciousness),0.2) *
-
-
-
-
-
-
-
-   power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
-
-
-
-
-
-
-
-) * 10),0) AS defense_rating,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0.5 * round_half_even((
-
-
-
-
-
-
-
-(
-
-
-
-
-
-
-
-	power(p.unthwackability,0.5) * 
-
-
-
-
-
-
-
-	power(p.ruthlessness,0.4) *
-
-
-
-
-
-
-
-   power(p.overpowerment,0.15) * 
-
-
-
-
-
-
-
-	power(p.shakespearianism,0.1) * 
-
-
-
-
-
-
-
-	power(p.coldness,0.025)
-
-
-
-
-
-
-
-) * 10),0) AS pitching_rating
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-FROM players p
-
-
-
-
-
-
-
-WHERE 
-
-
-
-
-
-
-
---player_name = 'Jessica Telephone'
-
-
-
-
-
-
-
-player_id = in_player_id
-
-
-
-
-
-
-
-AND coalesce(valid_until::text,'') = '';
-
-
-
-
-
-
-
+	SELECT max(first_time) FROM data.time_map WHERE first_time < in_timestamp
+)
 $$;
 
 
 --
--- Name: last_position(text, text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: last_position(text, text); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.last_position(in_string text, in_search text) RETURNS integer
+CREATE FUNCTION data.last_position(in_string text, in_search text) RETURNS integer
     LANGUAGE sql
     AS $$ 
 
@@ -896,338 +282,78 @@ $$;
 
 
 --
--- Name: pitching_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: pitching_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.pitching_rating(in_player_id character varying, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.pitching_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
     AS $$
-
-
-
-
-
-
-
 SELECT 
-
-
-
-
-
-
-
-	power(p.unthwackability,0.5) * 
-
-
-
-
-
-
-
-	power(p.ruthlessness,0.4) *
-
-
-
-
-
-
-
-   	power(p.overpowerment,0.15) * 
-
-
-
-
-
-
-
-	power(p.shakespearianism,0.1) * 
-
-
-
-
-
-
-
-	power(p.coldness,0.025)
-
-
-
-
-
-
-
-FROM players p
-
-
-
-
-
-
-
+power(p.unthwackability,0.5) * 
+power(p.ruthlessness,0.4) *
+power(p.overpowerment,0.15) * 
+power(p.shakespearianism,0.1) * 
+power(p.coldness,0.025)
+FROM data.players_from_timestamp(in_timestamp) p
 WHERE 
-
-
-
-
-
-
-
---player_name = 'Jessica Telephone'
-
-
-
-
-
-
-
-player_id = in_player_id
-
-
-
-
-
-
-
-AND coalesce(valid_until::text,'') = '';
-
-
-
-
-
-
-
+p.player_id = in_player_id;
 $$;
 
 
 --
--- Name: player_day_vibe(character varying, integer, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: player_day_vibe(character varying, integer, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.player_day_vibe(in_player_id character varying, in_gameday integer DEFAULT 0, valid_until timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.player_day_vibe(in_player_id character varying, in_gameday integer DEFAULT 0, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
     AS $$
-
-
-
-
-
-
 SELECT 
-
-
-
-
-
-
 (0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
-
-
-
-
-
-
-	(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
-
-
-
-
-
-
-    * p.pressurization + .5 * p.cinnamon)::numeric
-
-
-
-
-
-
-FROM players p
-
-
-
-
-
-
+(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
+* p.pressurization + .5 * p.cinnamon)::numeric
+FROM data.players_from_timestamp(in_timestamp) p
 WHERE 
-
-
-
-
-
-
---player_name = 'Jessica Telephone'
-
-
-
-
-
-
-player_id = in_player_id
-
-
-
-
-
-
-AND coalesce(valid_until::text,'') = '';
-
-
-
-
-
-
+p.player_id = in_player_id;
 $$;
 
 
 --
--- Name: player_from_gameday(character varying, integer, integer); Type: FUNCTION; Schema: public; Owner: -
+-- Name: player_id_from_timestamp(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.player_from_gameday(in_player_id character varying, in_season integer, in_gameday integer) RETURNS integer
+CREATE FUNCTION data.player_id_from_timestamp(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS integer
     LANGUAGE sql
     AS $$
-
-
-
-
-
-
-	SELECT min(id)
-
-
-
-
-
-
+	SELECT id
 	FROM players
-
-
-
-
-
-
 	WHERE player_id = in_player_id
-
-
-
-
-
-
-	AND valid_until >
-
-
-
-
-
-
-	(
-
-
-
-
-
-
-		SELECT first_time
-
-
-
-
-
-
-		FROM time_map
-
-
-
-
-
-
-		WHERE season = in_season
-
-
-
-
-
-
-		AND DAY = in_gameday
-
-
-
-
-
-
-	)
-
-
-
-
-
-
-
-
-
-
-
-
-
+	AND in_timestamp + (INTERVAL '1 millisecond') 
+	BETWEEN valid_from AND coalesce(valid_until,NOW() + (INTERVAL '1 millisecond'));	
 $$;
 
 
 --
--- Name: player_from_timestamp(character varying, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: players_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.player_from_timestamp(in_player_id character varying, in_timestamp timestamp without time zone) RETURNS integer
-    LANGUAGE sql
+CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric, pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint)
+    LANGUAGE plpgsql
     AS $$
-
-
-
-
-
-
-	SELECT min(id)
-
-
-
-
-
-
-	FROM players
-
-
-
-
-
-
-	WHERE player_id = in_player_id
-
-
-
-
-
-
-	AND valid_until > in_timestamp
-
-
-
-
-
-
-
-
-
-
-
-
-
-$$;
+begin
+	return query 
+		select *
+		from data.teams t
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
+end;$$;
 
 
 --
--- Name: rating_to_star(numeric); Type: FUNCTION; Schema: public; Owner: -
+-- Name: rating_to_star(numeric); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.rating_to_star(in_rating numeric) RETURNS numeric
+CREATE FUNCTION data.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
     AS $$
 
@@ -1257,10 +383,10 @@ $$;
 
 
 --
--- Name: round_half_even(numeric, integer); Type: FUNCTION; Schema: public; Owner: -
+-- Name: round_half_even(numeric, integer); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.round_half_even(val numeric, prec integer) RETURNS numeric
+CREATE FUNCTION data.round_half_even(val numeric, prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
     AS $$
 
@@ -1394,10 +520,10 @@ $$;
 
 
 --
--- Name: season_timespan(integer); Type: FUNCTION; Schema: public; Owner: -
+-- Name: season_timespan(integer); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.season_timespan(in_season integer) RETURNS TABLE(season_start timestamp without time zone, season_end timestamp without time zone)
+CREATE FUNCTION data.season_timespan(in_season integer) RETURNS TABLE(season_start timestamp without time zone, season_end timestamp without time zone)
     LANGUAGE sql
     AS $$
 
@@ -1487,212 +613,45 @@ $$;
 
 
 --
--- Name: team_from_gameday(character varying, integer, integer); Type: FUNCTION; Schema: public; Owner: -
+-- Name: team_roster_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.team_from_gameday(in_team_id character varying, in_season integer, in_gameday integer) RETURNS integer
-    LANGUAGE sql
+CREATE FUNCTION data.team_roster_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(team_roster_id integer, team_id character varying, position_id integer, valid_from timestamp without time zone, valid_until timestamp without time zone, player_id character varying)
+    LANGUAGE plpgsql
     AS $$
-
-
-
-
-
-
-	SELECT min(id)
-
-
-
-
-
-
-	FROM teams
-
-
-
-
-
-
-	WHERE team_id = team_id
-
-
-
-
-
-
-	AND valid_until >
-
-
-
-
-
-
-	(
-
-
-
-
-
-
-		SELECT first_time
-
-
-
-
-
-
-		FROM time_map
-
-
-
-
-
-
-		WHERE season = in_season
-
-
-
-
-
-
-		AND DAY = in_gameday
-
-
-
-
-
-
-	)
-
-
-
-
-
-
-
-
-
-
-
-
-
-$$;
+begin
+	return query 
+		select *
+		--tr.team_roster_id, tr.team_id, tr.position_id, tr.valid_from, tr.valid_until, tr.player_id 
+		from data.team_roster tr
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN tr.valid_from AND coalesce(tr.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
+end;$$;
 
 
 --
--- Name: team_from_timestamp(character varying, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: teams_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.team_from_timestamp(in_team_id character varying, in_timestamp timestamp without time zone) RETURNS integer
-    LANGUAGE sql
+CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(id integer, team_id character varying, location text, nickname text, full_name text, valid_from timestamp without time zone, valid_until timestamp without time zone, hash uuid)
+    LANGUAGE plpgsql
     AS $$
-
-
-
-
-
-
-	SELECT min(id)
-
-
-
-
-
-
-	FROM teams
-
-
-
-
-
-
-	WHERE team_id = in_team_id
-
-
-
-
-
-
-	AND valid_until > in_timestamp
-
-
-
-
-
-
-
-
-
-
-
-
-
-$$;
+begin
+	return query 
+		select *
+		from data.teams t
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
+end;$$;
 
 
 --
--- Name: timestamp_to_gameday(timestamp without time zone); Type: FUNCTION; Schema: public; Owner: -
+-- Name: wipe_all(); Type: PROCEDURE; Schema: data; Owner: -
 --
 
-CREATE FUNCTION public.timestamp_to_gameday(in_timestamp timestamp without time zone) RETURNS TABLE(season integer, gameday integer)
-    LANGUAGE sql
-    AS $$
-
-
-
-
-
-
-SELECT season, day
-
-
-
-
-
-
-FROM time_map
-
-
-
-
-
-
-WHERE first_time =
-
-
-
-
-
-
-(
-
-
-
-
-
-
-	SELECT max(first_time) FROM time_map WHERE first_time < in_timestamp
-
-
-
-
-
-
-)
-
-
-
-
-
-
-$$;
-
-
---
--- Name: wipe_all(); Type: PROCEDURE; Schema: public; Owner: -
---
-
-CREATE PROCEDURE public.wipe_all()
+CREATE PROCEDURE data.wipe_all()
     LANGUAGE plpgsql
     AS $$begin
 
@@ -1710,10 +669,10 @@ end;$$;
 
 
 --
--- Name: wipe_events(); Type: PROCEDURE; Schema: public; Owner: -
+-- Name: wipe_events(); Type: PROCEDURE; Schema: data; Owner: -
 --
 
-CREATE PROCEDURE public.wipe_events()
+CREATE PROCEDURE data.wipe_events()
     LANGUAGE plpgsql
     AS $$begin
 
@@ -1735,10 +694,10 @@ end;$$;
 
 
 --
--- Name: wipe_hourly(); Type: PROCEDURE; Schema: public; Owner: -
+-- Name: wipe_hourly(); Type: PROCEDURE; Schema: data; Owner: -
 --
 
-CREATE PROCEDURE public.wipe_hourly()
+CREATE PROCEDURE data.wipe_hourly()
     LANGUAGE plpgsql
     AS $$begin
 
@@ -1772,10 +731,10 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: game_event_base_runners; Type: TABLE; Schema: public; Owner: -
+-- Name: game_event_base_runners; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.game_event_base_runners (
+CREATE TABLE data.game_event_base_runners (
     id integer NOT NULL,
     game_event_id integer,
     runner_id character varying(36),
@@ -1789,10 +748,10 @@ CREATE TABLE public.game_event_base_runners (
 
 
 --
--- Name: game_event_base_runners_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: game_event_base_runners_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
-CREATE SEQUENCE public.game_event_base_runners_id_seq
+CREATE SEQUENCE data.game_event_base_runners_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1802,17 +761,17 @@ CREATE SEQUENCE public.game_event_base_runners_id_seq
 
 
 --
--- Name: game_event_base_runners_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: game_event_base_runners_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: -
 --
 
-ALTER SEQUENCE public.game_event_base_runners_id_seq OWNED BY public.game_event_base_runners.id;
+ALTER SEQUENCE data.game_event_base_runners_id_seq OWNED BY data.game_event_base_runners.id;
 
 
 --
--- Name: game_events; Type: TABLE; Schema: public; Owner: -
+-- Name: game_events; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.game_events (
+CREATE TABLE data.game_events (
     id integer NOT NULL,
     perceived_at timestamp without time zone,
     game_id character varying(36),
@@ -1863,10 +822,10 @@ CREATE TABLE public.game_events (
 
 
 --
--- Name: game_events_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: game_events_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
-CREATE SEQUENCE public.game_events_id_seq
+CREATE SEQUENCE data.game_events_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1876,17 +835,17 @@ CREATE SEQUENCE public.game_events_id_seq
 
 
 --
--- Name: game_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: game_events_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: -
 --
 
-ALTER SEQUENCE public.game_events_id_seq OWNED BY public.game_events.id;
+ALTER SEQUENCE data.game_events_id_seq OWNED BY data.game_events.id;
 
 
 --
--- Name: games; Type: TABLE; Schema: public; Owner: -
+-- Name: games; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.games (
+CREATE TABLE data.games (
     game_id character varying(36) NOT NULL,
     day integer,
     season integer,
@@ -1911,10 +870,10 @@ CREATE TABLE public.games (
 
 
 --
--- Name: imported_logs; Type: TABLE; Schema: public; Owner: -
+-- Name: imported_logs; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.imported_logs (
+CREATE TABLE data.imported_logs (
     id integer NOT NULL,
     key text,
     imported_at timestamp without time zone
@@ -1922,10 +881,10 @@ CREATE TABLE public.imported_logs (
 
 
 --
--- Name: imported_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: imported_logs_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
-CREATE SEQUENCE public.imported_logs_id_seq
+CREATE SEQUENCE data.imported_logs_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1935,17 +894,17 @@ CREATE SEQUENCE public.imported_logs_id_seq
 
 
 --
--- Name: imported_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: imported_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: -
 --
 
-ALTER SEQUENCE public.imported_logs_id_seq OWNED BY public.imported_logs.id;
+ALTER SEQUENCE data.imported_logs_id_seq OWNED BY data.imported_logs.id;
 
 
 --
--- Name: player_events; Type: TABLE; Schema: public; Owner: -
+-- Name: player_events; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.player_events (
+CREATE TABLE data.player_events (
     id integer NOT NULL,
     game_event_id integer,
     player_id character varying(36),
@@ -1954,10 +913,10 @@ CREATE TABLE public.player_events (
 
 
 --
--- Name: player_events_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: player_events_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
-CREATE SEQUENCE public.player_events_id_seq
+CREATE SEQUENCE data.player_events_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1967,31 +926,17 @@ CREATE SEQUENCE public.player_events_id_seq
 
 
 --
--- Name: player_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: player_events_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: -
 --
 
-ALTER SEQUENCE public.player_events_id_seq OWNED BY public.player_events.id;
-
-
---
--- Name: player_idols; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.player_idols (
-    player_idol_id bigint,
-    instance_id text,
-    player_id text,
-    idol_count integer,
-    valid_from timestamp without time zone,
-    valid_until timestamp without time zone
-);
+ALTER SEQUENCE data.player_events_id_seq OWNED BY data.player_events.id;
 
 
 --
--- Name: players; Type: TABLE; Schema: public; Owner: -
+-- Name: players; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.players (
+CREATE TABLE data.players (
     id integer NOT NULL,
     player_id character varying(36),
     valid_from timestamp without time zone,
@@ -2033,15 +978,16 @@ CREATE TABLE public.players (
     bat text,
     ritual text,
     coffee smallint,
-    blood smallint
+    blood smallint,
+    url_slug character varying
 );
 
 
 --
--- Name: players_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: players_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
-CREATE SEQUENCE public.players_id_seq
+CREATE SEQUENCE data.players_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -2051,17 +997,17 @@ CREATE SEQUENCE public.players_id_seq
 
 
 --
--- Name: players_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: players_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: -
 --
 
-ALTER SEQUENCE public.players_id_seq OWNED BY public.players.id;
+ALTER SEQUENCE data.players_id_seq OWNED BY data.players.id;
 
 
 --
--- Name: team_roster; Type: TABLE; Schema: public; Owner: -
+-- Name: team_roster; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.team_roster (
+CREATE TABLE data.team_roster (
     team_roster_id integer NOT NULL,
     team_id character varying,
     position_id integer,
@@ -2072,10 +1018,10 @@ CREATE TABLE public.team_roster (
 
 
 --
--- Name: teams; Type: TABLE; Schema: public; Owner: -
+-- Name: teams; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.teams (
+CREATE TABLE data.teams (
     id integer NOT NULL,
     team_id character varying(36),
     location text,
@@ -2102,10 +1048,10 @@ CREATE TABLE taxa.event_types (
 
 
 --
--- Name: season_leaders_batting_average; Type: VIEW; Schema: public; Owner: -
+-- Name: season_leaders_batting_average; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW public.season_leaders_batting_average AS
+CREATE VIEW data.season_leaders_batting_average AS
  SELECT p.player_id,
     p.player_name,
     t.nickname,
@@ -2125,12 +1071,12 @@ CREATE VIEW public.season_leaders_batting_average AS
             WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
             ELSE 0
         END)))::numeric))::numeric(10,3) AS batting_average
-   FROM ((((public.game_events ge
+   FROM ((((data.game_events ge
      JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
-     JOIN public.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
-     JOIN public.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
-  WHERE (ge.season = ( SELECT public.current_season() AS current_season))
+     JOIN data.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
+     JOIN data.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
+  WHERE (ge.season = ( SELECT data.current_season() AS current_season))
   GROUP BY p.player_id, p.player_name, t.nickname
   ORDER BY ((((sum(et.hit))::numeric / ((sum(et.at_bat) - sum(
         CASE
@@ -2140,10 +1086,10 @@ CREATE VIEW public.season_leaders_batting_average AS
 
 
 --
--- Name: season_leaders_batting_average_risp; Type: VIEW; Schema: public; Owner: -
+-- Name: season_leaders_batting_average_risp; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW public.season_leaders_batting_average_risp AS
+CREATE VIEW data.season_leaders_batting_average_risp AS
  SELECT p.player_id,
     p.player_name,
     t.nickname,
@@ -2163,17 +1109,17 @@ CREATE VIEW public.season_leaders_batting_average_risp AS
             WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
             ELSE 0
         END)))::numeric))::numeric(10,3) AS risp
-   FROM (((((public.game_events ge
+   FROM (((((data.game_events ge
      JOIN ( SELECT array_agg(game_event_base_runners.base_before_play ORDER BY game_event_base_runners.base_before_play) AS baserunners,
             game_event_base_runners.game_event_id
-           FROM public.game_event_base_runners
+           FROM data.game_event_base_runners
           GROUP BY game_event_base_runners.game_event_id
          HAVING ((2 = ANY (array_agg(game_event_base_runners.base_before_play))) OR (3 = ANY (array_agg(game_event_base_runners.base_before_play))))) br ON ((ge.id = br.game_event_id)))
      JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
-     JOIN public.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
-     JOIN public.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
-  WHERE (ge.season = ( SELECT public.current_season() AS current_season))
+     JOIN data.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
+     JOIN data.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
+  WHERE (ge.season = ( SELECT data.current_season() AS current_season))
   GROUP BY p.player_id, p.player_name, t.nickname
   ORDER BY ((((sum(et.hit))::numeric / ((sum(et.at_bat) - sum(
         CASE
@@ -2183,10 +1129,10 @@ CREATE VIEW public.season_leaders_batting_average_risp AS
 
 
 --
--- Name: season_leaders_on_base_perecentage; Type: VIEW; Schema: public; Owner: -
+-- Name: season_leaders_on_base_perecentage; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW public.season_leaders_on_base_perecentage AS
+CREATE VIEW data.season_leaders_on_base_perecentage AS
  SELECT p.player_id,
     p.player_name,
     t.nickname,
@@ -2227,12 +1173,12 @@ CREATE VIEW public.season_leaders_on_base_perecentage AS
             WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
             ELSE 0
         END)))::numeric))::numeric(10,3) AS on_base_percentage
-   FROM ((((public.game_events ge
+   FROM ((((data.game_events ge
      JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
-     JOIN public.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
-     JOIN public.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
-  WHERE (ge.season = ( SELECT public.current_season() AS current_season))
+     JOIN data.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
+     JOIN data.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
+  WHERE (ge.season = ( SELECT data.current_season() AS current_season))
   GROUP BY p.player_id, p.player_name, t.nickname
   ORDER BY (((((sum(et.hit) + sum(
         CASE
@@ -2250,10 +1196,10 @@ CREATE VIEW public.season_leaders_on_base_perecentage AS
 
 
 --
--- Name: season_leaders_slugging; Type: VIEW; Schema: public; Owner: -
+-- Name: season_leaders_slugging; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW public.season_leaders_slugging AS
+CREATE VIEW data.season_leaders_slugging AS
  SELECT p.player_id,
     p.player_name,
     t.nickname,
@@ -2273,12 +1219,12 @@ CREATE VIEW public.season_leaders_slugging AS
             WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
             ELSE 0
         END)))::numeric))::numeric(10,3) AS slugging
-   FROM ((((public.game_events ge
+   FROM ((((data.game_events ge
      JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
-     JOIN public.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
-     JOIN public.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
-  WHERE (ge.season = ( SELECT public.current_season() AS current_season))
+     JOIN data.players p ON ((((ge.batter_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (tp.valid_until IS NULL))))
+     JOIN data.teams t ON (((tp.team_id)::text = (t.team_id)::text)))
+  WHERE (ge.season = ( SELECT data.current_season() AS current_season))
   GROUP BY p.player_id, p.player_name, t.nickname
   ORDER BY ((((sum(et.total_bases))::numeric / ((sum(et.at_bat) - sum(
         CASE
@@ -2288,26 +1234,26 @@ CREATE VIEW public.season_leaders_slugging AS
 
 
 --
--- Name: season_leaders_on_base_slugging; Type: VIEW; Schema: public; Owner: -
+-- Name: season_leaders_on_base_slugging; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW public.season_leaders_on_base_slugging AS
+CREATE VIEW data.season_leaders_on_base_slugging AS
  SELECT a.player_id,
     a.player_name,
     a.nickname,
     a.on_base_percentage,
     b.slugging,
     ((a.on_base_percentage + b.slugging))::numeric(10,3) AS on_base_slugging
-   FROM (public.season_leaders_slugging b
-     JOIN public.season_leaders_on_base_perecentage a ON (((a.player_id)::text = (b.player_id)::text)))
+   FROM (data.season_leaders_slugging b
+     JOIN data.season_leaders_on_base_perecentage a ON (((a.player_id)::text = (b.player_id)::text)))
   ORDER BY (((a.on_base_percentage + b.slugging))::numeric(10,3)) DESC, a.player_name;
 
 
 --
--- Name: season_leaders_outs_defended; Type: VIEW; Schema: public; Owner: -
+-- Name: season_leaders_outs_defended; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW public.season_leaders_outs_defended AS
+CREATE VIEW data.season_leaders_outs_defended AS
  SELECT sum(a.plays) AS plays,
     btrim(a.defender) AS defender,
     p.player_id,
@@ -2315,29 +1261,29 @@ CREATE VIEW public.season_leaders_outs_defended AS
     rank() OVER (ORDER BY (sum(a.plays)) DESC) AS rank
    FROM (((( SELECT count(1) AS plays,
             "substring"((a_1.event_text)::text, ("position"((a_1.event_text)::text, 'ground out to '::text) + 14), "position"("right"((a_1.event_text)::text, ((length((a_1.event_text)::text) - "position"((a_1.event_text)::text, 'ground out to '::text)) - 14)), '.'::text)) AS defender
-           FROM (public.game_events a_1
-             JOIN public.games b USING (game_id))
+           FROM (data.game_events a_1
+             JOIN data.games b USING (game_id))
           WHERE (("position"((a_1.event_text)::text, 'ground out to '::text) > 0) AND (b.season = 4))
           GROUP BY ("substring"((a_1.event_text)::text, ("position"((a_1.event_text)::text, 'ground out to '::text) + 14), "position"("right"((a_1.event_text)::text, ((length((a_1.event_text)::text) - "position"((a_1.event_text)::text, 'ground out to '::text)) - 14)), '.'::text)))
         UNION
          SELECT count(1) AS plays,
             "substring"((a_1.event_text)::text, ("position"((a_1.event_text)::text, 'flyout to '::text) + 9), "position"("right"((a_1.event_text)::text, ((length((a_1.event_text)::text) - "position"((a_1.event_text)::text, 'flyout to '::text)) - 9)), '.'::text)) AS defender
-           FROM (public.game_events a_1
-             JOIN public.games b USING (game_id))
-          WHERE (("position"((a_1.event_text)::text, 'flyout to '::text) > 0) AND (a_1.season = ( SELECT public.current_season() AS current_season)))
+           FROM (data.game_events a_1
+             JOIN data.games b USING (game_id))
+          WHERE (("position"((a_1.event_text)::text, 'flyout to '::text) > 0) AND (a_1.season = ( SELECT data.current_season() AS current_season)))
           GROUP BY ("substring"((a_1.event_text)::text, ("position"((a_1.event_text)::text, 'flyout to '::text) + 9), "position"("right"((a_1.event_text)::text, ((length((a_1.event_text)::text) - "position"((a_1.event_text)::text, 'flyout to '::text)) - 9)), '.'::text)))) a
-     JOIN public.players p ON (((btrim(a.defender) = (p.player_name)::text) AND (p.valid_until IS NULL))))
-     JOIN public.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (p.valid_until IS NULL) AND (tp.valid_until IS NULL))))
-     JOIN public.teams t ON ((((tp.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+     JOIN data.players p ON (((btrim(a.defender) = (p.player_name)::text) AND (p.valid_until IS NULL))))
+     JOIN data.team_roster tp ON ((((p.player_id)::text = (tp.player_id)::text) AND (p.valid_until IS NULL) AND (tp.valid_until IS NULL))))
+     JOIN data.teams t ON ((((tp.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   GROUP BY (btrim(a.defender)), p.player_id, t.nickname
   ORDER BY (sum(a.plays)) DESC;
 
 
 --
--- Name: team_positions_team_position_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: team_positions_team_position_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
-CREATE SEQUENCE public.team_positions_team_position_id_seq
+CREATE SEQUENCE data.team_positions_team_position_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -2347,17 +1293,17 @@ CREATE SEQUENCE public.team_positions_team_position_id_seq
 
 
 --
--- Name: team_positions_team_position_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: team_positions_team_position_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: -
 --
 
-ALTER SEQUENCE public.team_positions_team_position_id_seq OWNED BY public.team_roster.team_roster_id;
+ALTER SEQUENCE data.team_positions_team_position_id_seq OWNED BY data.team_roster.team_roster_id;
 
 
 --
--- Name: teams_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: teams_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
-CREATE SEQUENCE public.teams_id_seq
+CREATE SEQUENCE data.teams_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -2367,17 +1313,17 @@ CREATE SEQUENCE public.teams_id_seq
 
 
 --
--- Name: teams_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: teams_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: -
 --
 
-ALTER SEQUENCE public.teams_id_seq OWNED BY public.teams.id;
+ALTER SEQUENCE data.teams_id_seq OWNED BY data.teams.id;
 
 
 --
--- Name: time_map; Type: TABLE; Schema: public; Owner: -
+-- Name: time_map; Type: TABLE; Schema: data; Owner: -
 --
 
-CREATE TABLE public.time_map (
+CREATE TABLE data.time_map (
     season integer NOT NULL,
     day integer NOT NULL,
     first_time timestamp without time zone,
@@ -2386,10 +1332,10 @@ CREATE TABLE public.time_map (
 
 
 --
--- Name: time_map_time_map_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: time_map_time_map_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
-CREATE SEQUENCE public.time_map_time_map_id_seq
+CREATE SEQUENCE data.time_map_time_map_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -2399,10 +1345,10 @@ CREATE SEQUENCE public.time_map_time_map_id_seq
 
 
 --
--- Name: time_map_time_map_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: time_map_time_map_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: -
 --
 
-ALTER SEQUENCE public.time_map_time_map_id_seq OWNED BY public.time_map.time_map_id;
+ALTER SEQUENCE data.time_map_time_map_id_seq OWNED BY data.time_map.time_map_id;
 
 
 --
@@ -2591,6 +1537,17 @@ CREATE TABLE taxa.player_fk_attributes (
 
 
 --
+-- Name: positions; Type: TABLE; Schema: taxa; Owner: -
+--
+
+CREATE TABLE taxa.positions (
+    position_id integer NOT NULL,
+    position_type character varying,
+    is_active boolean DEFAULT false
+);
+
+
+--
 -- Name: vibe_to_arrows; Type: TABLE; Schema: taxa; Owner: -
 --
 
@@ -2633,59 +1590,59 @@ CREATE TABLE taxa.weather (
 
 
 --
--- Name: game_event_base_runners id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: game_event_base_runners id; Type: DEFAULT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.game_event_base_runners ALTER COLUMN id SET DEFAULT nextval('public.game_event_base_runners_id_seq'::regclass);
-
-
---
--- Name: game_events id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.game_events ALTER COLUMN id SET DEFAULT nextval('public.game_events_id_seq'::regclass);
+ALTER TABLE ONLY data.game_event_base_runners ALTER COLUMN id SET DEFAULT nextval('data.game_event_base_runners_id_seq'::regclass);
 
 
 --
--- Name: imported_logs id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: game_events id; Type: DEFAULT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.imported_logs ALTER COLUMN id SET DEFAULT nextval('public.imported_logs_id_seq'::regclass);
-
-
---
--- Name: player_events id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.player_events ALTER COLUMN id SET DEFAULT nextval('public.player_events_id_seq'::regclass);
+ALTER TABLE ONLY data.game_events ALTER COLUMN id SET DEFAULT nextval('data.game_events_id_seq'::regclass);
 
 
 --
--- Name: players id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: imported_logs id; Type: DEFAULT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.players ALTER COLUMN id SET DEFAULT nextval('public.players_id_seq'::regclass);
-
-
---
--- Name: team_roster team_roster_id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.team_roster ALTER COLUMN team_roster_id SET DEFAULT nextval('public.team_positions_team_position_id_seq'::regclass);
+ALTER TABLE ONLY data.imported_logs ALTER COLUMN id SET DEFAULT nextval('data.imported_logs_id_seq'::regclass);
 
 
 --
--- Name: teams id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: player_events id; Type: DEFAULT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.teams ALTER COLUMN id SET DEFAULT nextval('public.teams_id_seq'::regclass);
+ALTER TABLE ONLY data.player_events ALTER COLUMN id SET DEFAULT nextval('data.player_events_id_seq'::regclass);
 
 
 --
--- Name: time_map time_map_id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: players id; Type: DEFAULT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.time_map ALTER COLUMN time_map_id SET DEFAULT nextval('public.time_map_time_map_id_seq'::regclass);
+ALTER TABLE ONLY data.players ALTER COLUMN id SET DEFAULT nextval('data.players_id_seq'::regclass);
+
+
+--
+-- Name: team_roster team_roster_id; Type: DEFAULT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.team_roster ALTER COLUMN team_roster_id SET DEFAULT nextval('data.team_positions_team_position_id_seq'::regclass);
+
+
+--
+-- Name: teams id; Type: DEFAULT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.teams ALTER COLUMN id SET DEFAULT nextval('data.teams_id_seq'::regclass);
+
+
+--
+-- Name: time_map time_map_id; Type: DEFAULT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.time_map ALTER COLUMN time_map_id SET DEFAULT nextval('data.time_map_time_map_id_seq'::regclass);
 
 
 --
@@ -2731,82 +1688,74 @@ ALTER TABLE ONLY taxa.vibe_to_arrows ALTER COLUMN vibe_to_arrow_id SET DEFAULT n
 
 
 --
--- Data for Name: game_event_base_runners; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: game_event_base_runners; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.game_event_base_runners (id, game_event_id, runner_id, responsible_pitcher_id, base_before_play, base_after_play, was_base_stolen, was_caught_stealing, was_picked_off) FROM stdin;
+COPY data.game_event_base_runners (id, game_event_id, runner_id, responsible_pitcher_id, base_before_play, base_after_play, was_base_stolen, was_caught_stealing, was_picked_off) FROM stdin;
 \.
 
 
 --
--- Data for Name: game_events; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: game_events; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.game_events (id, perceived_at, game_id, event_type, event_index, inning, top_of_inning, outs_before_play, batter_id, batter_team_id, pitcher_id, pitcher_team_id, home_score, away_score, home_strike_count, away_strike_count, batter_count, pitches, total_strikes, total_balls, total_fouls, is_leadoff, is_pinch_hit, lineup_position, is_last_event_for_plate_appearance, bases_hit, runs_batted_in, is_sacrifice_hit, is_sacrifice_fly, outs_on_play, is_double_play, is_triple_play, is_wild_pitch, batted_ball_type, is_bunt, errors_on_play, batter_base_after_play, is_last_game_event, event_text, additional_context, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list) FROM stdin;
+COPY data.game_events (id, perceived_at, game_id, event_type, event_index, inning, top_of_inning, outs_before_play, batter_id, batter_team_id, pitcher_id, pitcher_team_id, home_score, away_score, home_strike_count, away_strike_count, batter_count, pitches, total_strikes, total_balls, total_fouls, is_leadoff, is_pinch_hit, lineup_position, is_last_event_for_plate_appearance, bases_hit, runs_batted_in, is_sacrifice_hit, is_sacrifice_fly, outs_on_play, is_double_play, is_triple_play, is_wild_pitch, batted_ball_type, is_bunt, errors_on_play, batter_base_after_play, is_last_game_event, event_text, additional_context, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list) FROM stdin;
 \.
 
 
 --
--- Data for Name: games; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: games; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.games (game_id, day, season, last_game_event, home_odds, away_odds, weather, series_index, series_length, is_postseason, home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame, terminology_id, rules_id, statsheet_id) FROM stdin;
+COPY data.games (game_id, day, season, last_game_event, home_odds, away_odds, weather, series_index, series_length, is_postseason, home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame, terminology_id, rules_id, statsheet_id) FROM stdin;
 \.
 
 
 --
--- Data for Name: imported_logs; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: imported_logs; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.imported_logs (id, key, imported_at) FROM stdin;
+COPY data.imported_logs (id, key, imported_at) FROM stdin;
 \.
 
 
 --
--- Data for Name: player_events; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: player_events; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.player_events (id, game_event_id, player_id, event_type) FROM stdin;
+COPY data.player_events (id, game_event_id, player_id, event_type) FROM stdin;
 \.
 
 
 --
--- Data for Name: player_idols; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: players; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.player_idols (player_idol_id, instance_id, player_id, idol_count, valid_from, valid_until) FROM stdin;
+COPY data.players (id, player_id, valid_from, valid_until, player_name, deceased, hash, anticapitalism, base_thirst, buoyancy, chasiness, coldness, continuation, divinity, ground_friction, indulgence, laserlikeness, martyrdom, moxie, musclitude, omniscience, overpowerment, patheticism, ruthlessness, shakespearianism, suppression, tenaciousness, thwackability, tragicness, unthwackability, watchfulness, pressurization, cinnamon, total_fingers, soul, fate, peanut_allergy, armor, bat, ritual, coffee, blood, url_slug) FROM stdin;
 \.
 
 
 --
--- Data for Name: players; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: team_roster; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.players (id, player_id, valid_until, player_name, deceased, hash, anticapitalism, base_thirst, buoyancy, chasiness, coldness, continuation, divinity, ground_friction, indulgence, laserlikeness, martyrdom, moxie, musclitude, omniscience, overpowerment, patheticism, ruthlessness, shakespearianism, suppression, tenaciousness, thwackability, tragicness, unthwackability, watchfulness, pressurization, cinnamon, total_fingers, soul, fate, peanut_allergy, armor, bat, ritual, coffee, blood, valid_from) FROM stdin;
+COPY data.team_roster (team_roster_id, team_id, position_id, valid_from, valid_until, player_id) FROM stdin;
 \.
 
 
 --
--- Data for Name: team_roster; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: teams; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.team_roster (team_roster_id, team_id, position_id, valid_until, player_id, valid_from) FROM stdin;
+COPY data.teams (id, team_id, location, nickname, full_name, valid_from, valid_until, hash) FROM stdin;
 \.
 
 
 --
--- Data for Name: teams; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: time_map; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY public.teams (id, team_id, location, nickname, full_name, valid_until, hash, valid_from) FROM stdin;
-\.
-
-
---
--- Data for Name: time_map; Type: TABLE DATA; Schema: public; Owner: -
---
-
-COPY public.time_map (season, day, first_time, time_map_id) FROM stdin;
+COPY data.time_map (season, day, first_time, time_map_id) FROM stdin;
 \.
 
 
@@ -3010,18 +1959,6 @@ COPY taxa.divisions (division_db_id, division_text, league_id, valid_until, divi
 --
 
 COPY taxa.event_types (event_type_id, event_type, plate_appearance, at_bat, hit, total_bases) FROM stdin;
-13	CAUGHT_STEALING	0	0	0	0
-14	DOUBLE	1	1	1	2
-15	FIELDERS_CHOICE	1	1	0	1
-16	HOME_RUN	1	1	1	4
-17	OUT	1	1	0	0
-18	SINGLE	1	1	1	1
-19	STOLEN_BASE	0	0	0	0
-20	STRIKEOUT	1	1	0	0
-21	TRIPLE	1	1	1	3
-22	WALK	0	0	0	1
-23	UNKNOWN	1	0	0	0
-24	SACRIFICE	1	0	0	0
 1	CAUGHT_STEALING	0	0	0	0
 3	DOUBLE	1	1	1	2
 4	FIELDERS_CHOICE	1	1	0	1
@@ -3105,6 +2042,39 @@ COPY taxa.player_fk_attributes (attribute_id, attribute_text, attribute_desc, at
 
 
 --
+-- Data for Name: positions; Type: TABLE DATA; Schema: taxa; Owner: -
+--
+
+COPY taxa.positions (position_id, position_type, is_active) FROM stdin;
+14	BULLPEN	f
+15	BULLPEN	f
+16	BULLPEN	f
+17	BULLPEN	f
+18	BULLPEN	f
+19	BULLPEN	f
+20	BULLPEN	f
+21	BULLPEN	f
+22	BENCH	f
+23	BENCH	f
+24	BENCH	f
+0	BATTER	t
+1	BATTER	t
+2	BATTER	t
+3	BATTER	t
+4	BATTER	t
+5	BATTER	t
+6	BATTER	t
+7	BATTER	t
+8	BATTER	t
+9	PITCHER	t
+10	PITCHER	t
+11	PITCHER	t
+12	PITCHER	t
+13	PITCHER	t
+\.
+
+
+--
 -- Data for Name: vibe_to_arrows; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
@@ -3142,59 +2112,59 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 
 
 --
--- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('public.game_event_base_runners_id_seq', 476130, true);
-
-
---
--- Name: game_events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.game_events_id_seq', 534261, true);
+SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 476130, true);
 
 
 --
--- Name: imported_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: game_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('public.imported_logs_id_seq', 4304, true);
-
-
---
--- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.player_events_id_seq', 236, true);
+SELECT pg_catalog.setval('data.game_events_id_seq', 534261, true);
 
 
 --
--- Name: players_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: imported_logs_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('public.players_id_seq', 9169, true);
-
-
---
--- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.team_positions_team_position_id_seq', 1782, true);
+SELECT pg_catalog.setval('data.imported_logs_id_seq', 4304, true);
 
 
 --
--- Name: teams_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('public.teams_id_seq', 83, true);
+SELECT pg_catalog.setval('data.player_events_id_seq', 236, true);
 
 
 --
--- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('public.time_map_time_map_id_seq', 534261, true);
+SELECT pg_catalog.setval('data.players_id_seq', 9169, true);
+
+
+--
+-- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
+--
+
+SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 1782, true);
+
+
+--
+-- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
+--
+
+SELECT pg_catalog.setval('data.teams_id_seq', 83, true);
+
+
+--
+-- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
+--
+
+SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 534261, true);
 
 
 --
@@ -3240,74 +2210,82 @@ SELECT pg_catalog.setval('taxa.vibe_to_arrows_vibe_to_arrow_id_seq', 13, true);
 
 
 --
--- Name: game_event_base_runners game_event_base_runners_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: game_event_base_runners game_event_base_runners_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.game_event_base_runners
+ALTER TABLE ONLY data.game_event_base_runners
     ADD CONSTRAINT game_event_base_runners_pkey PRIMARY KEY (id);
 
 
 --
--- Name: game_events game_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: game_events game_events_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.game_events
+ALTER TABLE ONLY data.game_events
     ADD CONSTRAINT game_events_pkey PRIMARY KEY (id);
 
 
 --
--- Name: games game_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: games game_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.games
+ALTER TABLE ONLY data.games
     ADD CONSTRAINT game_pkey PRIMARY KEY (game_id);
 
 
 --
--- Name: imported_logs imported_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: imported_logs imported_logs_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.imported_logs
+ALTER TABLE ONLY data.imported_logs
     ADD CONSTRAINT imported_logs_pkey PRIMARY KEY (id);
 
 
 --
--- Name: player_events player_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: player_events player_events_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.player_events
+ALTER TABLE ONLY data.player_events
     ADD CONSTRAINT player_events_pkey PRIMARY KEY (id);
 
 
 --
--- Name: players players_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: players players_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.players
+ALTER TABLE ONLY data.players
     ADD CONSTRAINT players_pkey PRIMARY KEY (id);
 
 
 --
--- Name: time_map season_day_unique; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: time_map season_day_unique; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.time_map
+ALTER TABLE ONLY data.time_map
     ADD CONSTRAINT season_day_unique UNIQUE (season, day);
 
 
 --
--- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: team_roster team_roster_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.teams
+ALTER TABLE ONLY data.team_roster
+    ADD CONSTRAINT team_roster_pkey PRIMARY KEY (team_roster_id);
+
+
+--
+-- Name: teams teams_pkey; Type: CONSTRAINT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.teams
     ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
 
 
 --
--- Name: time_map time_map_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: time_map time_map_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.time_map
+ALTER TABLE ONLY data.time_map
     ADD CONSTRAINT time_map_pkey PRIMARY KEY (time_map_id);
 
 
@@ -3320,19 +2298,35 @@ ALTER TABLE ONLY taxa.event_types
 
 
 --
--- Name: game_event_base_runners game_event_base_runners_game_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: positions positions_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -
 --
 
-ALTER TABLE ONLY public.game_event_base_runners
-    ADD CONSTRAINT game_event_base_runners_game_event_id_fkey FOREIGN KEY (game_event_id) REFERENCES public.game_events(id) ON DELETE CASCADE;
+ALTER TABLE ONLY taxa.positions
+    ADD CONSTRAINT positions_pkey PRIMARY KEY (position_id);
 
 
 --
--- Name: player_events player_events_game_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: game_event_base_runners game_event_base_runners_game_event_id_fkey; Type: FK CONSTRAINT; Schema: data; Owner: -
 --
 
-ALTER TABLE ONLY public.player_events
-    ADD CONSTRAINT player_events_game_event_id_fkey FOREIGN KEY (game_event_id) REFERENCES public.game_events(id) ON DELETE CASCADE;
+ALTER TABLE ONLY data.game_event_base_runners
+    ADD CONSTRAINT game_event_base_runners_game_event_id_fkey FOREIGN KEY (game_event_id) REFERENCES data.game_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: game_events game_events_game_id_fkey; Type: FK CONSTRAINT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.game_events
+    ADD CONSTRAINT game_events_game_id_fkey FOREIGN KEY (game_id) REFERENCES data.games(game_id) ON DELETE CASCADE;
+
+
+--
+-- Name: player_events player_events_game_event_id_fkey; Type: FK CONSTRAINT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.player_events
+    ADD CONSTRAINT player_events_game_event_id_fkey FOREIGN KEY (game_event_id) REFERENCES data.game_events(id) ON DELETE CASCADE;
 
 
 --
