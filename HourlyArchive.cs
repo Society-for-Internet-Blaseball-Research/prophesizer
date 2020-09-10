@@ -57,15 +57,19 @@ public class Player {
   public double Tragicness { get; set; }
   public double Unthwackability { get; set; }
   public double Watchfulness { get; set; }
-  public double Pressurization { get; set; }
-  public double Cinnamon { get; set; }
+  [DbNullValue(0f)]
+  public double? Pressurization { get; set; }
+  [DbNullValue(0f)]
+  public double? Cinnamon { get; set; }
 
   // Other stuff
 
   public int TotalFingers { get; set; }
   public int Soul { get; set; }
-  public bool PeanutAllergy { get; set; }
-  public int Fate { get; set; }
+  [DbNullValue(false)]
+  public bool? PeanutAllergy { get; set; }
+  [DbNullValue(-1)]
+  public int? Fate { get; set; }
 
   [DbNullValue("")]
   public string Bat { get; set; }
@@ -73,8 +77,10 @@ public class Player {
   public string Armor { get; set; }
   [DbNullValue("")]
   public string Ritual { get; set; }
-  public int Coffee { get; set; }
-  public int Blood { get; set; }
+  [DbNullValue(-1)]
+  public int? Coffee { get; set; }
+  [DbNullValue(-1)]
+  public int? Blood { get; set; }
 
   // TODO: Arrays of modifiers?
 }
