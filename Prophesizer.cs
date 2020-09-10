@@ -229,7 +229,7 @@ namespace SIBR {
 
       try {
         foreach (var gameEvent in gameEvents) {
-          await PersistGame(psqlConnection, gameEvent);
+          await PersistGame(psqlConnection, gameEvent, keyName);
         }
 
         transaction.Commit();
@@ -255,7 +255,7 @@ namespace SIBR {
       }
     }
 
-    private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent) {
+    private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent, string keyName) {
       using (var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent)) {
         int id = (int)await gameEventStatement.ExecuteScalarAsync();
 
@@ -272,13 +272,22 @@ namespace SIBR {
 
           if(playerEvent.eventType == PlayerEventType.INCINERATION) {
             var playerId = playerEvent.playerId;
-            await LookupIncineratedPlayer(playerId, gameEvent.firstPerceivedAt, psqlConnection);
+
+            DateTime timestamp;
+            if (gameEvent.firstPerceivedAt.Year == 1970) {
+              timestamp = DateTimeFromKeyName(keyName);
+            } else {
+              timestamp = gameEvent.firstPerceivedAt;
+            }
+
+            await LookupIncineratedPlayer(playerId, timestamp, psqlConnection);
           }
         }
       }
     }
 
     private async Task LookupIncineratedPlayer(string playerId, DateTime timestamp, NpgsqlConnection psqlConnection) {
+
       HttpClient client = new HttpClient();
       client.BaseAddress = new Uri("https://www.blaseball.com/database/");
       client.DefaultRequestHeaders.Accept.Clear();
@@ -353,6 +362,16 @@ namespace SIBR {
       }
     }
 
+    private static DateTime DateTimeFromKeyName(string keyName) {
+      var dash = keyName.LastIndexOf('-');
+      var dot = keyName.IndexOf('.');
+
+      string timeStr = keyName.Substring(dash + 1, dot - dash - 1);
+      long timeNum = long.Parse(timeStr);
+      DateTime timestamp = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+      return timestamp.AddMilliseconds(timeNum);
+    }
+
     private void ProcessHourly(string keyName, Stream responseStream, NpgsqlConnection psqlConnection) {
       try {
         using (GZipStream decompressionStream = new GZipStream(responseStream, CompressionMode.Decompress))
@@ -369,15 +388,7 @@ namespace SIBR {
               DateTime timestamp;
 
               if(hourly.ClientMeta == null || hourly.ClientMeta.timestamp == null) {
-                
-                var dash = keyName.LastIndexOf('-');
-                var dot = keyName.IndexOf('.');
-                
-                string timeStr = keyName.Substring(dash+1, dot-dash-1);
-                long timeNum = long.Parse(timeStr);
-                // TODO make this a utility function already
-                timestamp = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                timestamp = timestamp.AddMilliseconds(timeNum);
+                timestamp = DateTimeFromKeyName(keyName);
               }
               else {
                 timestamp = hourly.ClientMeta.timestamp;
