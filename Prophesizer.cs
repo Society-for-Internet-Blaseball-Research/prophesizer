@@ -139,7 +139,7 @@ namespace SIBR {
       try {
         ListObjectsRequest request = new ListObjectsRequest {
           BucketName = bucketName,
-          MaxKeys = 2,
+          MaxKeys = 500,
           Prefix = prefix
         };
 
@@ -269,6 +269,37 @@ namespace SIBR {
           using (var playerEventStatement = PreparePlayerEventStatement(psqlConnection, id, playerEvent)) {
             await playerEventStatement.ExecuteNonQueryAsync();
           }
+
+          if(playerEvent.eventType == PlayerEventType.INCINERATION) {
+            var playerId = playerEvent.playerId;
+            await LookupIncineratedPlayer(playerId, gameEvent.firstPerceivedAt, psqlConnection);
+          }
+        }
+      }
+    }
+
+    private async Task LookupIncineratedPlayer(string playerId, DateTime timestamp, NpgsqlConnection psqlConnection) {
+      HttpClient client = new HttpClient();
+      client.BaseAddress = new Uri("https://www.blaseball.com/database/");
+      client.DefaultRequestHeaders.Accept.Clear();
+      client.DefaultRequestHeaders.Accept.Add(
+          new MediaTypeWithQualityHeaderValue("application/json"));
+
+      JsonSerializerOptions options = new JsonSerializerOptions();
+      options.IgnoreNullValues = true;
+      options.PropertyNameCaseInsensitive = true;
+
+      // Get player record
+      HttpResponseMessage response = await client.GetAsync($"players?ids={playerId}");
+
+      if (response.IsSuccessStatusCode) {
+
+        string strResponse = await response.Content.ReadAsStringAsync();
+        var playerList = JsonSerializer.Deserialize<List<Player>>(strResponse, options);
+
+        var player = playerList.FirstOrDefault();
+        using (MD5 md5 = MD5.Create()) {
+          ProcessPlayer(player, timestamp, psqlConnection, md5);
         }
       }
     }
@@ -387,6 +418,34 @@ namespace SIBR {
       return new Guid(data);
     }
 
+    private void ProcessPlayer(Player p, DateTime timestamp, NpgsqlConnection psqlConnection, HashAlgorithm hashAlg) {
+      // TODO move hashing into Player
+      var hash = HashObject(hashAlg, p);
+
+      NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.players where hash=@hash and valid_until is null", psqlConnection);
+      cmd.Parameters.AddWithValue("hash", hash);
+      var count = (long)cmd.ExecuteScalar();
+
+      if (count == 1) {
+        // Record exists
+      } else {
+        // Update the old record
+        NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
+        update.Parameters.AddWithValue("timestamp", timestamp);
+        update.Parameters.AddWithValue("player_id", p.Id);
+        int rows = update.ExecuteNonQuery();
+        if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+        var extra = new Dictionary<string, object>();
+        extra["hash"] = hash;
+        extra["valid_from"] = timestamp;
+        // Try to insert our current data
+        InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.players", p, extra);
+        var newId = insertCmd.Command.ExecuteNonQuery();
+
+      }
+    }
+
     private void ProcessPlayers(HourlyArchive hourly, DateTime timestamp, NpgsqlConnection psqlConnection) {
       string text = ((JsonElement)hourly.Data).GetRawText();
 
@@ -396,32 +455,8 @@ namespace SIBR {
 
         var playerList = JsonSerializer.Deserialize<IEnumerable<Player>>(text, serializerOptions);
 
-        foreach(var p in playerList) {
-          // TODO move hashing into Player
-          var hash = HashObject(md5, p);
-
-          NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.players where hash=@hash and valid_until is null", psqlConnection);
-          cmd.Parameters.AddWithValue("hash", hash);
-          var count = (long)cmd.ExecuteScalar();
-
-          if (count == 1) {
-            // Record exists
-          } else {
-            // Update the old record
-            NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
-            update.Parameters.AddWithValue("timestamp", timestamp);
-            update.Parameters.AddWithValue("player_id", p.Id);
-            int rows = update.ExecuteNonQuery();
-            if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
-
-            var extra = new Dictionary<string, object>();
-            extra["hash"] = hash;
-            extra["valid_from"] = timestamp;
-            // Try to insert our current data
-            InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.players", p, extra);
-            var newId = insertCmd.Command.ExecuteNonQuery();
-
-          }
+        foreach (var p in playerList) {
+          ProcessPlayer(p, timestamp, psqlConnection, md5);
         }
       }
     }
