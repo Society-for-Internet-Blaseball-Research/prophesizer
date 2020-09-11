@@ -214,8 +214,8 @@ namespace SIBR {
           }
         }
       } catch (Exception e) {
-        Console.WriteLine($"Failed to process {keyName}: {e.Message}");
-        Console.WriteLine(e.StackTrace);
+        ConsoleOrWebhook($"Failed to process {keyName}: {e.Message}");
+        ConsoleOrWebhook(e.StackTrace);
         return;
       }
     }
@@ -248,8 +248,8 @@ namespace SIBR {
       } catch (Exception e) {
         transaction.Rollback();
 
-        Console.WriteLine($"Failed to insert events from {keyName} into Postgres:");
-        Console.WriteLine(e.Message);
+        ConsoleOrWebhook($"Failed to insert events from {keyName} into Postgres:");
+        ConsoleOrWebhook(e.Message);
 
         return 0;
       }
@@ -410,8 +410,8 @@ namespace SIBR {
           }
         }
       } catch (Exception e) {
-        Console.WriteLine($"Failed to process {keyName}: {e.Message}");
-        Console.WriteLine(e.StackTrace);
+        ConsoleOrWebhook($"Failed to process {keyName}: {e.Message}");
+        ConsoleOrWebhook(e.StackTrace);
         return;
       }
     }
