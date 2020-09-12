@@ -607,9 +607,6 @@ namespace SIBR {
 
           await updateTimeMap.ExecuteNonQueryAsync();
         }
-        else {
-          Console.WriteLine(e);
-        }
       }
 
     }
