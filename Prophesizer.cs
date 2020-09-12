@@ -196,13 +196,13 @@ namespace SIBR {
       using (Stream responseStream = response.ResponseStream) {
         Console.WriteLine($"Processing document (Key: {keyName}, Length: {response.ContentLength})...");
 
-        ProcessObject(keyName, responseStream);
+        await ProcessObject(keyName, responseStream);
 
         return;
       }
     }
 
-    private void ProcessObject(string keyName, Stream responseStream) {
+    private async Task ProcessObject(string keyName, Stream responseStream) {
       try {
         using (GZipStream decompressionStream = new GZipStream(responseStream, CompressionMode.Decompress))
         using (MemoryStream decompressedStream = new MemoryStream()) {
@@ -210,12 +210,12 @@ namespace SIBR {
           decompressedStream.Seek(0, SeekOrigin.Begin);
 
           using (StreamReader reader = new StreamReader(decompressedStream)) {
-            processor.Process(reader);
+            await processor.Process(reader);
           }
         }
       } catch (Exception e) {
-        Console.WriteLine($"Failed to process {keyName}: {e.Message}");
-        Console.WriteLine(e.StackTrace);
+        ConsoleOrWebhook($"Failed to process {keyName}: {e.Message}");
+        ConsoleOrWebhook(e.StackTrace);
         return;
       }
     }
@@ -248,8 +248,8 @@ namespace SIBR {
       } catch (Exception e) {
         transaction.Rollback();
 
-        Console.WriteLine($"Failed to insert events from {keyName} into Postgres:");
-        Console.WriteLine(e.Message);
+        ConsoleOrWebhook($"Failed to insert events from {keyName} into Postgres:");
+        ConsoleOrWebhook(e.Message);
 
         return 0;
       }
@@ -265,13 +265,17 @@ namespace SIBR {
           }
         }
 
-        foreach (var playerEvent in gameEvent.playerEvents) {
-          using (var playerEventStatement = PreparePlayerEventStatement(psqlConnection, id, playerEvent)) {
+        foreach (var outcome in gameEvent.outcomes) {
+          if(outcome.entityId == "UNKNOWN" || outcome.entityId == null) {
+            Console.WriteLine($"Found an outcome with unknown entity ID in season {gameEvent.season}, day {gameEvent.day}, game {gameEvent.gameId}");
+          }
+
+          using (var playerEventStatement = PrepareOutcomeStatement(psqlConnection, id, outcome)) {
             await playerEventStatement.ExecuteNonQueryAsync();
           }
 
-          if(playerEvent.eventType == PlayerEventType.INCINERATION) {
-            var playerId = playerEvent.playerId;
+          if(outcome.eventType == OutcomeType.INCINERATION) {
+            var playerId = outcome.entityId;
 
             DateTime timestamp;
             if (gameEvent.firstPerceivedAt.Year == 1970) {
@@ -323,10 +327,10 @@ namespace SIBR {
       return new InsertCommand(psqlConnection, "data.game_event_base_runners", baseRunnerEvent, extra).Command;
     }
 
-    private NpgsqlCommand PreparePlayerEventStatement(NpgsqlConnection psqlConnection, int gameEventId, PlayerEvent playerEvent) {
+    private NpgsqlCommand PrepareOutcomeStatement(NpgsqlConnection psqlConnection, int gameEventId, Outcome outcome) {
       var extra = new Dictionary<string, object>();
       extra["game_event_id"] = gameEventId;
-      return new InsertCommand(psqlConnection, "data.player_events", playerEvent, extra).Command;
+      return new InsertCommand(psqlConnection, "data.outcomes", outcome, extra).Command;
     }
 
     private NpgsqlCommand PersistLogRecord(NpgsqlConnection psqlConnection, string keyName) {
@@ -410,8 +414,8 @@ namespace SIBR {
           }
         }
       } catch (Exception e) {
-        Console.WriteLine($"Failed to process {keyName}: {e.Message}");
-        Console.WriteLine(e.StackTrace);
+        ConsoleOrWebhook($"Failed to process {keyName}: {e.Message}");
+        ConsoleOrWebhook(e.StackTrace);
         return;
       }
     }
@@ -587,19 +591,22 @@ namespace SIBR {
 
       foreach(var e in events) {
 
-        // Record the first time seen for each season and day
-        var updateTimeMap = new NpgsqlCommand(@"
+        if (e.firstPerceivedAt != DateTime.MinValue && e.firstPerceivedAt.Year != 1970) {
+
+          // Record the first time seen for each season and day
+          var updateTimeMap = new NpgsqlCommand(@"
         insert into data.time_map values(@season, @day, @first_time)
         on conflict (season, day)  do
         update set first_time = EXCLUDED.first_time
         where time_map.first_time > EXCLUDED.first_time;
         ", psqlConnection);
 
-        updateTimeMap.Parameters.AddWithValue("season", e.season);
-        updateTimeMap.Parameters.AddWithValue("day", e.day);
-        updateTimeMap.Parameters.AddWithValue("first_time", e.firstPerceivedAt);
+          updateTimeMap.Parameters.AddWithValue("season", e.season);
+          updateTimeMap.Parameters.AddWithValue("day", e.day);
+          updateTimeMap.Parameters.AddWithValue("first_time", e.firstPerceivedAt);
 
-        await updateTimeMap.ExecuteNonQueryAsync();
+          await updateTimeMap.ExecuteNonQueryAsync();
+        }
       }
 
     }
