@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.4
--- Dumped by pg_dump version 12.4
+-- Dumped from database version 12.3
+-- Dumped by pg_dump version 12.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -19,6 +19,7 @@ SET row_security = off;
 ALTER TABLE IF EXISTS ONLY data.outcomes DROP CONSTRAINT IF EXISTS player_events_game_event_id_fkey;
 ALTER TABLE IF EXISTS ONLY data.game_events DROP CONSTRAINT IF EXISTS game_events_game_id_fkey;
 ALTER TABLE IF EXISTS ONLY data.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_game_event_id_fkey;
+DROP INDEX IF EXISTS data.team_roster_idx;
 ALTER TABLE IF EXISTS ONLY taxa.positions DROP CONSTRAINT IF EXISTS positions_pkey;
 ALTER TABLE IF EXISTS ONLY taxa.event_types DROP CONSTRAINT IF EXISTS event_types_pkey;
 ALTER TABLE IF EXISTS ONLY taxa.attributes DROP CONSTRAINT IF EXISTS attributes_pkey;
@@ -190,126 +191,54 @@ CREATE SCHEMA taxa;
 
 CREATE FUNCTION data.bankers_round(in_val numeric, in_prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
-    AS $$
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-declare
-
-
-
-
-    retval numeric;
-
-
-
-
-    difference numeric;
-
-
-
-
-    even boolean;
-
-
-
-
-	
-
-
-
-
-begin
-
-
-
-
-    retval := round(in_val,in_prec);
-
-
-
-
-    difference := retval-in_val;
-
-
-
-
-    if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
-
-
-
-
-        even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
-
-
-
-
-        if not even then
-
-
-
-
-            retval := round(val-difference,in_prec);
-
-
-
-
-        end if;
-
-
-
-
-    end if;
-
-
-
-
-    return retval;
-
-
-
-
-end;
-
-
-
-
-
-
-
-
-
+    AS $$
+
+
+declare
+
+
+    retval numeric;
+
+
+    difference numeric;
+
+
+    even boolean;
+
+
+begin
+
+
+    retval := round(in_val,in_prec);
+
+
+    difference := retval-in_val;
+
+
+    if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
+
+
+        even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
+
+
+        if not even then
+
+
+            retval := round(val-difference,in_prec);
+
+
+        end if;
+
+
+    end if;
+
+
+    return retval;
+
+
+end;
+
+
 $$;
 
 
@@ -319,6 +248,7 @@ $$;
 
 CREATE FUNCTION data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
+
     AS $$
 SELECT 
 	power(p.laserlikeness,0.5) *
@@ -338,63 +268,57 @@ $$;
 
 CREATE FUNCTION data.batter_idol_coins(in_player_id character varying, in_season integer DEFAULT '-1'::integer) RETURNS bigint
     LANGUAGE sql
-    AS $$
-
-
-
-
-
-SELECT 
-
-
-SUM
-
-
-(
-
-
-	CASE
-
-
-	  WHEN ge.event_type IN ('SINGLE','DOUBLE','TRIPLE') THEN 200
-
-
-	  WHEN ge.event_type = 'HOME_RUN' THEN 1200
-
-
-	  ELSE 0
-
-
-	END 
-
-
-) AS coins
-
-
-FROM data.game_events ge
-
-
-WHERE ge.season = 
-
-
-CASE
-
-
-  when in_season = -1 then (SELECT data.current_season())
-
-
-  else in_season
-
-
-END
-
-
-AND ge.batter_id = in_player_id;
-
-
-
-
-
+    AS $$
+
+
+SELECT 
+
+
+SUM
+
+
+(
+
+
+	CASE
+
+
+	  WHEN ge.event_type IN ('SINGLE','DOUBLE','TRIPLE') THEN 200
+
+
+	  WHEN ge.event_type = 'HOME_RUN' THEN 1200
+
+
+	  ELSE 0
+
+
+	END 
+
+
+) AS coins
+
+
+FROM data.game_events ge
+
+
+WHERE ge.season = 
+
+
+CASE
+
+
+  when in_season = -1 then (SELECT data.current_season())
+
+
+  else in_season
+
+
+END
+
+
+AND ge.batter_id = in_player_id;
+
+
 $$;
 
 
@@ -404,12 +328,12 @@ $$;
 
 CREATE FUNCTION data.batting_average(in_hits bigint, in_raw_at_bats bigint, in_sacs bigint DEFAULT 0) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-
-SELECT (in_hits/ (in_raw_at_bats - in_sacs)::numeric)::numeric(10,3)
-
-
+    AS $$
+
+
+SELECT (in_hits/ (in_raw_at_bats - in_sacs)::numeric)::numeric(10,3)
+
+
 $$;
 
 
@@ -419,6 +343,7 @@ $$;
 
 CREATE FUNCTION data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
+
     AS $$
 SELECT 
    power((1 - p.tragicness),0.01) * 
@@ -437,15 +362,15 @@ $$;
 
 CREATE FUNCTION data.current_gameday() RETURNS integer
     LANGUAGE sql
-    AS $$
-
-
-SELECT max(day) FROM data.game_events WHERE
-
-
-season = (SELECT data.current_season());
-
-
+    AS $$
+
+
+SELECT max(day) FROM data.game_events WHERE
+
+
+season = (SELECT data.current_season());
+
+
 $$;
 
 
@@ -455,12 +380,12 @@ $$;
 
 CREATE FUNCTION data.current_season() RETURNS integer
     LANGUAGE sql
-    AS $$
-
-
-SELECT max(season) from data.games;
-
-
+    AS $$
+
+
+SELECT max(season) from data.games;
+
+
 $$;
 
 
@@ -470,6 +395,7 @@ $$;
 
 CREATE FUNCTION data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
+
     AS $$
 SELECT 
 	power((p.omniscience * p.tenaciousness),0.2) *
@@ -486,7 +412,11 @@ $$;
 CREATE FUNCTION data.earned_run_average(in_runs numeric, in_outs numeric) RETURNS numeric
     LANGUAGE sql
     AS $$
+
+
 SELECT round(9*(in_runs/((in_outs::DECIMAL)/3)::DECIMAL) ,2)
+
+
 $$;
 
 
@@ -525,6 +455,7 @@ SELECT
 		)
 	,0)
 );
+
 $$;
 
 
@@ -535,7 +466,11 @@ $$;
 CREATE FUNCTION data.innings_from_outs(in_outs numeric) RETURNS numeric
     LANGUAGE sql
     AS $$
+
+
 select ((round(in_outs/3,0))::TEXT || '.' ||  (mod(in_outs,3))::text)::numeric
+
+
 $$;
 
 
@@ -545,15 +480,15 @@ $$;
 
 CREATE FUNCTION data.last_position_in_string(in_string text, in_search text) RETURNS integer
     LANGUAGE sql
-    AS $$
-
-
-Select length(in_string) - 
-
-
-position(reverse(in_search) in reverse(in_string)) - length(in_search);
-
-
+    AS $$
+
+
+Select length(in_string) - 
+
+
+position(reverse(in_search) in reverse(in_string)) - length(in_search);
+
+
 $$;
 
 
@@ -563,12 +498,12 @@ $$;
 
 CREATE FUNCTION data.on_base_percentage(in_hits bigint, in_raw_at_bats bigint, in_walks bigint, in_sacs bigint DEFAULT 0) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-
-SELECT ((in_hits + in_walks)/ (in_raw_at_bats +in_walks + in_sacs)::numeric)::numeric(10,3)
-
-
+    AS $$
+
+
+SELECT ((in_hits + in_walks)/ (in_raw_at_bats +in_walks + in_sacs)::numeric)::numeric(10,3)
+
+
 $$;
 
 
@@ -578,98 +513,144 @@ $$;
 
 CREATE FUNCTION data.pitcher_idol_coins(in_player_id character varying, in_season integer DEFAULT '-1'::integer) RETURNS bigint
     LANGUAGE sql
-    AS $$
-
-select
-
-(
-
-	SELECT 
-
-	(count(1)) * 200
-
-	FROM data.game_events ge
-
-	WHERE ge.season = 
-
-	CASE
-
-  	  when in_season = -1 then (SELECT data.current_season())
-
-  	  else in_season
-
-	END
-
-	AND ge.event_type = 'STRIKEOUT'
-
-	AND ge.pitcher_id = in_player_id
-
-) 
-
-+
-
-(
-
-	SELECT SUM(shutout) FROM
-
-	(
-
-		SELECT 10000 as shutout
-
-		FROM DATA.game_events ge
-
-		WHERE ge.season = 
-
-		CASE
-
-  		  when in_season = -1 then (SELECT data.current_season())
-
-  		  else in_season
-
-		END
-
-		AND ge.pitcher_id = in_player_id 
-
-		GROUP BY game_id, top_of_inning
-
-		HAVING 
-
-		CASE
-
-		  WHEN top_of_inning THEN MAX(away_score)
-
-		  ELSE MAX(home_score)
-
-		END = 0
-
-		-- Removing all outs check for now, speed issue
-
-		/*
-
-		AND (MAX(inning) +1) * 3 = 
-
-		SUM
-
-		(
-
-		  CASE 
-
-		    WHEN event_type IN ('CAUGHT_STEALING','OUT','STRIKEOUT','FIELDERS_CHOICE')
-
-		    THEN 1
-
-		    ELSE 0
-
-		  END 
-
-		)
-
-		*/
-
-	) s
-
-)
-
+    AS $$
+
+
+select
+
+
+(
+
+
+	SELECT 
+
+
+	(count(1)) * 200
+
+
+	FROM data.game_events ge
+
+
+	WHERE ge.season = 
+
+
+	CASE
+
+
+  	  when in_season = -1 then (SELECT data.current_season())
+
+
+  	  else in_season
+
+
+	END
+
+
+	AND ge.event_type = 'STRIKEOUT'
+
+
+	AND ge.pitcher_id = in_player_id
+
+
+) 
+
+
++
+
+
+(
+
+
+	SELECT SUM(shutout) FROM
+
+
+	(
+
+
+		SELECT 10000 as shutout
+
+
+		FROM DATA.game_events ge
+
+
+		WHERE ge.season = 
+
+
+		CASE
+
+
+  		  when in_season = -1 then (SELECT data.current_season())
+
+
+  		  else in_season
+
+
+		END
+
+
+		AND ge.pitcher_id = in_player_id 
+
+
+		GROUP BY game_id, top_of_inning
+
+
+		HAVING 
+
+
+		CASE
+
+
+		  WHEN top_of_inning THEN MAX(away_score)
+
+
+		  ELSE MAX(home_score)
+
+
+		END = 0
+
+
+		-- Removing all outs check for now, speed issue
+
+
+		/*
+
+
+		AND (MAX(inning) +1) * 3 = 
+
+
+		SUM
+
+
+		(
+
+
+		  CASE 
+
+
+		    WHEN event_type IN ('CAUGHT_STEALING','OUT','STRIKEOUT','FIELDERS_CHOICE')
+
+
+		    THEN 1
+
+
+		    ELSE 0
+
+
+		  END 
+
+
+		)
+
+
+		*/
+
+
+	) s
+
+
+)
+
+
 $$;
 
 
@@ -698,46 +679,30 @@ $$;
 
 CREATE FUNCTION data.player_day_vibe(in_player_id character varying, in_gameday integer DEFAULT 0, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-
-
-
-SELECT 
-
-
-
-
-(0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
-
-
-
-
-(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
-
-
-
-
-* p.pressurization + .5 * p.cinnamon)::numeric
-
-
-
-
-FROM data.players_from_timestamp(in_timestamp) p
-
-
-
-
-WHERE 
-
-
-
-
-p.player_id = in_player_id;
-
-
-
-
+    AS $$
+
+
+SELECT 
+
+
+(0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
+
+
+(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
+
+
+* p.pressurization + .5 * p.cinnamon)::numeric
+
+
+FROM data.players_from_timestamp(in_timestamp) p
+
+
+WHERE 
+
+
+p.player_id = in_player_id;
+
+
 $$;
 
 
@@ -760,132 +725,22 @@ end;
 $$;
 
 
+
 --
 -- Name: rating_to_star(numeric); Type: FUNCTION; Schema: data; Owner: -
 --
 
 CREATE FUNCTION data.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-SELECT 0.5 * round_half_even((
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-(in_rating)* 10),0);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    AS $$
+
+
+SELECT 0.5 * round_half_even((
+
+
+(in_rating)* 10),0);
+
+
 $$;
 
 
@@ -970,12 +825,12 @@ $$;
 
 CREATE FUNCTION data.slugging(in_total_bases_from_hits bigint, in_raw_at_bats bigint, in_sacs bigint DEFAULT 0) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-
-SELECT (in_total_bases_from_hits/ (in_raw_at_bats - in_sacs)::numeric)::numeric(10,3)
-
-
+    AS $$
+
+
+SELECT (in_total_bases_from_hits/ (in_raw_at_bats - in_sacs)::numeric)::numeric(10,3)
+
+
 $$;
 
 
@@ -1002,18 +857,14 @@ $$;
 
 CREATE PROCEDURE data.wipe_all()
     LANGUAGE plpgsql
-    AS $$begin
-
-
-
-call data.wipe_events();
-
-
-
-call data.wipe_hourly();
-
-
-
+    AS $$begin
+
+
+call data.wipe_events();
+
+
+call data.wipe_hourly();
+
 end;$$;
 
 
@@ -1023,22 +874,17 @@ end;$$;
 
 CREATE PROCEDURE data.wipe_events()
     LANGUAGE plpgsql
-    AS $$begin
-
-
-
-truncate data.game_events cascade;
-
-
-
-delete from data.imported_logs where key like 'blaseball-log%';
-
-
-
-truncate data.time_map;
-
-
-
+    AS $$begin
+
+
+truncate data.game_events cascade;
+
+
+delete from data.imported_logs where key like 'blaseball-log%';
+
+
+truncate data.time_map;
+
 end;$$;
 
 
@@ -1048,30 +894,16 @@ end;$$;
 
 CREATE PROCEDURE data.wipe_hourly()
     LANGUAGE plpgsql
-    AS $$begin
-
-
-
-delete from data.imported_logs where key like 'compressed-hourly%';
-
-
-
-truncate data.players cascade;
-
-
-
-truncate data.teams cascade;
-
-
-
-truncate data.games cascade;
-
-
-
-truncate data.team_roster cascade;
-
-
-
+
+    AS $$begin
+delete from data.imported_logs where key like 'compressed-hourly%';
+truncate data.players cascade;
+truncate data.teams cascade;
+truncate data.games cascade;
+truncate data.team_roster cascade;
+truncate data.player_modifications cascade;
+truncate data.team_modifications cascade;
+
 end;$$;
 
 
@@ -1343,7 +1175,8 @@ CREATE TABLE data.team_roster (
     valid_from timestamp without time zone,
     valid_until timestamp without time zone,
     player_id character varying,
-    position_type character varying
+    position_type_id numeric
+
 );
 
 
@@ -1463,16 +1296,6 @@ CREATE TABLE taxa.player_url_slugs (
     player_url_slug character varying
 );
 
-
---
--- Name: positions; Type: TABLE; Schema: taxa; Owner: -
---
-
-CREATE TABLE taxa.positions (
-    position_id integer NOT NULL,
-    position_type character varying,
-    is_active boolean DEFAULT false
-);
 
 
 --
@@ -5235,7 +5058,7 @@ COPY data.team_modifications (team_modifications_id, team_id, modification, vali
 -- Data for Name: team_roster; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY data.team_roster (team_roster_id, team_id, position_id, valid_from, valid_until, player_id, position_type) FROM stdin;
+COPY data.team_roster (team_roster_id, team_id, position_id, valid_from, valid_until, player_id, position_type_id) FROM stdin;
 \.
 
 
@@ -8323,35 +8146,43 @@ SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 3618574, true);
 -- Name: game_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
+
 SELECT pg_catalog.setval('data.game_events_id_seq', 4067891, true);
+
 
 
 --
 -- Name: imported_logs_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
+
 SELECT pg_catalog.setval('data.imported_logs_id_seq', 19577, true);
+
 
 
 --
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
+
 SELECT pg_catalog.setval('data.player_events_id_seq', 1923, true);
+
 
 
 --
 -- Name: player_modifications_player_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 1, false);
+SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 92, true);
 
 
 --
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
+
 SELECT pg_catalog.setval('data.players_id_seq', 30910, true);
+
 
 
 --
@@ -8365,6 +8196,7 @@ SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 1,
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
+
 SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 7400, true);
 
 
@@ -8372,14 +8204,18 @@ SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 7400, true)
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
+
 SELECT pg_catalog.setval('data.teams_id_seq', 280, true);
+
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
+
 SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 3528602, true);
+
 
 
 --
@@ -8563,6 +8399,13 @@ ALTER TABLE ONLY taxa.event_types
 
 ALTER TABLE ONLY taxa.positions
     ADD CONSTRAINT positions_pkey PRIMARY KEY (position_id);
+
+
+--
+-- Name: team_roster_idx; Type: INDEX; Schema: data; Owner: -
+--
+
+CREATE INDEX team_roster_idx ON data.team_roster USING btree (valid_until NULLS FIRST, team_id, position_id, position_type_id) INCLUDE (team_id, position_id, valid_until, position_type_id);
 
 
 --

@@ -6,6 +6,7 @@ using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -45,6 +46,9 @@ namespace SIBR {
 
     private int numEvents = 0;
 
+    private const bool TIMING = false;
+    private const bool TIMING_FILE = true;
+
     public Prophesizer(string bucketName) {
       this.bucketName = bucketName;
       this.client = new AmazonS3Client(Environment.GetEnvironmentVariable("AWS_KEY"), Environment.GetEnvironmentVariable("AWS_SECRET"), bucketRegion);
@@ -54,6 +58,7 @@ namespace SIBR {
       serializerOptions = new JsonSerializerOptions();
       serializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
       serializerOptions.PropertyNameCaseInsensitive = true;
+      serializerOptions.IgnoreNullValues = true;
 
     }
 
@@ -215,7 +220,7 @@ namespace SIBR {
         }
       } catch (Exception e) {
         ConsoleOrWebhook($"Failed to process {keyName}: {e.Message}");
-        ConsoleOrWebhook(e.StackTrace);
+        Console.WriteLine(e.StackTrace);
         return;
       }
     }
@@ -377,7 +382,10 @@ namespace SIBR {
     }
 
     private void ProcessHourly(string keyName, Stream responseStream, NpgsqlConnection psqlConnection) {
+      Stopwatch s = new Stopwatch();
+      s.Start();
       try {
+
         using (GZipStream decompressionStream = new GZipStream(responseStream, CompressionMode.Decompress))
         using (MemoryStream decompressedStream = new MemoryStream()) {
           decompressionStream.CopyTo(decompressedStream);
@@ -415,9 +423,11 @@ namespace SIBR {
         }
       } catch (Exception e) {
         ConsoleOrWebhook($"Failed to process {keyName}: {e.Message}");
-        ConsoleOrWebhook(e.StackTrace);
+        Console.WriteLine(e.StackTrace);
         return;
       }
+      s.Stop();
+      if(TIMING_FILE) Console.WriteLine($"File processing took {s.ElapsedMilliseconds} ms");
     }
 
     private Guid HashObject(HashAlgorithm hashAlgorithm, object obj) {
@@ -433,7 +443,59 @@ namespace SIBR {
       return new Guid(data);
     }
 
+    private void ProcessPlayerModAttrs(Player p, DateTime timestamp, NpgsqlConnection psqlConnection, HashAlgorithm hashAlg) {
+
+      var countCmd = new NpgsqlCommand(@"select count(modification) from data.player_modifications where player_id=@player_id and valid_until is null", psqlConnection);
+      countCmd.Parameters.AddWithValue("player_id", p.Id);
+      long count = (long)countCmd.ExecuteScalar();
+      if (count == 0 && p.PermAttr == null && p.SeasonAttr == null && p.WeekAttr == null && p.GameAttr == null) {
+        return;
+      }
+
+      var allMods = new List<string>();
+      var currentMods = new List<string>();
+
+      if (p.PermAttr != null) allMods.AddRange(p.PermAttr);
+      if (p.SeasonAttr != null) allMods.AddRange(p.SeasonAttr);
+      if (p.WeekAttr != null) allMods.AddRange(p.WeekAttr);
+      if (p.GameAttr != null) allMods.AddRange(p.GameAttr);
+
+      NpgsqlCommand cmd = new NpgsqlCommand(@"select modification from data.player_modifications where player_id=@player_id and valid_until is null", psqlConnection);
+      cmd.Parameters.AddWithValue("player_id", p.Id);
+      using (var reader = cmd.ExecuteReader()) {
+        while (reader.Read()) {
+          currentMods.Add(reader[0] as string);
+        }
+      }
+      var newMods = allMods.Except(currentMods);
+      var oldMods = currentMods.Except(allMods);
+
+      foreach (var modification in newMods) {
+
+        // Try to insert our current data
+        var insertCmd = new NpgsqlCommand(@"insert into data.player_modifications(player_id, modification, valid_from) values(@player_id, @modification, @valid_from)", psqlConnection);
+        insertCmd.Parameters.AddWithValue("player_id", p.Id);
+        insertCmd.Parameters.AddWithValue("modification", modification);
+        insertCmd.Parameters.AddWithValue("valid_from", timestamp);
+        int rows = insertCmd.ExecuteNonQuery();
+        if (rows != 1) throw new InvalidOperationException($"Tried to insert but got {rows} rows affected!");
+      }
+
+      foreach (var modification in oldMods) {
+        // Update the old record
+        NpgsqlCommand update = new NpgsqlCommand(@"update data.player_modifications set valid_until=@timestamp where player_id = @player_id and modification=@modification and valid_until is null", psqlConnection);
+        update.Parameters.AddWithValue("timestamp", timestamp);
+        update.Parameters.AddWithValue("modification", modification);
+        update.Parameters.AddWithValue("player_id", p.Id);
+        int rows = update.ExecuteNonQuery();
+        if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+      }
+
+    }
+
     private void ProcessPlayer(Player p, DateTime timestamp, NpgsqlConnection psqlConnection, HashAlgorithm hashAlg) {
+
       // TODO move hashing into Player
       var hash = HashObject(hashAlg, p);
 
@@ -459,6 +521,8 @@ namespace SIBR {
         var newId = insertCmd.Command.ExecuteNonQuery();
 
       }
+
+      ProcessPlayerModAttrs(p, timestamp, psqlConnection, hashAlg);
     }
 
     private void ProcessPlayers(HourlyArchive hourly, DateTime timestamp, NpgsqlConnection psqlConnection) {
@@ -466,40 +530,49 @@ namespace SIBR {
 
       IEnumerable<string> playerIds = hourly.Params["ids"];
 
+      Stopwatch s = new Stopwatch();
       using (MD5 md5 = MD5.Create()) {
+        s.Start();
 
         var playerList = JsonSerializer.Deserialize<IEnumerable<Player>>(text, serializerOptions);
 
         foreach (var p in playerList) {
           ProcessPlayer(p, timestamp, psqlConnection, md5);
         }
+        s.Stop();
+        //Console.WriteLine($"Processed {playerList.Count()} players in {s.ElapsedMilliseconds} ms");
       }
     }
 
 
-    private void ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime timestamp, string teamId, string playerId, int rosterPosition) {
+    private void ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime timestamp, string teamId, string playerId, int rosterPosition, PositionType positionTypeEnum) {
 
-      NpgsqlCommand cmd = new NpgsqlCommand(@"select player_id from data.team_roster where team_id=@team_id and position_id=@position_id and valid_until is null", psqlConnection);
+      int positionType = (int)positionTypeEnum;
+
+      NpgsqlCommand cmd = new NpgsqlCommand(@"select player_id from data.team_roster where team_id=@team_id and position_id=@position_id and position_type_id=@position_type and valid_until is null", psqlConnection);
       cmd.Parameters.AddWithValue("team_id", teamId);
       cmd.Parameters.AddWithValue("position_id", rosterPosition);
+      cmd.Parameters.AddWithValue("position_type", positionType);
       var oldPlayerId = (string)cmd.ExecuteScalar();
 
       if (oldPlayerId == playerId) {
         // No change
       } else {
         // Update the old record
-        NpgsqlCommand update = new NpgsqlCommand(@"update data.team_roster set valid_until=@timestamp where team_id = @team_id and position_id = @position_id and valid_until is null", psqlConnection);
+        NpgsqlCommand update = new NpgsqlCommand(@"update data.team_roster set valid_until=@timestamp where team_id = @team_id and position_id = @position_id and position_type_id=@position_type and valid_until is null", psqlConnection);
         update.Parameters.AddWithValue("timestamp", timestamp);
         update.Parameters.AddWithValue("team_id", teamId);
         update.Parameters.AddWithValue("position_id", rosterPosition);
+        update.Parameters.AddWithValue("position_type", positionType);
         int rows = update.ExecuteNonQuery();
         if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
-        NpgsqlCommand insert = new NpgsqlCommand(@"insert into data.team_roster(team_id, position_id, player_id, valid_from) values(@team_id, @position_id, @player_id, @valid_from)", psqlConnection);
+        NpgsqlCommand insert = new NpgsqlCommand(@"insert into data.team_roster(team_id, position_id, player_id, position_type_id, valid_from) values(@team_id, @position_id, @player_id, @position_type, @valid_from)", psqlConnection);
         insert.Parameters.AddWithValue("team_id", teamId);
         insert.Parameters.AddWithValue("position_id", rosterPosition);
         insert.Parameters.AddWithValue("player_id", playerId);
         insert.Parameters.AddWithValue("valid_from", timestamp);
+        insert.Parameters.AddWithValue("position_type", positionType);
         // Try to insert our current data
         rows = insert.ExecuteNonQuery();
         if (rows == 0) throw new InvalidOperationException($"Failed to insert new team roster entry");
@@ -507,28 +580,41 @@ namespace SIBR {
 
     }
 
-    private void ProcessRoster(Team t, DateTime timestamp, NpgsqlConnection psqlConnection) {
+    enum PositionType {
+      Batter = 0,
+      Pitcher,
+      Bullpen,
+      Bench
+    }
 
-      int rosterPosition = 0;
+    private void ProcessRoster(Team t, DateTime timestamp, NpgsqlConnection psqlConnection) {
+      Stopwatch s = new Stopwatch();
+      s.Start();
       foreach (var playerId in t.Lineup) {
-        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition);
+        int rosterPosition = 0;
+        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition, PositionType.Batter);
         rosterPosition++;
       }
 
       foreach(var playerId in t.Rotation) {
-        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition);
+        int rosterPosition = 0;
+        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition, PositionType.Pitcher);
         rosterPosition++;
       }
 
       foreach (var playerId in t.Bullpen) {
-        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition);
+        int rosterPosition = 0;
+        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition, PositionType.Bullpen);
         rosterPosition++;
       }
 
       foreach (var playerId in t.Bench) {
-        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition);
+        int rosterPosition = 0;
+        ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition, PositionType.Bench);
         rosterPosition++;
       }
+      s.Stop();
+      if(TIMING) Console.WriteLine($"Processed rosters in {s.ElapsedMilliseconds} ms");
     }
 
     // Hash just the basic attributes of a team, not including their player roster
@@ -551,7 +637,8 @@ namespace SIBR {
       var teams = JsonSerializer.Deserialize<IEnumerable<Team>>(text, serializerOptions);
 
       using (MD5 md5 = MD5.Create()) {
-
+        Stopwatch s = new Stopwatch();
+        s.Start();
         foreach (var t in teams) {
           ProcessRoster(t, timestamp, psqlConnection);
 
@@ -582,6 +669,8 @@ namespace SIBR {
 
 
         }
+        s.Stop();
+        if (TIMING) Console.WriteLine($"Processed {teams.Count()} teams in {s.ElapsedMilliseconds} ms");
       }
     }
 
