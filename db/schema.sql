@@ -19,13 +19,17 @@ SET row_security = off;
 ALTER TABLE IF EXISTS ONLY data.outcomes DROP CONSTRAINT IF EXISTS player_events_game_event_id_fkey;
 ALTER TABLE IF EXISTS ONLY data.game_events DROP CONSTRAINT IF EXISTS game_events_game_id_fkey;
 ALTER TABLE IF EXISTS ONLY data.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_game_event_id_fkey;
+DROP INDEX IF EXISTS data.team_roster_idx;
 ALTER TABLE IF EXISTS ONLY taxa.positions DROP CONSTRAINT IF EXISTS positions_pkey;
 ALTER TABLE IF EXISTS ONLY taxa.event_types DROP CONSTRAINT IF EXISTS event_types_pkey;
+ALTER TABLE IF EXISTS ONLY taxa.attributes DROP CONSTRAINT IF EXISTS attributes_pkey;
 ALTER TABLE IF EXISTS ONLY data.time_map DROP CONSTRAINT IF EXISTS time_map_pkey;
 ALTER TABLE IF EXISTS ONLY data.teams DROP CONSTRAINT IF EXISTS teams_pkey;
 ALTER TABLE IF EXISTS ONLY data.team_roster DROP CONSTRAINT IF EXISTS team_roster_pkey;
+ALTER TABLE IF EXISTS ONLY data.team_modifications DROP CONSTRAINT IF EXISTS team_modifications_pkey;
 ALTER TABLE IF EXISTS ONLY data.time_map DROP CONSTRAINT IF EXISTS season_day_unique;
 ALTER TABLE IF EXISTS ONLY data.players DROP CONSTRAINT IF EXISTS players_pkey;
+ALTER TABLE IF EXISTS ONLY data.player_modifications DROP CONSTRAINT IF EXISTS player_modifications_pkey;
 ALTER TABLE IF EXISTS ONLY data.outcomes DROP CONSTRAINT IF EXISTS player_events_pkey;
 ALTER TABLE IF EXISTS ONLY data.imported_logs DROP CONSTRAINT IF EXISTS imported_logs_pkey;
 ALTER TABLE IF EXISTS ONLY data.games DROP CONSTRAINT IF EXISTS game_pkey;
@@ -76,30 +80,36 @@ DROP SEQUENCE IF EXISTS data.team_positions_team_position_id_seq;
 DROP SEQUENCE IF EXISTS data.team_modifications_team_modifications_id_seq;
 DROP TABLE IF EXISTS data.team_modifications;
 DROP VIEW IF EXISTS data.season_leaders_outs_defended;
-DROP VIEW IF EXISTS data.season_leaders_on_base_slugging;
-DROP VIEW IF EXISTS data.season_leaders_slugging;
-DROP VIEW IF EXISTS data.season_leaders_on_base_percentage;
-DROP VIEW IF EXISTS data.season_leaders_batting_average_risp;
-DROP VIEW IF EXISTS data.season_leaders_batting_average;
-DROP VIEW IF EXISTS data.rosters_expanded_current;
+DROP VIEW IF EXISTS data.running_stats_player_playoffs_career;
+DROP VIEW IF EXISTS data.running_stats_player_playoffs_by_season_team;
+DROP VIEW IF EXISTS data.running_stats_player_playoffs_by_season_combined_teams;
+DROP VIEW IF EXISTS data.running_stats_player_career;
+DROP VIEW IF EXISTS data.running_stats_player_by_season_team;
+DROP VIEW IF EXISTS data.rosters_extended_current;
 DROP VIEW IF EXISTS data.rosters_current;
 DROP SEQUENCE IF EXISTS data.players_id_seq;
 DROP VIEW IF EXISTS data.players_extended_current;
 DROP SEQUENCE IF EXISTS data.player_modifications_player_modifications_id_seq;
 DROP TABLE IF EXISTS data.player_modifications;
 DROP SEQUENCE IF EXISTS data.player_events_id_seq;
+DROP VIEW IF EXISTS data.pitching_stats_player_playoffs_career;
+DROP VIEW IF EXISTS data.pitching_stats_player_playoffs_by_season;
+DROP VIEW IF EXISTS data.pitching_stats_player_career;
+DROP VIEW IF EXISTS data.pitching_stats_player_by_season;
 DROP TABLE IF EXISTS data.outcomes;
 DROP SEQUENCE IF EXISTS data.imported_logs_id_seq;
 DROP TABLE IF EXISTS data.imported_logs;
 DROP SEQUENCE IF EXISTS data.game_events_id_seq;
 DROP SEQUENCE IF EXISTS data.game_event_base_runners_id_seq;
-DROP TABLE IF EXISTS data.game_event_base_runners;
-DROP VIEW IF EXISTS data.batting_stats_season_combined;
-DROP VIEW IF EXISTS data.batting_stats_season_total;
-DROP VIEW IF EXISTS data.batting_stats_season_team;
-DROP VIEW IF EXISTS data.batting_stats_playoffs_season;
-DROP VIEW IF EXISTS data.batting_stats_playoffs_career;
-DROP VIEW IF EXISTS data.batting_stats_career;
+DROP VIEW IF EXISTS data.batting_stats_team_playoffs_lifetime;
+DROP VIEW IF EXISTS data.batting_stats_team_playoffs_by_season;
+DROP VIEW IF EXISTS data.batting_stats_team_lifetime;
+DROP VIEW IF EXISTS data.batting_stats_team_by_season;
+DROP VIEW IF EXISTS data.batting_stats_player_playoffs_career;
+DROP VIEW IF EXISTS data.batting_stats_player_playoffs_by_season_team;
+DROP VIEW IF EXISTS data.batting_stats_player_career;
+DROP VIEW IF EXISTS data.batting_stats_player_by_season_team;
+DROP VIEW IF EXISTS data.batting_stats_player_by_season_combined_teams;
 DROP TABLE IF EXISTS taxa.event_types;
 DROP VIEW IF EXISTS data.players_current;
 DROP TABLE IF EXISTS taxa.positions;
@@ -115,6 +125,7 @@ DROP TABLE IF EXISTS data.team_roster;
 DROP TABLE IF EXISTS data.players;
 DROP TABLE IF EXISTS data.games;
 DROP TABLE IF EXISTS data.game_events;
+DROP TABLE IF EXISTS data.game_event_base_runners;
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();
 DROP PROCEDURE IF EXISTS data.wipe_all();
@@ -131,7 +142,9 @@ DROP FUNCTION IF EXISTS data.pitching_rating(in_player_id character varying, in_
 DROP FUNCTION IF EXISTS data.pitcher_idol_coins(in_player_id character varying, in_season integer);
 DROP FUNCTION IF EXISTS data.on_base_percentage(in_hits bigint, in_raw_at_bats bigint, in_walks bigint, in_sacs bigint);
 DROP FUNCTION IF EXISTS data.last_position_in_string(in_string text, in_search text);
+DROP FUNCTION IF EXISTS data.innings_from_outs(in_outs numeric);
 DROP FUNCTION IF EXISTS data.gameday_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.earned_run_average(in_runs numeric, in_outs numeric);
 DROP FUNCTION IF EXISTS data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone);
 DROP FUNCTION IF EXISTS data.current_season();
 DROP FUNCTION IF EXISTS data.current_gameday();
@@ -169,30 +182,22 @@ CREATE SCHEMA taxa;
 
 CREATE FUNCTION data.bankers_round(in_val numeric, in_prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
-    AS $$
-
-
-
-
-
-
-declare
-    retval numeric;
-    difference numeric;
-    even boolean;
-	
-begin
-    retval := round(in_val,in_prec);
-    difference := retval-in_val;
-    if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
-        even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
-        if not even then
-            retval := round(val-difference,in_prec);
-        end if;
-    end if;
-    return retval;
-end;
-
+    AS $$
+declare
+    retval numeric;
+    difference numeric;
+    even boolean;
+begin
+    retval := round(in_val,in_prec);
+    difference := retval-in_val;
+    if abs(difference)*(10::numeric^in_prec) = 0.5::numeric then
+        even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
+        if not even then
+            retval := round(val-difference,in_prec);
+        end if;
+    end if;
+    return retval;
+end;
 $$;
 
 
@@ -202,12 +207,12 @@ $$;
 
 CREATE FUNCTION data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-	power(p.laserlikeness,0.5) *
-   	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE p.player_id = in_player_id
+    AS $$
+SELECT 
+	power(p.laserlikeness,0.5) *
+   	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE p.player_id = in_player_id
 $$;
 
 
@@ -218,7 +223,6 @@ $$;
 CREATE FUNCTION data.batter_idol_coins(in_player_id character varying, in_season integer DEFAULT '-1'::integer) RETURNS bigint
     LANGUAGE sql
     AS $$
-
 SELECT 
 SUM
 (
@@ -235,7 +239,6 @@ CASE
   else in_season
 END
 AND ge.batter_id = in_player_id;
-
 $$;
 
 
@@ -256,15 +259,15 @@ $$;
 
 CREATE FUNCTION data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-   power((1 - p.tragicness),0.01) * 
-   power((1 - p.patheticism),0.05) *
-   power((p.thwackability * p.divinity),0.35) *
-   power((p.moxie * p.musclitude),0.075) * 
-   power(p.martyrdom,0.02)
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE player_id = in_player_id;
+    AS $$
+SELECT 
+   power((1 - p.tragicness),0.01) * 
+   power((1 - p.patheticism),0.05) *
+   power((p.thwackability * p.divinity),0.35) *
+   power((p.moxie * p.musclitude),0.075) * 
+   power(p.martyrdom,0.02)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE player_id = in_player_id;
 $$;
 
 
@@ -297,12 +300,23 @@ $$;
 
 CREATE FUNCTION data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-	power((p.omniscience * p.tenaciousness),0.2) *
-   	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE p.player_id = in_player_id;
+    AS $$
+SELECT 
+	power((p.omniscience * p.tenaciousness),0.2) *
+   	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE p.player_id = in_player_id;
+$$;
+
+
+--
+-- Name: earned_run_average(numeric, numeric); Type: FUNCTION; Schema: data; Owner: -
+--
+
+CREATE FUNCTION data.earned_run_average(in_runs numeric, in_outs numeric) RETURNS numeric
+    LANGUAGE sql
+    AS $$
+SELECT round(9*(in_runs/((in_outs::DECIMAL)/3)::DECIMAL) ,2)
 $$;
 
 
@@ -312,34 +326,45 @@ $$;
 
 CREATE FUNCTION data.gameday_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(season integer, gameday integer)
     LANGUAGE sql
-    AS $$
-SELECT
-(
-	SELECT COALESCE
-	(
-  		(
-  			SELECT day FROM data.time_map WHERE first_time = 
-			(
-			SELECT max(first_time)
-			FROM data.time_map 
-			WHERE first_time < in_timestamp
-			)	
-		)
-	,0)
-),
-(
-	SELECT COALESCE
-	(
-  		(
-  			SELECT season FROM data.time_map WHERE first_time = 
-			(
-			SELECT max(first_time)
-			FROM data.time_map 
-			WHERE first_time < in_timestamp
-			)	
-		)
-	,0)
-);
+    AS $$
+SELECT
+(
+	SELECT COALESCE
+	(
+  		(
+  			SELECT day FROM data.time_map WHERE first_time = 
+			(
+			SELECT max(first_time)
+			FROM data.time_map 
+			WHERE first_time < in_timestamp
+			)	
+		)
+	,0)
+),
+(
+	SELECT COALESCE
+	(
+  		(
+  			SELECT season FROM data.time_map WHERE first_time = 
+			(
+			SELECT max(first_time)
+			FROM data.time_map 
+			WHERE first_time < in_timestamp
+			)	
+		)
+	,0)
+);
+$$;
+
+
+--
+-- Name: innings_from_outs(numeric); Type: FUNCTION; Schema: data; Owner: -
+--
+
+CREATE FUNCTION data.innings_from_outs(in_outs numeric) RETURNS numeric
+    LANGUAGE sql
+    AS $$
+select ((round(in_outs/3,0))::TEXT || '.' ||  (mod(in_outs,3))::text)::numeric
 $$;
 
 
@@ -372,52 +397,52 @@ $$;
 
 CREATE FUNCTION data.pitcher_idol_coins(in_player_id character varying, in_season integer DEFAULT '-1'::integer) RETURNS bigint
     LANGUAGE sql
-    AS $$
-select
-(
-	SELECT 
-	(count(1)) * 200
-	FROM data.game_events ge
-	WHERE ge.season = 
-	CASE
-  	  when in_season = -1 then (SELECT data.current_season())
-  	  else in_season
-	END
-	AND ge.event_type = 'STRIKEOUT'
-	AND ge.pitcher_id = in_player_id
-) 
-+
-(
-	SELECT SUM(shutout) FROM
-	(
-		SELECT 10000 as shutout
-		FROM DATA.game_events ge
-		WHERE ge.season = 
-		CASE
-  		  when in_season = -1 then (SELECT data.current_season())
-  		  else in_season
-		END
-		AND ge.pitcher_id = in_player_id 
-		GROUP BY game_id, top_of_inning
-		HAVING 
-		CASE
-		  WHEN top_of_inning THEN MAX(away_score)
-		  ELSE MAX(home_score)
-		END = 0
-		-- Removing all outs check for now, speed issue
-		/*
-		AND (MAX(inning) +1) * 3 = 
-		SUM
-		(
-		  CASE 
-		    WHEN event_type IN ('CAUGHT_STEALING','OUT','STRIKEOUT','FIELDERS_CHOICE')
-		    THEN 1
-		    ELSE 0
-		  END 
-		)
-		*/
-	) s
-)
+    AS $$
+select
+(
+	SELECT 
+	(count(1)) * 200
+	FROM data.game_events ge
+	WHERE ge.season = 
+	CASE
+  	  when in_season = -1 then (SELECT data.current_season())
+  	  else in_season
+	END
+	AND ge.event_type = 'STRIKEOUT'
+	AND ge.pitcher_id = in_player_id
+) 
++
+(
+	SELECT SUM(shutout) FROM
+	(
+		SELECT 10000 as shutout
+		FROM DATA.game_events ge
+		WHERE ge.season = 
+		CASE
+  		  when in_season = -1 then (SELECT data.current_season())
+  		  else in_season
+		END
+		AND ge.pitcher_id = in_player_id 
+		GROUP BY game_id, top_of_inning
+		HAVING 
+		CASE
+		  WHEN top_of_inning THEN MAX(away_score)
+		  ELSE MAX(home_score)
+		END = 0
+		-- Removing all outs check for now, speed issue
+		/*
+		AND (MAX(inning) +1) * 3 = 
+		SUM
+		(
+		  CASE 
+		    WHEN event_type IN ('CAUGHT_STEALING','OUT','STRIKEOUT','FIELDERS_CHOICE')
+		    THEN 1
+		    ELSE 0
+		  END 
+		)
+		*/
+	) s
+)
 $$;
 
 
@@ -427,16 +452,16 @@ $$;
 
 CREATE FUNCTION data.pitching_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-power(p.unthwackability,0.5) * 
-power(p.ruthlessness,0.4) *
-power(p.overpowerment,0.15) * 
-power(p.shakespearianism,0.1) * 
-power(p.coldness,0.025)
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE 
-p.player_id = in_player_id;
+    AS $$
+SELECT 
+power(p.unthwackability,0.5) * 
+power(p.ruthlessness,0.4) *
+power(p.overpowerment,0.15) * 
+power(p.shakespearianism,0.1) * 
+power(p.coldness,0.025)
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE 
+p.player_id = in_player_id;
 $$;
 
 
@@ -446,14 +471,14 @@ $$;
 
 CREATE FUNCTION data.player_day_vibe(in_player_id character varying, in_gameday integer DEFAULT 0, in_timestamp timestamp without time zone DEFAULT NULL::timestamp without time zone) RETURNS numeric
     LANGUAGE sql
-    AS $$
-SELECT 
-(0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
-(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
-* p.pressurization + .5 * p.cinnamon)::numeric
-FROM data.players_from_timestamp(in_timestamp) p
-WHERE 
-p.player_id = in_player_id;
+    AS $$
+SELECT 
+(0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
+(2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
+* p.pressurization + .5 * p.cinnamon)::numeric
+FROM data.players_from_timestamp(in_timestamp) p
+WHERE 
+p.player_id = in_player_id;
 $$;
 
 
@@ -463,12 +488,12 @@ $$;
 
 CREATE FUNCTION data.player_id_from_timestamp(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS integer
     LANGUAGE sql
-    AS $$
-	SELECT id
-	FROM players
-	WHERE player_id = in_player_id
-	AND in_timestamp + (INTERVAL '1 millisecond') 
-	BETWEEN valid_from AND coalesce(valid_until,NOW() + (INTERVAL '1 millisecond'));	
+    AS $$
+	SELECT id
+	FROM players
+	WHERE player_id = in_player_id
+	AND in_timestamp + (INTERVAL '1 millisecond') 
+	BETWEEN valid_from AND coalesce(valid_until,NOW() + (INTERVAL '1 millisecond'));	
 $$;
 
 
@@ -478,14 +503,14 @@ $$;
 
 CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric, pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint)
     LANGUAGE plpgsql
-    AS $$
-begin
-	return query 
-		select *
-		from data.teams t
-		where in_timestamp + (INTERVAL '1 millisecond') 
-		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
-		
+    AS $$
+begin
+	return query 
+		select *
+		from data.teams t
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
 end;$$;
 
 
@@ -495,30 +520,9 @@ end;$$;
 
 CREATE FUNCTION data.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
-    AS $$
-
-
-
-
-
-
-
-SELECT 0.5 * round_half_even((
-
-
-
-
-
-
-
-(in_rating)* 10),0);
-
-
-
-
-
-
-
+    AS $$
+SELECT 0.5 * round_half_even((
+(in_rating)* 10),0);
 $$;
 
 
@@ -528,134 +532,22 @@ $$;
 
 CREATE FUNCTION data.round_half_even(val numeric, prec integer) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE STRICT
-    AS $$
-
-
-
-
-
-
-
-declare
-
-
-
-
-
-
-
-    retval numeric;
-
-
-
-
-
-
-
-    difference numeric;
-
-
-
-
-
-
-
-    even boolean;
-
-
-
-
-
-
-
-begin
-
-
-
-
-
-
-
-    retval := round(val,prec);
-
-
-
-
-
-
-
-    difference := retval-val;
-
-
-
-
-
-
-
-    if abs(difference)*(10::numeric^prec) = 0.5::numeric then
-
-
-
-
-
-
-
-        even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
-
-
-
-
-
-
-
-        if not even then
-
-
-
-
-
-
-
-            retval := round(val-difference,prec);
-
-
-
-
-
-
-
-        end if;
-
-
-
-
-
-
-
-    end if;
-
-
-
-
-
-
-
-    return retval;
-
-
-
-
-
-
-
-end;
-
-
-
-
-
-
-
+    AS $$
+declare
+    retval numeric;
+    difference numeric;
+    even boolean;
+begin
+    retval := round(val,prec);
+    difference := retval-val;
+    if abs(difference)*(10::numeric^prec) = 0.5::numeric then
+        even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
+        if not even then
+            retval := round(val-difference,prec);
+        end if;
+    end if;
+    return retval;
+end;
 $$;
 
 
@@ -665,90 +557,18 @@ $$;
 
 CREATE FUNCTION data.season_timespan(in_season integer) RETURNS TABLE(season_start timestamp without time zone, season_end timestamp without time zone)
     LANGUAGE sql
-    AS $$
-
-
-
-
-
-
-SELECT
-
-
-
-
-
-
-(
-
-
-
-
-
-
-	SELECT first_time FROM time_map WHERE DAY = 0 AND season = in_season
-
-
-
-
-
-
-) AS season_start,
-
-
-
-
-
-
-COALESCE
-
-
-
-
-
-
-(
-
-
-
-
-
-
-	(
-
-
-
-
-
-
-		SELECT first_time - INTERVAL '1 SECOND' FROM time_map WHERE DAY = 0 AND season = 
-
-
-
-
-
-
-		(in_season + 1)
-
-
-
-
-
-
-	), NOW()::timestamp
-
-
-
-
-
-
-) AS season_end
-
-
-
-
-
-
+    AS $$
+SELECT
+(
+	SELECT first_time FROM time_map WHERE DAY = 0 AND season = in_season
+) AS season_start,
+COALESCE
+(
+	(
+		SELECT first_time - INTERVAL '1 SECOND' FROM time_map WHERE DAY = 0 AND season = 
+		(in_season + 1)
+	), NOW()::timestamp
+) AS season_end
 $$;
 
 
@@ -769,15 +589,15 @@ $$;
 
 CREATE FUNCTION data.team_roster_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(team_roster_id integer, team_id character varying, position_id integer, valid_from timestamp without time zone, valid_until timestamp without time zone, player_id character varying)
     LANGUAGE plpgsql
-    AS $$
-begin
-	return query 
-		select *
-		--tr.team_roster_id, tr.team_id, tr.position_id, tr.valid_from, tr.valid_until, tr.player_id 
-		from data.team_roster tr
-		where in_timestamp + (INTERVAL '1 millisecond') 
-		BETWEEN tr.valid_from AND coalesce(tr.valid_until,NOW() + (INTERVAL '1 millisecond'));
-		
+    AS $$
+begin
+	return query 
+		select *
+		--tr.team_roster_id, tr.team_id, tr.position_id, tr.valid_from, tr.valid_until, tr.player_id 
+		from data.team_roster tr
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN tr.valid_from AND coalesce(tr.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
 end;$$;
 
 
@@ -787,14 +607,14 @@ end;$$;
 
 CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(id integer, team_id character varying, location text, nickname text, full_name text, valid_from timestamp without time zone, valid_until timestamp without time zone, hash uuid)
     LANGUAGE plpgsql
-    AS $$
-begin
-	return query 
-		select *
-		from data.teams t
-		where in_timestamp + (INTERVAL '1 millisecond') 
-		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
-		
+    AS $$
+begin
+	return query 
+		select *
+		from data.teams t
+		where in_timestamp + (INTERVAL '1 millisecond') 
+		BETWEEN t.valid_from AND coalesce(t.valid_until,NOW() + (INTERVAL '1 millisecond'));
+		
 end;$$;
 
 
@@ -804,9 +624,9 @@ end;$$;
 
 CREATE PROCEDURE data.wipe_all()
     LANGUAGE plpgsql
-    AS $$begin
-call data.wipe_events();
-call data.wipe_hourly();
+    AS $$begin
+call data.wipe_events();
+call data.wipe_hourly();
 end;$$;
 
 
@@ -816,10 +636,10 @@ end;$$;
 
 CREATE PROCEDURE data.wipe_events()
     LANGUAGE plpgsql
-    AS $$begin
-truncate data.game_events cascade;
-delete from data.imported_logs where key like 'blaseball-log%';
-truncate data.time_map;
+    AS $$begin
+truncate data.game_events cascade;
+delete from data.imported_logs where key like 'blaseball-log%';
+truncate data.time_map;
 end;$$;
 
 
@@ -829,18 +649,37 @@ end;$$;
 
 CREATE PROCEDURE data.wipe_hourly()
     LANGUAGE plpgsql
-    AS $$begin
-delete from data.imported_logs where key like 'compressed-hourly%';
-truncate data.players cascade;
-truncate data.teams cascade;
-truncate data.games cascade;
-truncate data.team_roster cascade;
+    AS $$begin
+delete from data.imported_logs where key like 'compressed-hourly%';
+truncate data.players cascade;
+truncate data.teams cascade;
+truncate data.games cascade;
+truncate data.team_roster cascade;
+truncate data.player_modifications cascade;
+truncate data.team_modifications cascade;
 end;$$;
 
 
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: game_event_base_runners; Type: TABLE; Schema: data; Owner: -
+--
+
+CREATE TABLE data.game_event_base_runners (
+    id integer NOT NULL,
+    game_event_id integer,
+    runner_id character varying(36),
+    responsible_pitcher_id character varying(36),
+    base_before_play integer,
+    base_after_play integer,
+    was_base_stolen boolean,
+    was_caught_stealing boolean,
+    was_picked_off boolean
+);
+
 
 --
 -- Name: game_events; Type: TABLE; Schema: data; Owner: -
@@ -985,7 +824,8 @@ CREATE TABLE data.team_roster (
     position_id integer,
     valid_from timestamp without time zone,
     valid_until timestamp without time zone,
-    player_id character varying
+    player_id character varying,
+    position_type_id numeric
 );
 
 
@@ -1202,202 +1042,19 @@ CREATE TABLE taxa.event_types (
 
 
 --
--- Name: batting_stats_career; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_player_by_season_combined_teams; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW data.batting_stats_career AS
+CREATE VIEW data.batting_stats_player_by_season_combined_teams AS
  SELECT p.player_name,
+    a.team,
     a.player_id,
-    a.games,
-    a.plate_appearances,
-    a.at_bats,
-    a.hits,
-    a.total_bases,
-    a.rbis,
-    a.singles,
-    a.doubles,
-    a.triples,
-    a.home_runs,
-    a.walks,
-    a.strikeouts,
-    a.sacrifices,
-    a.ground_outs,
-    a.flyouts,
-    data.batting_average(a.hits, a.at_bats) AS batting_average,
-    data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
-    data.slugging(a.total_bases, a.at_bats) AS slugging,
-    (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging,
-    p.deceased
-   FROM (( SELECT ge.batter_id AS player_id,
-            count(DISTINCT ge.game_id) AS games,
-            sum(xe.plate_appearance) AS plate_appearances,
-            (sum(xe.at_bat) - sum(
-                CASE
-                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
-                    ELSE 0
-                END)) AS at_bats,
-            sum(xe.hit) AS hits,
-            sum(xe.total_bases) AS total_bases,
-            sum(ge.runs_batted_in) AS rbis,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'SINGLE'::text) THEN 1
-                    ELSE 0
-                END) AS singles,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
-                    ELSE 0
-                END) AS doubles,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
-                    ELSE 0
-                END) AS triples,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
-                    ELSE 0
-                END) AS home_runs,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'WALK'::text) THEN 1
-                    ELSE 0
-                END) AS walks,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
-                    ELSE 0
-                END) AS strikeouts,
-            sum(
-                CASE
-                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
-                    ELSE 0
-                END) AS sacrifices,
-            sum(
-                CASE
-                    WHEN ("position"((ge.event_text)::text, 'ground out to'::text) > 0) THEN 1
-                    ELSE 0
-                END) AS ground_outs,
-            sum(
-                CASE
-                    WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
-                    ELSE 0
-                END) AS flyouts
-           FROM ((data.game_events ge
-             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
-             JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
-          WHERE (NOT ga.is_postseason)
-          GROUP BY ge.batter_id) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)))
-  ORDER BY (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) DESC;
-
-
---
--- Name: batting_stats_playoffs_career; Type: VIEW; Schema: data; Owner: -
---
-
-CREATE VIEW data.batting_stats_playoffs_career AS
- SELECT p.player_name,
-    a.player_id,
-    a.games,
-    a.plate_appearances,
-    a.at_bats,
-    a.hits,
-    a.total_bases,
-    a.rbis,
-    a.singles,
-    a.doubles,
-    a.triples,
-    a.home_runs,
-    a.walks,
-    a.strikeouts,
-    a.sacrifices,
-    a.ground_outs,
-    a.flyouts,
-    data.batting_average(a.hits, a.at_bats) AS batting_average,
-    data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
-    data.slugging(a.total_bases, a.at_bats) AS slugging,
-    (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging,
-    p.deceased
-   FROM (( SELECT ge.batter_id AS player_id,
-            count(DISTINCT ge.game_id) AS games,
-            sum(xe.plate_appearance) AS plate_appearances,
-            (sum(xe.at_bat) - sum(
-                CASE
-                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
-                    ELSE 0
-                END)) AS at_bats,
-            sum(xe.hit) AS hits,
-            sum(xe.total_bases) AS total_bases,
-            sum(ge.runs_batted_in) AS rbis,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'SINGLE'::text) THEN 1
-                    ELSE 0
-                END) AS singles,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
-                    ELSE 0
-                END) AS doubles,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
-                    ELSE 0
-                END) AS triples,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
-                    ELSE 0
-                END) AS home_runs,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'WALK'::text) THEN 1
-                    ELSE 0
-                END) AS walks,
-            sum(
-                CASE
-                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
-                    ELSE 0
-                END) AS strikeouts,
-            sum(
-                CASE
-                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
-                    ELSE 0
-                END) AS sacrifices,
-            sum(
-                CASE
-                    WHEN ("position"((ge.event_text)::text, 'ground out to'::text) > 0) THEN 1
-                    ELSE 0
-                END) AS ground_outs,
-            sum(
-                CASE
-                    WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
-                    ELSE 0
-                END) AS flyouts
-           FROM ((data.game_events ge
-             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
-             JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
-          WHERE ga.is_postseason
-          GROUP BY ge.batter_id) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)))
-  ORDER BY (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) DESC;
-
-
---
--- Name: batting_stats_playoffs_season; Type: VIEW; Schema: data; Owner: -
---
-
-CREATE VIEW data.batting_stats_playoffs_season AS
- SELECT p.player_name,
-    t.nickname AS team,
-    a.player_id,
-    a.team_id,
     a.season,
     a.games,
     a.plate_appearances,
     a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
     a.hits,
     a.total_bases,
     a.rbis,
@@ -1410,13 +1067,18 @@ CREATE VIEW data.batting_stats_playoffs_season AS
     a.sacrifices,
     a.ground_outs,
     a.flyouts,
+    a.gidp,
     data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
     data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
     data.slugging(a.total_bases, a.at_bats) AS slugging,
     (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging,
     p.deceased
-   FROM ((( SELECT ge.batter_id AS player_id,
-            ge.batter_team_id AS team_id,
+   FROM (( SELECT 'TOTAL'::character varying AS team,
+            ge.batter_id AS player_id,
             ge.season,
             count(DISTINCT ge.game_id) AS games,
             sum(xe.plate_appearance) AS plate_appearances,
@@ -1425,6 +1087,26 @@ CREATE VIEW data.batting_stats_playoffs_season AS
                     WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
                     ELSE 0
                 END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
             sum(xe.hit) AS hits,
             sum(xe.total_bases) AS total_bases,
             sum(ge.runs_batted_in) AS rbis,
@@ -1472,22 +1154,27 @@ CREATE VIEW data.batting_stats_playoffs_season AS
                 CASE
                     WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
                     ELSE 0
-                END) AS flyouts
-           FROM ((data.game_events ge
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
+           FROM (((data.game_events ge
              JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
              JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
-          WHERE ga.is_postseason
-          GROUP BY ge.batter_id, ge.batter_team_id, ge.season) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)))
-     JOIN data.teams_current t ON (((a.team_id)::text = (t.team_id)::text)))
-  ORDER BY (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) DESC;
+             JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
+          WHERE ((NOT ga.is_postseason) AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
+          GROUP BY ge.batter_id, ge.season, 'TOTAL'::character varying
+         HAVING (count(DISTINCT ge.batter_team_id) > 1)) a
+     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
 
 
 --
--- Name: batting_stats_season_team; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_player_by_season_team; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW data.batting_stats_season_team AS
+CREATE VIEW data.batting_stats_player_by_season_team AS
  SELECT p.player_name,
     a.team,
     a.player_id,
@@ -1495,6 +1182,8 @@ CREATE VIEW data.batting_stats_season_team AS
     a.games,
     a.plate_appearances,
     a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
     a.hits,
     a.total_bases,
     a.rbis,
@@ -1507,7 +1196,12 @@ CREATE VIEW data.batting_stats_season_team AS
     a.sacrifices,
     a.ground_outs,
     a.flyouts,
+    a.gidp,
     data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
     data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
     data.slugging(a.total_bases, a.at_bats) AS slugging,
     (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging,
@@ -1522,6 +1216,26 @@ CREATE VIEW data.batting_stats_season_team AS
                     WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
                     ELSE 0
                 END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
             sum(xe.hit) AS hits,
             sum(xe.total_bases) AS total_bases,
             sum(ge.runs_batted_in) AS rbis,
@@ -1569,29 +1283,33 @@ CREATE VIEW data.batting_stats_season_team AS
                 CASE
                     WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
                     ELSE 0
-                END) AS flyouts
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
            FROM (((data.game_events ge
              JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
              JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
              JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
           WHERE ((NOT ga.is_postseason) AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
           GROUP BY ge.batter_id, ge.season, t.nickname) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)))
-  ORDER BY (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) DESC;
+     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
 
 
 --
--- Name: batting_stats_season_total; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_player_career; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW data.batting_stats_season_total AS
+CREATE VIEW data.batting_stats_player_career AS
  SELECT p.player_name,
-    'TOTAL'::character varying AS team,
     a.player_id,
-    a.season,
     a.games,
     a.plate_appearances,
     a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
     a.hits,
     a.total_bases,
     a.rbis,
@@ -1604,13 +1322,17 @@ CREATE VIEW data.batting_stats_season_total AS
     a.sacrifices,
     a.ground_outs,
     a.flyouts,
+    a.gidp,
     data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
     data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
     data.slugging(a.total_bases, a.at_bats) AS slugging,
     (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging,
     p.deceased
    FROM (( SELECT ge.batter_id AS player_id,
-            ge.season,
             count(DISTINCT ge.game_id) AS games,
             sum(xe.plate_appearance) AS plate_appearances,
             (sum(xe.at_bat) - sum(
@@ -1618,6 +1340,26 @@ CREATE VIEW data.batting_stats_season_total AS
                     WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
                     ELSE 0
                 END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
             sum(xe.hit) AS hits,
             sum(xe.total_bases) AS total_bases,
             sum(ge.runs_batted_in) AS rbis,
@@ -1665,90 +1407,767 @@ CREATE VIEW data.batting_stats_season_total AS
                 CASE
                     WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
                     ELSE 0
-                END) AS flyouts
-           FROM ((data.game_events ge
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
+           FROM (((data.game_events ge
              JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
              JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+             JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
           WHERE ((NOT ga.is_postseason) AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
-          GROUP BY ge.batter_id, ge.season
-         HAVING (count(DISTINCT ge.batter_team_id) > 1)) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)))
-  ORDER BY (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) DESC;
+          GROUP BY ge.batter_id) a
+     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
 
 
 --
--- Name: batting_stats_season_combined; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_player_playoffs_by_season_team; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW data.batting_stats_season_combined AS
- SELECT batting_stats_season_team.player_name,
-    batting_stats_season_team.team,
-    batting_stats_season_team.player_id,
-    batting_stats_season_team.season,
-    batting_stats_season_team.games,
-    batting_stats_season_team.plate_appearances,
-    batting_stats_season_team.at_bats,
-    batting_stats_season_team.hits,
-    batting_stats_season_team.total_bases,
-    batting_stats_season_team.rbis,
-    batting_stats_season_team.singles,
-    batting_stats_season_team.doubles,
-    batting_stats_season_team.triples,
-    batting_stats_season_team.home_runs,
-    batting_stats_season_team.walks,
-    batting_stats_season_team.strikeouts,
-    batting_stats_season_team.sacrifices,
-    batting_stats_season_team.ground_outs,
-    batting_stats_season_team.flyouts,
-    batting_stats_season_team.batting_average,
-    batting_stats_season_team.on_base_percentage,
-    batting_stats_season_team.slugging,
-    batting_stats_season_team.on_base_slugging,
-    batting_stats_season_team.deceased
-   FROM data.batting_stats_season_team
-UNION
- SELECT batting_stats_season_total.player_name,
-    batting_stats_season_total.team,
-    batting_stats_season_total.player_id,
-    batting_stats_season_total.season,
-    batting_stats_season_total.games,
-    batting_stats_season_total.plate_appearances,
-    batting_stats_season_total.at_bats,
-    batting_stats_season_total.hits,
-    batting_stats_season_total.total_bases,
-    batting_stats_season_total.rbis,
-    batting_stats_season_total.singles,
-    batting_stats_season_total.doubles,
-    batting_stats_season_total.triples,
-    batting_stats_season_total.home_runs,
-    batting_stats_season_total.walks,
-    batting_stats_season_total.strikeouts,
-    batting_stats_season_total.sacrifices,
-    batting_stats_season_total.ground_outs,
-    batting_stats_season_total.flyouts,
-    batting_stats_season_total.batting_average,
-    batting_stats_season_total.on_base_percentage,
-    batting_stats_season_total.slugging,
-    batting_stats_season_total.on_base_slugging,
-    batting_stats_season_total.deceased
-   FROM data.batting_stats_season_total;
+CREATE VIEW data.batting_stats_player_playoffs_by_season_team AS
+ SELECT p.player_name,
+    a.player_id,
+    a.team,
+    a.season,
+    a.games,
+    a.plate_appearances,
+    a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
+    a.hits,
+    a.total_bases,
+    a.rbis,
+    a.singles,
+    a.doubles,
+    a.triples,
+    a.home_runs,
+    a.walks,
+    a.strikeouts,
+    a.sacrifices,
+    a.ground_outs,
+    a.flyouts,
+    a.gidp,
+    data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
+    data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
+    data.slugging(a.total_bases, a.at_bats) AS slugging,
+    (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging,
+    p.deceased
+   FROM (( SELECT ge.batter_id AS player_id,
+            t.nickname AS team,
+            ge.season,
+            count(DISTINCT ge.game_id) AS games,
+            sum(xe.plate_appearance) AS plate_appearances,
+            (sum(xe.at_bat) - sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
+            sum(xe.hit) AS hits,
+            sum(xe.total_bases) AS total_bases,
+            sum(ge.runs_batted_in) AS rbis,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'SINGLE'::text) THEN 1
+                    ELSE 0
+                END) AS singles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
+                    ELSE 0
+                END) AS doubles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
+                    ELSE 0
+                END) AS triples,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS home_runs,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS walks,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS strikeouts,
+            sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END) AS sacrifices,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'ground out to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS ground_outs,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+             JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
+          WHERE (ga.is_postseason AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
+          GROUP BY ge.batter_id, ge.season, t.nickname) a
+     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
 
 
 --
--- Name: game_event_base_runners; Type: TABLE; Schema: data; Owner: -
+-- Name: batting_stats_player_playoffs_career; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE TABLE data.game_event_base_runners (
-    id integer NOT NULL,
-    game_event_id integer,
-    runner_id character varying(36),
-    responsible_pitcher_id character varying(36),
-    base_before_play integer,
-    base_after_play integer,
-    was_base_stolen boolean,
-    was_caught_stealing boolean,
-    was_picked_off boolean
-);
+CREATE VIEW data.batting_stats_player_playoffs_career AS
+ SELECT p.player_name,
+    a.player_id,
+    a.games,
+    a.plate_appearances,
+    a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
+    a.hits,
+    a.total_bases,
+    a.rbis,
+    a.singles,
+    a.doubles,
+    a.triples,
+    a.home_runs,
+    a.walks,
+    a.strikeouts,
+    a.sacrifices,
+    a.ground_outs,
+    a.flyouts,
+    a.gidp,
+    data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
+    data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
+    data.slugging(a.total_bases, a.at_bats) AS slugging,
+    (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging,
+    p.deceased
+   FROM (( SELECT ge.batter_id AS player_id,
+            count(DISTINCT ge.game_id) AS games,
+            sum(xe.plate_appearance) AS plate_appearances,
+            (sum(xe.at_bat) - sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
+            sum(xe.hit) AS hits,
+            sum(xe.total_bases) AS total_bases,
+            sum(ge.runs_batted_in) AS rbis,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'SINGLE'::text) THEN 1
+                    ELSE 0
+                END) AS singles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
+                    ELSE 0
+                END) AS doubles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
+                    ELSE 0
+                END) AS triples,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS home_runs,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS walks,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS strikeouts,
+            sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END) AS sacrifices,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'ground out to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS ground_outs,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+             JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
+          WHERE (ga.is_postseason AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
+          GROUP BY ge.batter_id) a
+     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
+
+
+--
+-- Name: batting_stats_team_by_season; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_stats_team_by_season AS
+ SELECT a.team,
+    a.team_id,
+    a.season,
+    a.games,
+    a.plate_appearances,
+    a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
+    a.hits,
+    a.total_bases,
+    a.rbis,
+    a.singles,
+    a.doubles,
+    a.triples,
+    a.home_runs,
+    a.walks,
+    a.strikeouts,
+    a.sacrifices,
+    a.ground_outs,
+    a.flyouts,
+    a.gidp,
+    data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
+    data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
+    data.slugging(a.total_bases, a.at_bats) AS slugging,
+    (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging
+   FROM ( SELECT t.nickname AS team,
+            t.team_id,
+            ge.season,
+            count(DISTINCT ge.game_id) AS games,
+            sum(xe.plate_appearance) AS plate_appearances,
+            (sum(xe.at_bat) - sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
+            sum(xe.hit) AS hits,
+            sum(xe.total_bases) AS total_bases,
+            sum(ge.runs_batted_in) AS rbis,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'SINGLE'::text) THEN 1
+                    ELSE 0
+                END) AS singles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
+                    ELSE 0
+                END) AS doubles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
+                    ELSE 0
+                END) AS triples,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS home_runs,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS walks,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS strikeouts,
+            sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END) AS sacrifices,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'ground out to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS ground_outs,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+             JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
+          WHERE ((NOT ga.is_postseason) AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
+          GROUP BY ge.season, t.nickname, t.team_id) a;
+
+
+--
+-- Name: batting_stats_team_lifetime; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_stats_team_lifetime AS
+ SELECT a.team,
+    a.team_id,
+    a.games,
+    a.plate_appearances,
+    a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
+    a.hits,
+    a.total_bases,
+    a.rbis,
+    a.singles,
+    a.doubles,
+    a.triples,
+    a.home_runs,
+    a.walks,
+    a.strikeouts,
+    a.sacrifices,
+    a.ground_outs,
+    a.flyouts,
+    a.gidp,
+    data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
+    data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
+    data.slugging(a.total_bases, a.at_bats) AS slugging,
+    (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging
+   FROM ( SELECT t.nickname AS team,
+            t.team_id,
+            count(DISTINCT ge.game_id) AS games,
+            sum(xe.plate_appearance) AS plate_appearances,
+            (sum(xe.at_bat) - sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
+            sum(xe.hit) AS hits,
+            sum(xe.total_bases) AS total_bases,
+            sum(ge.runs_batted_in) AS rbis,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'SINGLE'::text) THEN 1
+                    ELSE 0
+                END) AS singles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
+                    ELSE 0
+                END) AS doubles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
+                    ELSE 0
+                END) AS triples,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS home_runs,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS walks,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS strikeouts,
+            sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END) AS sacrifices,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'ground out to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS ground_outs,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+             JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
+          WHERE ((NOT ga.is_postseason) AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
+          GROUP BY t.nickname, t.team_id) a;
+
+
+--
+-- Name: batting_stats_team_playoffs_by_season; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_stats_team_playoffs_by_season AS
+ SELECT a.team,
+    a.team_id,
+    a.season,
+    a.games,
+    a.plate_appearances,
+    a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
+    a.hits,
+    a.total_bases,
+    a.rbis,
+    a.singles,
+    a.doubles,
+    a.triples,
+    a.home_runs,
+    a.walks,
+    a.strikeouts,
+    a.sacrifices,
+    a.ground_outs,
+    a.flyouts,
+    a.gidp,
+    data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
+    data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
+    data.slugging(a.total_bases, a.at_bats) AS slugging,
+    (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging
+   FROM ( SELECT t.nickname AS team,
+            t.team_id,
+            ge.season,
+            count(DISTINCT ge.game_id) AS games,
+            sum(xe.plate_appearance) AS plate_appearances,
+            (sum(xe.at_bat) - sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
+            sum(xe.hit) AS hits,
+            sum(xe.total_bases) AS total_bases,
+            sum(ge.runs_batted_in) AS rbis,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'SINGLE'::text) THEN 1
+                    ELSE 0
+                END) AS singles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
+                    ELSE 0
+                END) AS doubles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
+                    ELSE 0
+                END) AS triples,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS home_runs,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS walks,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS strikeouts,
+            sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END) AS sacrifices,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'ground out to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS ground_outs,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+             JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
+          WHERE (ga.is_postseason AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
+          GROUP BY ge.season, t.nickname, t.team_id) a;
+
+
+--
+-- Name: batting_stats_team_playoffs_lifetime; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_stats_team_playoffs_lifetime AS
+ SELECT a.team,
+    a.team_id,
+    a.games,
+    a.plate_appearances,
+    a.at_bats,
+    a.at_bats_risp,
+    a.hits_risp,
+    a.hits,
+    a.total_bases,
+    a.rbis,
+    a.singles,
+    a.doubles,
+    a.triples,
+    a.home_runs,
+    a.walks,
+    a.strikeouts,
+    a.sacrifices,
+    a.ground_outs,
+    a.flyouts,
+    a.gidp,
+    data.batting_average(a.hits, a.at_bats) AS batting_average,
+        CASE
+            WHEN (a.at_bats_risp = 0) THEN NULL::numeric
+            ELSE data.batting_average(a.hits_risp, a.at_bats_risp)
+        END AS batting_average_risp,
+    data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) AS on_base_percentage,
+    data.slugging(a.total_bases, a.at_bats) AS slugging,
+    (data.on_base_percentage(a.hits, a.at_bats, a.walks, a.sacrifices) + data.slugging(a.total_bases, a.at_bats)) AS on_base_slugging
+   FROM ( SELECT t.nickname AS team,
+            t.team_id,
+            count(DISTINCT ge.game_id) AS games,
+            sum(xe.plate_appearance) AS plate_appearances,
+            (sum(xe.at_bat) - sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END)) AS at_bats,
+            (sum(
+                CASE
+                    WHEN (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3]))))) THEN 1
+                    ELSE 0
+                END) - sum(
+                CASE
+                    WHEN ((ge.is_sacrifice_hit OR ge.is_sacrifice_fly) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END)) AS at_bats_risp,
+            sum(
+                CASE
+                    WHEN ((xe.hit = 1) AND (EXISTS ( SELECT 1
+                       FROM data.game_event_base_runners geb
+                      WHERE ((ge.id = geb.game_event_id) AND (geb.base_before_play = ANY (ARRAY[2, 3])))))) THEN 1
+                    ELSE 0
+                END) AS hits_risp,
+            sum(xe.hit) AS hits,
+            sum(xe.total_bases) AS total_bases,
+            sum(ge.runs_batted_in) AS rbis,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'SINGLE'::text) THEN 1
+                    ELSE 0
+                END) AS singles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
+                    ELSE 0
+                END) AS doubles,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
+                    ELSE 0
+                END) AS triples,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS home_runs,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS walks,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS strikeouts,
+            sum(
+                CASE
+                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    ELSE 0
+                END) AS sacrifices,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'ground out to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS ground_outs,
+            sum(
+                CASE
+                    WHEN ("position"((ge.event_text)::text, 'flyout to'::text) > 0) THEN 1
+                    ELSE 0
+                END) AS flyouts,
+            sum(
+                CASE
+                    WHEN ge.is_double_play THEN 1
+                    ELSE 0
+                END) AS gidp
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+             JOIN data.teams_current t ON (((ge.batter_team_id)::text = (t.team_id)::text)))
+          WHERE (ga.is_postseason AND ((ge.batter_id)::text <> 'UNKNOWN'::text))
+          GROUP BY t.nickname, t.team_id) a;
 
 
 --
@@ -1833,6 +2252,290 @@ CREATE TABLE data.outcomes (
     event_type text,
     original_text text
 );
+
+
+--
+-- Name: pitching_stats_player_by_season; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.pitching_stats_player_by_season AS
+ SELECT p.player_name,
+    a.season,
+    sum(a.win) AS wins,
+    sum(a.loss) AS losses,
+    sum(a.k) AS strikeouts,
+    sum(a.bb) AS walks,
+    sum(a.hr) AS hrs_allowed,
+    sum(a.hit) AS hits,
+    sum(a.run) AS runs,
+    sum(a."out") AS outs,
+    sum(
+        CASE
+            WHEN (a.run = 0) THEN 1
+            ELSE 0
+        END) AS shutouts,
+    data.innings_from_outs(sum(a."out")) AS innings,
+    data.earned_run_average(sum(a.run), sum(a."out")) AS era
+   FROM (( SELECT ge.game_id,
+            ge.pitcher_id,
+            ge.season,
+                CASE
+                    WHEN (ge.top_of_inning AND (fs.home_final > fs.away_final)) THEN 1
+                    WHEN ((NOT ge.top_of_inning) AND (fs.home_final < fs.away_final)) THEN 1
+                    ELSE 0
+                END AS win,
+                CASE
+                    WHEN (ge.top_of_inning AND (fs.home_final > fs.away_final)) THEN 0
+                    WHEN ((NOT ge.top_of_inning) AND (fs.home_final < fs.away_final)) THEN 0
+                    ELSE 1
+                END AS loss,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS k,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS bb,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS hr,
+            sum(xe.hit) AS hit,
+            sum(
+                CASE
+                    WHEN (geb.base_after_play = 4) THEN 1
+                    ELSE 0
+                END) AS run,
+            sum(ge.outs_on_play) AS "out",
+            max(ge.event_index) AS last_event
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.game_event_base_runners geb ON ((ge.id = geb.game_event_id)))
+             JOIN ( SELECT max(game_events.home_score) AS home_final,
+                    max(game_events.away_score) AS away_final,
+                    game_events.game_id
+                   FROM data.game_events
+                  GROUP BY game_events.game_id) fs ON (((ge.game_id)::text = (fs.game_id)::text)))
+          WHERE (ge.day < 99)
+          GROUP BY ge.game_id, ge.pitcher_id, ge.top_of_inning, fs.home_final, fs.away_final, ge.season) a
+     JOIN data.players_current p ON (((a.pitcher_id)::text = (p.player_id)::text)))
+  GROUP BY p.player_name, a.season;
+
+
+--
+-- Name: pitching_stats_player_career; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.pitching_stats_player_career AS
+ SELECT p.player_name,
+    sum(a.win) AS wins,
+    sum(a.loss) AS losses,
+    sum(a.k) AS strikeouts,
+    sum(a.bb) AS walks,
+    sum(a.hr) AS hrs_allowed,
+    sum(a.hit) AS hits,
+    sum(a.run) AS runs,
+    sum(a."out") AS outs,
+    sum(
+        CASE
+            WHEN (a.run = 0) THEN 1
+            ELSE 0
+        END) AS shutouts,
+    data.innings_from_outs(sum(a."out")) AS innings,
+    data.earned_run_average(sum(a.run), sum(a."out")) AS era
+   FROM (( SELECT ge.game_id,
+            ge.pitcher_id,
+                CASE
+                    WHEN (ge.top_of_inning AND (fs.home_final > fs.away_final)) THEN 1
+                    WHEN ((NOT ge.top_of_inning) AND (fs.home_final < fs.away_final)) THEN 1
+                    ELSE 0
+                END AS win,
+                CASE
+                    WHEN (ge.top_of_inning AND (fs.home_final > fs.away_final)) THEN 0
+                    WHEN ((NOT ge.top_of_inning) AND (fs.home_final < fs.away_final)) THEN 0
+                    ELSE 1
+                END AS loss,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS k,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS bb,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS hr,
+            sum(xe.hit) AS hit,
+            sum(
+                CASE
+                    WHEN (geb.base_after_play = 4) THEN 1
+                    ELSE 0
+                END) AS run,
+            sum(ge.outs_on_play) AS "out",
+            max(ge.event_index) AS last_event
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.game_event_base_runners geb ON ((ge.id = geb.game_event_id)))
+             JOIN ( SELECT max(game_events.home_score) AS home_final,
+                    max(game_events.away_score) AS away_final,
+                    game_events.game_id
+                   FROM data.game_events
+                  GROUP BY game_events.game_id) fs ON (((ge.game_id)::text = (fs.game_id)::text)))
+          WHERE (ge.day < 99)
+          GROUP BY ge.game_id, ge.pitcher_id, ge.top_of_inning, fs.home_final, fs.away_final) a
+     JOIN data.players_current p ON (((a.pitcher_id)::text = (p.player_id)::text)))
+  GROUP BY p.player_name;
+
+
+--
+-- Name: pitching_stats_player_playoffs_by_season; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.pitching_stats_player_playoffs_by_season AS
+ SELECT p.player_name,
+    a.season,
+    sum(a.win) AS wins,
+    sum(a.loss) AS losses,
+    sum(a.k) AS strikeouts,
+    sum(a.bb) AS walks,
+    sum(a.hr) AS hrs_allowed,
+    sum(a.hit) AS hits,
+    sum(a.run) AS runs,
+    sum(a."out") AS outs,
+    sum(
+        CASE
+            WHEN (a.run = 0) THEN 1
+            ELSE 0
+        END) AS shutouts,
+    data.innings_from_outs(sum(a."out")) AS innings,
+    data.earned_run_average(sum(a.run), sum(a."out")) AS era
+   FROM (( SELECT ge.game_id,
+            ge.pitcher_id,
+            ge.season,
+                CASE
+                    WHEN (ge.top_of_inning AND (fs.home_final > fs.away_final)) THEN 1
+                    WHEN ((NOT ge.top_of_inning) AND (fs.home_final < fs.away_final)) THEN 1
+                    ELSE 0
+                END AS win,
+                CASE
+                    WHEN (ge.top_of_inning AND (fs.home_final > fs.away_final)) THEN 0
+                    WHEN ((NOT ge.top_of_inning) AND (fs.home_final < fs.away_final)) THEN 0
+                    ELSE 1
+                END AS loss,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS k,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS bb,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS hr,
+            sum(xe.hit) AS hit,
+            sum(
+                CASE
+                    WHEN (geb.base_after_play = 4) THEN 1
+                    ELSE 0
+                END) AS run,
+            sum(ge.outs_on_play) AS "out",
+            max(ge.event_index) AS last_event
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.game_event_base_runners geb ON ((ge.id = geb.game_event_id)))
+             JOIN ( SELECT max(game_events.home_score) AS home_final,
+                    max(game_events.away_score) AS away_final,
+                    game_events.game_id
+                   FROM data.game_events
+                  GROUP BY game_events.game_id) fs ON (((ge.game_id)::text = (fs.game_id)::text)))
+          WHERE (ge.day >= 99)
+          GROUP BY ge.game_id, ge.pitcher_id, ge.top_of_inning, fs.home_final, fs.away_final, ge.season) a
+     JOIN data.players_current p ON (((a.pitcher_id)::text = (p.player_id)::text)))
+  GROUP BY p.player_name, a.season;
+
+
+--
+-- Name: pitching_stats_player_playoffs_career; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.pitching_stats_player_playoffs_career AS
+ SELECT p.player_name,
+    sum(a.win) AS wins,
+    sum(a.loss) AS losses,
+    sum(a.k) AS strikeouts,
+    sum(a.bb) AS walks,
+    sum(a.hr) AS hrs_allowed,
+    sum(a.hit) AS hits,
+    sum(a.run) AS runs,
+    sum(a."out") AS outs,
+    sum(
+        CASE
+            WHEN (a.run = 0) THEN 1
+            ELSE 0
+        END) AS shutouts,
+    data.innings_from_outs(sum(a."out")) AS innings,
+    data.earned_run_average(sum(a.run), sum(a."out")) AS era
+   FROM (( SELECT ge.game_id,
+            ge.pitcher_id,
+                CASE
+                    WHEN (ge.top_of_inning AND (fs.home_final > fs.away_final)) THEN 1
+                    WHEN ((NOT ge.top_of_inning) AND (fs.home_final < fs.away_final)) THEN 1
+                    ELSE 0
+                END AS win,
+                CASE
+                    WHEN (ge.top_of_inning AND (fs.home_final > fs.away_final)) THEN 0
+                    WHEN ((NOT ge.top_of_inning) AND (fs.home_final < fs.away_final)) THEN 0
+                    ELSE 1
+                END AS loss,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'STRIKEOUT'::text) THEN 1
+                    ELSE 0
+                END) AS k,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    ELSE 0
+                END) AS bb,
+            sum(
+                CASE
+                    WHEN (ge.event_type = 'HOME_RUN'::text) THEN 1
+                    ELSE 0
+                END) AS hr,
+            sum(xe.hit) AS hit,
+            sum(
+                CASE
+                    WHEN (geb.base_after_play = 4) THEN 1
+                    ELSE 0
+                END) AS run,
+            sum(ge.outs_on_play) AS "out",
+            max(ge.event_index) AS last_event
+           FROM (((data.game_events ge
+             JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+             JOIN data.game_event_base_runners geb ON ((ge.id = geb.game_event_id)))
+             JOIN ( SELECT max(game_events.home_score) AS home_final,
+                    max(game_events.away_score) AS away_final,
+                    game_events.game_id
+                   FROM data.game_events
+                  GROUP BY game_events.game_id) fs ON (((ge.game_id)::text = (fs.game_id)::text)))
+          WHERE (ge.day >= 99)
+          GROUP BY ge.game_id, ge.pitcher_id, ge.top_of_inning, fs.home_final, fs.away_final) a
+     JOIN data.players_current p ON (((a.pitcher_id)::text = (p.player_id)::text)))
+  GROUP BY p.player_name;
 
 
 --
@@ -1989,176 +2692,220 @@ CREATE VIEW data.rosters_current AS
            FROM data.gameday_from_timestamp(tr.valid_from) gameday_from_timestamp(season, gameday)) AS season_from,
     tr.team_id,
     t.nickname,
-    xp.position_type,
-        CASE
-            WHEN ((xp.position_type)::text = 'PITCHER'::text) THEN (tr.position_id - 9)
-            ELSE tr.position_id
-        END AS position_id,
     tr.player_id,
-    p.player_name
-   FROM (((data.team_roster tr
-     JOIN taxa.positions xp ON ((tr.position_id = xp.position_id)))
+    p.player_name,
+    tr.position_id
+   FROM ((data.team_roster tr
      JOIN data.players p ON ((((tr.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams t ON ((((tr.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((tr.valid_until IS NULL) AND (tr.position_id < 14))
-  ORDER BY t.nickname, xp.position_type,
-        CASE
-            WHEN ((xp.position_type)::text = 'PITCHER'::text) THEN (tr.position_id - 9)
-            ELSE tr.position_id
-        END;
+  ORDER BY t.nickname, tr.position_id;
 
 
 --
--- Name: rosters_expanded_current; Type: VIEW; Schema: data; Owner: -
+-- Name: rosters_extended_current; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW data.rosters_expanded_current AS
+CREATE VIEW data.rosters_extended_current AS
  SELECT tr.valid_from,
+    ( SELECT gameday_from_timestamp.gameday
+           FROM data.gameday_from_timestamp(tr.valid_from) gameday_from_timestamp(season, gameday)) AS gameday_from,
+    ( SELECT gameday_from_timestamp.season
+           FROM data.gameday_from_timestamp(tr.valid_from) gameday_from_timestamp(season, gameday)) AS season_from,
     tr.team_id,
     t.nickname,
-    xp.position_type,
-        CASE
-            WHEN ((xp.position_type)::text = 'PITCHER'::text) THEN (tr.position_id - 9)
-            ELSE tr.position_id
-        END AS position_id,
     tr.player_id,
-    p.player_name
-   FROM (((data.team_roster tr
-     JOIN taxa.positions xp ON ((tr.position_id = xp.position_id)))
+    p.player_name,
+    tr.position_id
+   FROM ((data.team_roster tr
      JOIN data.players p ON ((((tr.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams t ON ((((tr.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
-  ORDER BY t.nickname, xp.position_type,
-        CASE
-            WHEN ((xp.position_type)::text = 'PITCHER'::text) THEN (tr.position_id - 9)
-            ELSE tr.position_id
-        END;
+  WHERE (tr.valid_until IS NULL)
+  ORDER BY t.nickname, tr.position_id;
 
 
 --
--- Name: season_leaders_batting_average; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_player_by_season_team; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW data.season_leaders_batting_average AS
- SELECT p.player_id,
-    p.player_name,
-    p.team,
-    rank() OVER (ORDER BY (data.batting_average(a.hits, a.at_bats, a.sacs)) DESC) AS rank,
-    (a.at_bats - a.sacs) AS at_bats,
-    a.hits,
-    data.batting_average(a.hits, a.at_bats, a.sacs) AS batting_average
-   FROM (( SELECT ge.batter_id AS player_id,
-            sum(et.at_bat) AS at_bats,
-            sum(et.hit) AS hits,
+CREATE VIEW data.running_stats_player_by_season_team AS
+ SELECT p.player_name,
+    p.player_id,
+    t.nickname AS team,
+    ru.season,
+    ru.runs,
+    ru.stolen_bases,
+    ru.caught_stealing
+   FROM ((( SELECT geb.runner_id AS player_id,
+            ge.season,
+            ge.batter_team_id AS team_id,
             sum(
                 CASE
-                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    WHEN (geb.base_after_play = 4) THEN 1
                     ELSE 0
-                END) AS sacs
-           FROM (data.game_events ge
-             JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
-          WHERE (ge.season = ( SELECT data.current_season() AS current_season))
-          GROUP BY ge.batter_id) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
-
-
---
--- Name: season_leaders_batting_average_risp; Type: VIEW; Schema: data; Owner: -
---
-
-CREATE VIEW data.season_leaders_batting_average_risp AS
- SELECT p.player_id,
-    p.player_name,
-    p.team,
-    rank() OVER (ORDER BY (data.batting_average(a.hits, a.at_bats, a.sacs)) DESC) AS rank,
-    (a.at_bats - a.sacs) AS at_bats,
-    a.hits,
-    data.batting_average(a.hits, a.at_bats, a.sacs) AS batting_average_risp
-   FROM (( SELECT ge.batter_id AS player_id,
-            sum(et.at_bat) AS at_bats,
-            sum(et.hit) AS hits,
+                END) AS runs,
             sum(
                 CASE
-                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    WHEN geb.was_base_stolen THEN 1
                     ELSE 0
-                END) AS sacs
-           FROM (data.game_events ge
-             JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
-          WHERE ((ge.season = ( SELECT data.current_season() AS current_season)) AND (EXISTS ( SELECT 1
-                   FROM data.game_event_base_runners geb
-                  WHERE ((geb.base_before_play = ANY (ARRAY[2, 3])) AND (ge.id = geb.game_event_id)))))
-          GROUP BY ge.batter_id) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
-
-
---
--- Name: season_leaders_on_base_percentage; Type: VIEW; Schema: data; Owner: -
---
-
-CREATE VIEW data.season_leaders_on_base_percentage AS
- SELECT p.player_id,
-    p.player_name,
-    p.team,
-    rank() OVER (ORDER BY (data.on_base_percentage(a.hits, a.at_bats_plus_sacs, a.walks)) DESC) AS rank,
-    a.at_bats_plus_sacs,
-    a.walks,
-    a.hits,
-    data.on_base_percentage(a.hits, a.at_bats_plus_sacs, a.walks) AS on_base_percentage
-   FROM (( SELECT ge.batter_id AS player_id,
-            sum(et.at_bat) AS at_bats_plus_sacs,
-            sum(et.hit) AS hits,
+                END) AS stolen_bases,
             sum(
                 CASE
-                    WHEN (ge.event_type = 'WALK'::text) THEN 1
+                    WHEN geb.was_caught_stealing THEN 1
                     ELSE 0
-                END) AS walks
-           FROM (data.game_events ge
-             JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
-          WHERE (ge.season = ( SELECT data.current_season() AS current_season))
-          GROUP BY ge.batter_id) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
+                END) AS caught_stealing
+           FROM ((data.game_event_base_runners geb
+             JOIN data.game_events ge ON ((ge.id = geb.game_event_id)))
+             JOIN data.games ga ON (((ga.game_id)::text = (ge.game_id)::text)))
+          WHERE (((geb.runner_id)::text <> ''::text) AND (NOT ga.is_postseason))
+          GROUP BY geb.runner_id, ge.season, ge.batter_team_id) ru
+     JOIN data.players_current p ON (((ru.player_id)::text = (p.player_id)::text)))
+     JOIN data.teams_current t ON (((ru.team_id)::text = (t.team_id)::text)));
 
 
 --
--- Name: season_leaders_slugging; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_player_career; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW data.season_leaders_slugging AS
- SELECT p.player_id,
-    p.player_name,
-    p.team,
-    rank() OVER (ORDER BY (data.slugging(a.total_bases, a.at_bats, a.sacs)) DESC) AS rank,
-    (a.at_bats - a.sacs) AS at_bats,
-    a.total_bases,
-    data.slugging(a.total_bases, a.at_bats, a.sacs) AS slugging
-   FROM (( SELECT ge.batter_id AS player_id,
-            sum(et.at_bat) AS at_bats,
-            sum(et.total_bases) AS total_bases,
+CREATE VIEW data.running_stats_player_career AS
+ SELECT p.player_name,
+    p.player_id,
+    ru.runs,
+    ru.stolen_bases,
+    ru.caught_stealing
+   FROM (( SELECT geb.runner_id AS player_id,
             sum(
                 CASE
-                    WHEN (ge.is_sacrifice_hit OR ge.is_sacrifice_fly) THEN 1
+                    WHEN (geb.base_after_play = 4) THEN 1
                     ELSE 0
-                END) AS sacs
-           FROM (data.game_events ge
-             JOIN taxa.event_types et ON ((ge.event_type = et.event_type)))
-          WHERE (ge.season = ( SELECT data.current_season() AS current_season))
-          GROUP BY ge.batter_id) a
-     JOIN data.players_current p ON (((a.player_id)::text = (p.player_id)::text)));
+                END) AS runs,
+            sum(
+                CASE
+                    WHEN geb.was_base_stolen THEN 1
+                    ELSE 0
+                END) AS stolen_bases,
+            sum(
+                CASE
+                    WHEN geb.was_caught_stealing THEN 1
+                    ELSE 0
+                END) AS caught_stealing
+           FROM ((data.game_event_base_runners geb
+             JOIN data.game_events ge ON ((ge.id = geb.game_event_id)))
+             JOIN data.games ga ON (((ga.game_id)::text = (ge.game_id)::text)))
+          WHERE (((geb.runner_id)::text <> ''::text) AND (NOT ga.is_postseason))
+          GROUP BY geb.runner_id) ru
+     JOIN data.players_current p ON (((ru.player_id)::text = (p.player_id)::text)));
 
 
 --
--- Name: season_leaders_on_base_slugging; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_player_playoffs_by_season_combined_teams; Type: VIEW; Schema: data; Owner: -
 --
 
-CREATE VIEW data.season_leaders_on_base_slugging AS
- SELECT p.player_id,
-    p.player_name,
-    p.team,
-    rank() OVER (ORDER BY (p.slugging + o.on_base_percentage) DESC) AS rank,
-    o.on_base_percentage,
-    p.slugging,
-    (p.slugging + o.on_base_percentage) AS on_base_slugging
-   FROM (data.season_leaders_on_base_percentage o
-     JOIN data.season_leaders_slugging p ON (((p.player_id)::text = (o.player_id)::text)));
+CREATE VIEW data.running_stats_player_playoffs_by_season_combined_teams AS
+ SELECT p.player_name,
+    p.player_id,
+    ru.season,
+    'TOTAL'::character varying AS team,
+    ru.runs,
+    ru.stolen_bases,
+    ru.caught_stealing
+   FROM (( SELECT geb.runner_id AS player_id,
+            ge.season,
+            sum(
+                CASE
+                    WHEN (geb.base_after_play = 4) THEN 1
+                    ELSE 0
+                END) AS runs,
+            sum(
+                CASE
+                    WHEN geb.was_base_stolen THEN 1
+                    ELSE 0
+                END) AS stolen_bases,
+            sum(
+                CASE
+                    WHEN geb.was_caught_stealing THEN 1
+                    ELSE 0
+                END) AS caught_stealing
+           FROM ((data.game_event_base_runners geb
+             JOIN data.game_events ge ON ((ge.id = geb.game_event_id)))
+             JOIN data.games ga ON (((ga.game_id)::text = (ge.game_id)::text)))
+          WHERE (((geb.runner_id)::text <> ''::text) AND (NOT ga.is_postseason))
+          GROUP BY geb.runner_id, ge.season
+         HAVING (count(DISTINCT ge.batter_team_id) > 1)) ru
+     JOIN data.players_current p ON (((ru.player_id)::text = (p.player_id)::text)));
+
+
+--
+-- Name: running_stats_player_playoffs_by_season_team; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.running_stats_player_playoffs_by_season_team AS
+ SELECT p.player_name,
+    p.player_id,
+    t.nickname AS team,
+    ru.season,
+    ru.runs,
+    ru.stolen_bases,
+    ru.caught_stealing
+   FROM ((( SELECT geb.runner_id AS player_id,
+            ge.season,
+            ge.batter_team_id AS team_id,
+            sum(
+                CASE
+                    WHEN (geb.base_after_play = 4) THEN 1
+                    ELSE 0
+                END) AS runs,
+            sum(
+                CASE
+                    WHEN geb.was_base_stolen THEN 1
+                    ELSE 0
+                END) AS stolen_bases,
+            sum(
+                CASE
+                    WHEN geb.was_caught_stealing THEN 1
+                    ELSE 0
+                END) AS caught_stealing
+           FROM ((data.game_event_base_runners geb
+             JOIN data.game_events ge ON ((ge.id = geb.game_event_id)))
+             JOIN data.games ga ON (((ga.game_id)::text = (ge.game_id)::text)))
+          WHERE (((geb.runner_id)::text <> ''::text) AND ga.is_postseason)
+          GROUP BY geb.runner_id, ge.season, ge.batter_team_id) ru
+     JOIN data.players_current p ON (((ru.player_id)::text = (p.player_id)::text)))
+     JOIN data.teams_current t ON (((ru.team_id)::text = (t.team_id)::text)));
+
+
+--
+-- Name: running_stats_player_playoffs_career; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.running_stats_player_playoffs_career AS
+ SELECT p.player_name,
+    p.player_id,
+    ru.runs,
+    ru.stolen_bases,
+    ru.caught_stealing
+   FROM (( SELECT geb.runner_id AS player_id,
+            sum(
+                CASE
+                    WHEN (geb.base_after_play = 4) THEN 1
+                    ELSE 0
+                END) AS runs,
+            sum(
+                CASE
+                    WHEN geb.was_base_stolen THEN 1
+                    ELSE 0
+                END) AS stolen_bases,
+            sum(
+                CASE
+                    WHEN geb.was_caught_stealing THEN 1
+                    ELSE 0
+                END) AS caught_stealing
+           FROM ((data.game_event_base_runners geb
+             JOIN data.game_events ge ON ((ge.id = geb.game_event_id)))
+             JOIN data.games ga ON (((ga.game_id)::text = (ge.game_id)::text)))
+          WHERE (((geb.runner_id)::text <> ''::text) AND ga.is_postseason)
+          GROUP BY geb.runner_id) ru
+     JOIN data.players_current p ON (((ru.player_id)::text = (p.player_id)::text)));
 
 
 --
@@ -2805,7 +3552,7 @@ COPY data.team_modifications (team_modifications_id, team_id, modification, vali
 -- Data for Name: team_roster; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY data.team_roster (team_roster_id, team_id, position_id, valid_from, valid_until, player_id) FROM stdin;
+COPY data.team_roster (team_roster_id, team_id, position_id, valid_from, valid_until, player_id, position_type_id) FROM stdin;
 \.
 
 
@@ -2830,134 +3577,38 @@ COPY data.time_map (season, day, first_time, time_map_id) FROM stdin;
 --
 
 COPY taxa.attributes (attribute_id, attribute_text, attribute_desc, attribute_objects, attributes_short, attribute_short) FROM stdin;
-1	anticapitalism	\N	\N	\N	A
-2	base_thirst	\N	\N	\N	Bt
-3	buoyancy	\N	\N	\N	Bu
-4	chasiness	\N	\N	\N	Ch
-5	coldness	\N	\N	\N	Co
-6	continuation	\N	\N	\N	Cn
-7	divinity	\N	\N	\N	Dv
-8	ground_friction	\N	\N	\N	G
-9	indulgence	\N	\N	\N	I
-10	laserlikeness	\N	\N	\N	L
-11	martyrdom	\N	\N	\N	Mr
-12	moxie	\N	\N	\N	Mo
-13	musclitude	\N	\N	\N	Ms
-14	omniscience	\N	\N	\N	Om
-15	overpowerment	\N	\N	\N	Ov
-16	patheticism	\N	\N	\N	Pa
-17	ruthlessness	\N	\N	\N	R
-18	shakespearianism	\N	\N	\N	S
-19	suppression	\N	\N	\N	
-20	tenaciousness	\N	\N	\N	Te
-21	thwackability	\N	\N	\N	Tw
-22	tragicness	\N	\N	\N	Tr
-23	unthwackability	\N	\N	\N	Un
-24	watchfulness	\N	\N	\N	W
-25	pressurization	\N	\N	\N	Pr
-26	cinnamon	\N	\N	\N	Ci
-27	total_fingers	\N	\N	\N	
-28	soul	\N	\N	\N	
-29	fate	\N	\N	\N	
-30	peanut_allergy	\N	\N	\N	
-31	coffee	\N	\N	\N	
-32	blood	\N	\N	\N	
-1	anticapitalism	\N	\N	\N	A
-2	base_thirst	\N	\N	\N	Bt
-3	buoyancy	\N	\N	\N	Bu
-4	chasiness	\N	\N	\N	Ch
-5	coldness	\N	\N	\N	Co
-6	continuation	\N	\N	\N	Cn
-7	divinity	\N	\N	\N	Dv
-8	ground_friction	\N	\N	\N	G
-9	indulgence	\N	\N	\N	I
-10	laserlikeness	\N	\N	\N	L
-11	martyrdom	\N	\N	\N	Mr
-12	moxie	\N	\N	\N	Mo
-13	musclitude	\N	\N	\N	Ms
-14	omniscience	\N	\N	\N	Om
-15	overpowerment	\N	\N	\N	Ov
-16	patheticism	\N	\N	\N	Pa
-17	ruthlessness	\N	\N	\N	R
-18	shakespearianism	\N	\N	\N	S
-19	suppression	\N	\N	\N	
-20	tenaciousness	\N	\N	\N	Te
-21	thwackability	\N	\N	\N	Tw
-22	tragicness	\N	\N	\N	Tr
-23	unthwackability	\N	\N	\N	Un
-24	watchfulness	\N	\N	\N	W
-25	pressurization	\N	\N	\N	Pr
-26	cinnamon	\N	\N	\N	Ci
-27	total_fingers	\N	\N	\N	
-28	soul	\N	\N	\N	
-29	fate	\N	\N	\N	
-30	peanut_allergy	\N	\N	\N	
-31	coffee	\N	\N	\N	
-32	blood	\N	\N	\N	
-1	anticapitalism	\N	\N	\N	A
-2	base_thirst	\N	\N	\N	Bt
-3	buoyancy	\N	\N	\N	Bu
-4	chasiness	\N	\N	\N	Ch
-5	coldness	\N	\N	\N	Co
-6	continuation	\N	\N	\N	Cn
-7	divinity	\N	\N	\N	Dv
-8	ground_friction	\N	\N	\N	G
-9	indulgence	\N	\N	\N	I
-10	laserlikeness	\N	\N	\N	L
-11	martyrdom	\N	\N	\N	Mr
-12	moxie	\N	\N	\N	Mo
-13	musclitude	\N	\N	\N	Ms
-14	omniscience	\N	\N	\N	Om
-15	overpowerment	\N	\N	\N	Ov
-16	patheticism	\N	\N	\N	Pa
-17	ruthlessness	\N	\N	\N	R
-18	shakespearianism	\N	\N	\N	S
-19	suppression	\N	\N	\N	
-20	tenaciousness	\N	\N	\N	Te
-21	thwackability	\N	\N	\N	Tw
-22	tragicness	\N	\N	\N	Tr
-23	unthwackability	\N	\N	\N	Un
-24	watchfulness	\N	\N	\N	W
-25	pressurization	\N	\N	\N	Pr
-26	cinnamon	\N	\N	\N	Ci
-27	total_fingers	\N	\N	\N	
-28	soul	\N	\N	\N	
-29	fate	\N	\N	\N	
-30	peanut_allergy	\N	\N	\N	
-31	coffee	\N	\N	\N	
-32	blood	\N	\N	\N	
-1	anticapitalism	\N	\N	\N	A
-2	base_thirst	\N	\N	\N	Bt
-3	buoyancy	\N	\N	\N	Bu
-4	chasiness	\N	\N	\N	Ch
-5	coldness	\N	\N	\N	Co
-6	continuation	\N	\N	\N	Cn
-7	divinity	\N	\N	\N	Dv
-8	ground_friction	\N	\N	\N	G
-9	indulgence	\N	\N	\N	I
-10	laserlikeness	\N	\N	\N	L
-11	martyrdom	\N	\N	\N	Mr
-12	moxie	\N	\N	\N	Mo
-13	musclitude	\N	\N	\N	Ms
-14	omniscience	\N	\N	\N	Om
-15	overpowerment	\N	\N	\N	Ov
-16	patheticism	\N	\N	\N	Pa
-17	ruthlessness	\N	\N	\N	R
-18	shakespearianism	\N	\N	\N	S
-19	suppression	\N	\N	\N	
-20	tenaciousness	\N	\N	\N	Te
-21	thwackability	\N	\N	\N	Tw
-22	tragicness	\N	\N	\N	Tr
-23	unthwackability	\N	\N	\N	Un
-24	watchfulness	\N	\N	\N	W
-25	pressurization	\N	\N	\N	Pr
-26	cinnamon	\N	\N	\N	Ci
-27	total_fingers	\N	\N	\N	
-28	soul	\N	\N	\N	
-29	fate	\N	\N	\N	
-30	peanut_allergy	\N	\N	\N	
-31	coffee	\N	\N	\N	
-32	blood	\N	\N	\N	
+33	suppression	\N	\N	\N	
+34	pressurization	\N	\N	\N	Pr
+35	chasiness	\N	\N	\N	Ch
+36	peanut_allergy	\N	\N	\N	
+37	unthwackability	\N	\N	\N	Un
+38	moxie	\N	\N	\N	Mo
+39	base_thirst	\N	\N	\N	Bt
+40	soul	\N	\N	\N	
+41	indulgence	\N	\N	\N	I
+42	tragicness	\N	\N	\N	Tr
+43	musclitude	\N	\N	\N	Ms
+44	anticapitalism	\N	\N	\N	A
+45	total_fingers	\N	\N	\N	
+46	ground_friction	\N	\N	\N	G
+47	divinity	\N	\N	\N	Dv
+48	overpowerment	\N	\N	\N	Ov
+49	coffee	\N	\N	\N	
+50	thwackability	\N	\N	\N	Tw
+51	shakespearianism	\N	\N	\N	S
+52	laserlikeness	\N	\N	\N	L
+53	tenaciousness	\N	\N	\N	Te
+54	continuation	\N	\N	\N	Cn
+55	cinnamon	\N	\N	\N	Ci
+56	watchfulness	\N	\N	\N	W
+57	martyrdom	\N	\N	\N	Mr
+58	omniscience	\N	\N	\N	Om
+59	blood	\N	\N	\N	
+60	fate	\N	\N	\N	
+61	coldness	\N	\N	\N	Co
+62	buoyancy	\N	\N	\N	Bu
+63	ruthlessness	\N	\N	\N	R
+64	patheticism	\N	\N	\N	Pa
 \.
 
 
@@ -2971,13 +3622,13 @@ COPY taxa.blessings (blessing_id, blessing_short, blessing, blessing_desc, bless
 \N	\N	Max Out Pitcher	This will max out the hitting stats of a random pitcher on your team.	\N	0	adc5b394-8f76-416d-9ce9-813706877b84
 \N	\N	Mysterious Improvement	This blessing happened at the same time as the regular election but were not officially part of said election.	\N	0	adc5b394-8f76-416d-9ce9-813706877b84
 \N	\N	Mystery Defection	This blessing happened at the same time as the regular election but were not officially part of said election.	\N	0	979aee4a-6d80-4863-bf1c-ee1a78e06024
-\N	\N	Pitching Boost	Your pitchers each grow an extra finger. This will boost your team's pitching by 10%.	\N	0	747b8e4a-7e50-4638-a973-ea7950a3e739
+\N	\N	Pitching Boost	Your pitchers each grow an extra finger. This will boost your team's pitching by 10%.	\N	0	747b8e4a-7e50-4638-a973-ea7950a3e739
 \N	\N	Randomize Players	Your five worst players will be sent into deep hypnosis, randomizing their stats.	\N	0	747b8e4a-7e50-4638-a973-ea7950a3e739
 \N	\N	Steal Best Pitcher	This will steal the highest rated pitcher in the league to your team.	\N	0	8d87c468-699a-47a8-b40d-cfb73a5660ad
 \N	\N	Team Boost	Your team goes to a team-building workshop. This will boost your team's stats overall by 6%.	\N	0	8d87c468-699a-47a8-b40d-cfb73a5660ad
 \N	\N	Bloodlust	URRRRRRGGHHHHHH. Maxes the stats of a random player on your team.	\N	1	b72f3061-f573-40d7-832a-5ad475bd7909
 \N	\N	Defection	It's business. The best pitcher in the league joins your team.	\N	1	eb67ae5e-c4bf-46ca-bbbc-425cd34182ff
-\N	\N	Gunblade Bat	A random hitter on your team will gain the gunblade bat, maxing out their hitting stats.	\N	1	979aee4a-6d80-4863-bf1c-ee1a78e06024
+\N	\N	Gunblade Bat	A random hitter on your team will gain the gunblade bat, maxing out their hitting stats.	\N	1	979aee4a-6d80-4863-bf1c-ee1a78e06024
 \N	\N	Literal Arm Cannon	A random pitcher on your team will gain an arm cannon, maxing out their pitching stats.	\N	1	adc5b394-8f76-416d-9ce9-813706877b84
 \N	\N	Performance Enhancing Demons	Mggoka match ng strike fm'latghor. Fm'latgh. +8% Team Overall	\N	1	b72f3061-f573-40d7-832a-5ad475bd7909
 \N	\N	Pseudo-Thumbs	Pseudo-Thumbs burst from the skin on the opposite of your pitchers' hands. +10% Team Pitching	\N	1	105bc3ff-1320-4e37-8ef0-8d595cb95dd0
@@ -5969,42 +6620,42 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 -- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 3060074, true);
+SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 3619835, true);
 
 
 --
 -- Name: game_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_events_id_seq', 3430008, true);
+SELECT pg_catalog.setval('data.game_events_id_seq', 4069413, true);
 
 
 --
 -- Name: imported_logs_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.imported_logs_id_seq', 15799, true);
+SELECT pg_catalog.setval('data.imported_logs_id_seq', 22159, true);
 
 
 --
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_events_id_seq', 1585, true);
+SELECT pg_catalog.setval('data.player_events_id_seq', 1939, true);
 
 
 --
 -- Name: player_modifications_player_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 1, false);
+SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 92, true);
 
 
 --
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.players_id_seq', 25052, true);
+SELECT pg_catalog.setval('data.players_id_seq', 41129, true);
 
 
 --
@@ -6018,28 +6669,28 @@ SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 1,
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 5812, true);
+SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 1986528, true);
 
 
 --
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.teams_id_seq', 227, true);
+SELECT pg_catalog.setval('data.teams_id_seq', 401, true);
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 2893587, true);
+SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 3531558, true);
 
 
 --
 -- Name: attributes_attribute_id_seq; Type: SEQUENCE SET; Schema: taxa; Owner: -
 --
 
-SELECT pg_catalog.setval('taxa.attributes_attribute_id_seq', 32, true);
+SELECT pg_catalog.setval('taxa.attributes_attribute_id_seq', 64, true);
 
 
 --
@@ -6146,6 +6797,14 @@ ALTER TABLE ONLY data.outcomes
 
 
 --
+-- Name: player_modifications player_modifications_pkey; Type: CONSTRAINT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.player_modifications
+    ADD CONSTRAINT player_modifications_pkey PRIMARY KEY (player_modifications_id);
+
+
+--
 -- Name: players players_pkey; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
@@ -6159,6 +6818,14 @@ ALTER TABLE ONLY data.players
 
 ALTER TABLE ONLY data.time_map
     ADD CONSTRAINT season_day_unique UNIQUE (season, day);
+
+
+--
+-- Name: team_modifications team_modifications_pkey; Type: CONSTRAINT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.team_modifications
+    ADD CONSTRAINT team_modifications_pkey PRIMARY KEY (team_modifications_id);
 
 
 --
@@ -6186,6 +6853,14 @@ ALTER TABLE ONLY data.time_map
 
 
 --
+-- Name: attributes attributes_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -
+--
+
+ALTER TABLE ONLY taxa.attributes
+    ADD CONSTRAINT attributes_pkey PRIMARY KEY (attribute_id);
+
+
+--
 -- Name: event_types event_types_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -
 --
 
@@ -6199,6 +6874,13 @@ ALTER TABLE ONLY taxa.event_types
 
 ALTER TABLE ONLY taxa.positions
     ADD CONSTRAINT positions_pkey PRIMARY KEY (position_id);
+
+
+--
+-- Name: team_roster_idx; Type: INDEX; Schema: data; Owner: -
+--
+
+CREATE INDEX team_roster_idx ON data.team_roster USING btree (valid_until NULLS FIRST, team_id, position_id, position_type_id) INCLUDE (team_id, position_id, valid_until, position_type_id);
 
 
 --

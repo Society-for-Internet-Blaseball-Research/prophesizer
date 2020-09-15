@@ -83,6 +83,14 @@ public class Player {
   public int? Blood { get; set; }
 
   // TODO: Arrays of modifiers?
+  [DbIgnore]
+  public IEnumerable<string> PermAttr { get; set; }
+  [DbIgnore] 
+  public IEnumerable<string> SeasonAttr { get; set; }
+  [DbIgnore]
+  public IEnumerable<string> WeekAttr { get; set; }
+  [DbIgnore]
+  public IEnumerable<string> GameAttr { get; set; }
 }
 
 public class Team {
