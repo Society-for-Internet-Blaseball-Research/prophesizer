@@ -600,6 +600,7 @@ WHERE
 
 p.player_id = in_player_id;
 
+$$;
 
 -- Name: players_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
@@ -778,6 +779,12 @@ end;$$;
 
 CREATE PROCEDURE data.wipe_hourly()
     LANGUAGE plpgsql
+	    AS $$begin
+delete from data.imported_logs where key like 'compressed-hourly%';
+truncate data.players cascade;
+truncate data.teams cascade;
+truncate data.games cascade;
+truncate data.team_roster cascade;
 truncate data.player_modifications cascade;
 truncate data.team_modifications cascade;
 end;$$;
@@ -1173,6 +1180,15 @@ CREATE TABLE taxa.player_url_slugs (
 );
 
 
+--
+-- Name: positions; Type: TABLE; Schema: taxa; Owner: -
+--
+
+CREATE TABLE taxa.positions (
+    position_id integer NOT NULL,
+    position_type character varying,
+    is_active boolean DEFAULT false
+);
 
 --
 -- Name: players_current; Type: VIEW; Schema: data; Owner: -
