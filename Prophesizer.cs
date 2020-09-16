@@ -48,6 +48,8 @@ namespace SIBR {
 
     private const bool TIMING = false;
     private const bool TIMING_FILE = true;
+    private const bool DO_HOURLY = true;
+    private const bool DO_EVENTS = true;
 
     public Prophesizer(string bucketName) {
       this.bucketName = bucketName;
@@ -85,30 +87,34 @@ namespace SIBR {
       Console.WriteLine($"Found {unprocessedLogs.updateLogs.Count()} unprocessed game update log(s).");
       Console.WriteLine($"Found {unprocessedLogs.hourlyLogs.Count()} unprocessed hourly log(s).");
 
-      foreach (S3Object logObject in unprocessedLogs.hourlyLogs) {
-        await FetchAndProcessHourly(logObject.Key, psqlConnection);
+      if (DO_HOURLY) {
+        foreach (S3Object logObject in unprocessedLogs.hourlyLogs) {
+          await FetchAndProcessHourly(logObject.Key, psqlConnection);
 
-        using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
-          await logStatement.ExecuteNonQueryAsync();
+          using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
+            await logStatement.ExecuteNonQueryAsync();
+          }
         }
       }
 
-      processor.GameComplete += Processor_GameComplete;
-      foreach (S3Object logObject in unprocessedLogs.updateLogs) {
-        await FetchAndProcessObject(logObject.Key, psqlConnection);
+      if (DO_EVENTS) {
+        processor.GameComplete += Processor_GameComplete;
+        foreach (S3Object logObject in unprocessedLogs.updateLogs) {
+          await FetchAndProcessObject(logObject.Key, psqlConnection);
 
-        using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
-          await logStatement.ExecuteNonQueryAsync();
-        }
+          using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
+            await logStatement.ExecuteNonQueryAsync();
+          }
 
-        //Console.WriteLine($"Found {gamesToInsert.Count} games to insert.");
-        while (gamesToInsert.Count > 0) {
-          var gameEvents = gamesToInsert.Dequeue();
-          await PersistGameEvents(logObject.Key, gameEvents, psqlConnection);
-          await PersistTimeMap(gameEvents, psqlConnection);
+          //Console.WriteLine($"Found {gamesToInsert.Count} games to insert.");
+          while (gamesToInsert.Count > 0) {
+            var gameEvents = gamesToInsert.Dequeue();
+            await PersistGameEvents(logObject.Key, gameEvents, psqlConnection);
+            await PersistTimeMap(gameEvents, psqlConnection);
+          }
         }
+        processor.GameComplete -= Processor_GameComplete;
       }
-      processor.GameComplete -= Processor_GameComplete;
 
       string msg = $"Processed {unprocessedLogs.updateLogs.Count} game update logs and {unprocessedLogs.hourlyLogs.Count} hourly logs.\n";
       if (numEvents > 0) {
@@ -590,26 +596,26 @@ namespace SIBR {
     private void ProcessRoster(Team t, DateTime timestamp, NpgsqlConnection psqlConnection) {
       Stopwatch s = new Stopwatch();
       s.Start();
+      int rosterPosition = 0;
       foreach (var playerId in t.Lineup) {
-        int rosterPosition = 0;
         ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition, PositionType.Batter);
         rosterPosition++;
       }
 
-      foreach(var playerId in t.Rotation) {
-        int rosterPosition = 0;
+      rosterPosition = 0;
+      foreach (var playerId in t.Rotation) {
         ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition, PositionType.Pitcher);
         rosterPosition++;
       }
 
+      rosterPosition = 0;
       foreach (var playerId in t.Bullpen) {
-        int rosterPosition = 0;
         ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition, PositionType.Bullpen);
         rosterPosition++;
       }
 
+      rosterPosition = 0;
       foreach (var playerId in t.Bench) {
-        int rosterPosition = 0;
         ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, rosterPosition, PositionType.Bench);
         rosterPosition++;
       }
