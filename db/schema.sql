@@ -579,24 +579,28 @@ CREATE FUNCTION data.player_day_vibe(in_player_id character varying, in_gameday 
     LANGUAGE sql
     AS $$
 
+
 SELECT 
+
 
 (0.5 * (p.pressurization + p.cinnamon) * sin(PI() * 
 
+
 (2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
+
 
 * p.pressurization + .5 * p.cinnamon)::numeric
 
+
 FROM data.players_from_timestamp(in_timestamp) p
+
 
 WHERE 
 
+
 p.player_id = in_player_id;
 
-$$;
 
-
---
 -- Name: players_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
 
@@ -613,8 +617,6 @@ begin
 
 end;
 $$;
-
-
 --
 -- Name: rating_to_star(numeric); Type: FUNCTION; Schema: data; Owner: -
 --
@@ -623,9 +625,12 @@ CREATE FUNCTION data.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
     AS $$
 
+
 SELECT 0.5 * round_half_even((
 
+
 (in_rating)* 10),0);
+
 
 $$;
 
@@ -773,12 +778,6 @@ end;$$;
 
 CREATE PROCEDURE data.wipe_hourly()
     LANGUAGE plpgsql
-    AS $$begin
-delete from data.imported_logs where key like 'compressed-hourly%';
-truncate data.players cascade;
-truncate data.teams cascade;
-truncate data.games cascade;
-truncate data.team_roster cascade;
 truncate data.player_modifications cascade;
 truncate data.team_modifications cascade;
 end;$$;
@@ -1053,6 +1052,7 @@ CREATE TABLE data.team_roster (
     valid_until timestamp without time zone,
     player_id character varying,
     position_type_id numeric
+
 );
 
 
@@ -1172,16 +1172,6 @@ CREATE TABLE taxa.player_url_slugs (
     player_url_slug character varying
 );
 
-
---
--- Name: positions; Type: TABLE; Schema: taxa; Owner: -
---
-
-CREATE TABLE taxa.positions (
-    position_id integer NOT NULL,
-    position_type character varying,
-    is_active boolean DEFAULT false
-);
 
 
 --
@@ -8025,28 +8015,24 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 -- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 3619835, true);
 
 
 --
 -- Name: game_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_events_id_seq', 4069413, true);
 
 
 --
 -- Name: imported_logs_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.imported_logs_id_seq', 22159, true);
 
 
 --
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_events_id_seq', 1939, true);
 
 
 --
@@ -8060,7 +8046,6 @@ SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq'
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.players_id_seq', 41129, true);
 
 
 --
@@ -8074,21 +8059,18 @@ SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 1,
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 1986528, true);
 
 
 --
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.teams_id_seq', 401, true);
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 3531558, true);
 
 
 --
