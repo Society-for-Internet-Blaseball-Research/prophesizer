@@ -184,7 +184,7 @@ namespace SIBR {
       Console.WriteLine("Determining which logs require processing...");
 
       using (var importedLogsStatement = new NpgsqlCommand("SELECT key FROM data.imported_logs", psqlConnection)) {
-        importedLogsStatement.Prepare();
+        //importedLogsStatement.Prepare();
         using (var reader = await importedLogsStatement.ExecuteReaderAsync()) {
 
           var processedLogs = new List<string>();
@@ -333,7 +333,7 @@ namespace SIBR {
 
     private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent) {
       var cmd = new InsertCommand(psqlConnection, "data.game_events", gameEvent).Command;
-      cmd.Prepare();
+      //cmd.Prepare();
       return cmd;
     }
 
@@ -341,7 +341,7 @@ namespace SIBR {
       var extra = new Dictionary<string, object>();
       extra["game_event_id"] = gameEventId;
       var cmd = new InsertCommand(psqlConnection, "data.game_event_base_runners", baseRunnerEvent, extra).Command;
-      cmd.Prepare();
+      //cmd.Prepare();
       return cmd;
     }
 
@@ -349,7 +349,7 @@ namespace SIBR {
       var extra = new Dictionary<string, object>();
       extra["game_event_id"] = gameEventId;
       var cmd = new InsertCommand(psqlConnection, "data.outcomes", outcome, extra).Command;
-      cmd.Prepare();
+      //cmd.Prepare();
       return cmd;
     }
 
@@ -366,7 +366,7 @@ namespace SIBR {
 
       persistLogStatement.Parameters.AddWithValue("key", keyName);
       persistLogStatement.Parameters.AddWithValue("imported_at", DateTime.UtcNow);
-      persistLogStatement.Prepare();
+      //persistLogStatement.Prepare();
       return persistLogStatement;
     }
 
@@ -462,7 +462,7 @@ namespace SIBR {
 
       var countCmd = new NpgsqlCommand(@"select count(modification) from data.player_modifications where player_id=@player_id and valid_until is null", psqlConnection);
       countCmd.Parameters.AddWithValue("player_id", p.Id);
-      countCmd.Prepare();
+      //countCmd.Prepare();
       long count = (long)countCmd.ExecuteScalar();
       if (count == 0 && p.PermAttr == null && p.SeasonAttr == null && p.WeekAttr == null && p.GameAttr == null) {
         return;
@@ -478,7 +478,7 @@ namespace SIBR {
 
       NpgsqlCommand cmd = new NpgsqlCommand(@"select modification from data.player_modifications where player_id=@player_id and valid_until is null", psqlConnection);
       cmd.Parameters.AddWithValue("player_id", p.Id);
-      cmd.Prepare();
+      //cmd.Prepare();
       using (var reader = cmd.ExecuteReader()) {
         while (reader.Read()) {
           currentMods.Add(reader[0] as string);
@@ -494,7 +494,7 @@ namespace SIBR {
         insertCmd.Parameters.AddWithValue("player_id", p.Id);
         insertCmd.Parameters.AddWithValue("modification", modification);
         insertCmd.Parameters.AddWithValue("valid_from", timestamp);
-        insertCmd.Prepare();
+        //insertCmd.Prepare();
         int rows = insertCmd.ExecuteNonQuery();
         if (rows != 1) throw new InvalidOperationException($"Tried to insert but got {rows} rows affected!");
       }
@@ -505,7 +505,7 @@ namespace SIBR {
         update.Parameters.AddWithValue("timestamp", timestamp);
         update.Parameters.AddWithValue("modification", modification);
         update.Parameters.AddWithValue("player_id", p.Id);
-        update.Prepare();
+        //update.Prepare();
         int rows = update.ExecuteNonQuery();
         if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
@@ -520,7 +520,7 @@ namespace SIBR {
 
       NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.players where hash=@hash and valid_until is null", psqlConnection);
       cmd.Parameters.AddWithValue("hash", hash);
-      cmd.Prepare();
+      //cmd.Prepare();
       var count = (long)cmd.ExecuteScalar();
 
       if (count == 1) {
@@ -530,7 +530,7 @@ namespace SIBR {
         NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
         update.Parameters.AddWithValue("timestamp", timestamp);
         update.Parameters.AddWithValue("player_id", p.Id);
-        update.Prepare();
+        //update.Prepare();
         int rows = update.ExecuteNonQuery();
         if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
@@ -574,7 +574,7 @@ namespace SIBR {
       cmd.Parameters.AddWithValue("team_id", teamId);
       cmd.Parameters.AddWithValue("position_id", rosterPosition);
       cmd.Parameters.AddWithValue("position_type", positionType);
-      cmd.Prepare();
+      //cmd.Prepare();
       var oldPlayerId = (string)cmd.ExecuteScalar();
 
       if (oldPlayerId == playerId) {
@@ -586,7 +586,7 @@ namespace SIBR {
         update.Parameters.AddWithValue("team_id", teamId);
         update.Parameters.AddWithValue("position_id", rosterPosition);
         update.Parameters.AddWithValue("position_type", positionType);
-        update.Prepare();
+        //update.Prepare();
         int rows = update.ExecuteNonQuery();
         if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
@@ -596,7 +596,7 @@ namespace SIBR {
         insert.Parameters.AddWithValue("player_id", playerId);
         insert.Parameters.AddWithValue("valid_from", timestamp);
         insert.Parameters.AddWithValue("position_type", positionType);
-        insert.Prepare();
+        //insert.Prepare();
         // Try to insert our current data
         rows = insert.ExecuteNonQuery();
         if (rows == 0) throw new InvalidOperationException($"Failed to insert new team roster entry");
@@ -669,7 +669,7 @@ namespace SIBR {
           var hash = HashTeamAttrs(md5, t);
           NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.teams where hash=@hash and valid_until is null", psqlConnection);
           cmd.Parameters.AddWithValue("hash", hash);
-          cmd.Prepare();
+          //cmd.Prepare();
           var count = (long)cmd.ExecuteScalar();
 
           if(count == 1) {
@@ -680,7 +680,7 @@ namespace SIBR {
             NpgsqlCommand update = new NpgsqlCommand(@"update data.teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
             update.Parameters.AddWithValue("timestamp", timestamp);
             update.Parameters.AddWithValue("team_id", t.Id);
-            update.Prepare();
+            //update.Prepare();
             int rows = update.ExecuteNonQuery();
             if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
@@ -719,7 +719,7 @@ namespace SIBR {
           updateTimeMap.Parameters.AddWithValue("season", e.season);
           updateTimeMap.Parameters.AddWithValue("day", e.day);
           updateTimeMap.Parameters.AddWithValue("first_time", e.firstPerceivedAt);
-          updateTimeMap.Prepare();
+          //updateTimeMap.Prepare();
           await updateTimeMap.ExecuteNonQueryAsync();
         }
       }
@@ -764,7 +764,7 @@ namespace SIBR {
       insertGameStatement.Parameters.AddWithValue("terminology_id", game.terminology);
       insertGameStatement.Parameters.AddWithValue("rules_id", game.rules);
       insertGameStatement.Parameters.AddWithValue("statsheet_id", game.statsheet);
-      insertGameStatement.Prepare();
+      //insertGameStatement.Prepare();
       return insertGameStatement;
     }
 

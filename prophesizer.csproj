@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <PackageId>SIBR.Prophesizer</PackageId>
-    <Version>1.5.2</Version>
+    <Version>1.5.3</Version>
     <Authors>lilserf</Authors>
     <Company>Society for Internet Blaseball Research</Company>
   </PropertyGroup>
