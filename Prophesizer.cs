@@ -804,6 +804,9 @@ namespace SIBR {
       JsonSerializerOptions options = new JsonSerializerOptions();
       options.IgnoreNullValues = true;
 
+      // Okay we know we have completed at least this many full seasons
+      int MIN_SEASON = 5;
+
       // Loop until we break out
       while (true) {
         // Get games for this season & day
@@ -814,7 +817,8 @@ namespace SIBR {
           string strResponse = await response.Content.ReadAsStringAsync();
           var gameList = JsonSerializer.Deserialize<IEnumerable<Game>>(strResponse, options);
 
-          if (gameList == null || gameList.Count() == 0 ) {//|| gameList.First().gameComplete == false) {
+          // If we got no response OR we're past the minimum and we got a "game not complete" response
+          if (gameList == null || gameList.Count() == 0  || (season > MIN_SEASON && gameList.First().gameComplete == false)) {
             if (day > 0) {
               // Ran out of finished games this season, try the next
               season++;
