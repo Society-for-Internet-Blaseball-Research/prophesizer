@@ -82,7 +82,6 @@ public class Player {
   [DbNullValue(-1)]
   public int? Blood { get; set; }
 
-  // TODO: Arrays of modifiers?
   [DbIgnore]
   public IEnumerable<string> PermAttr { get; set; }
   [DbIgnore] 
@@ -115,7 +114,14 @@ public class Team {
   public string Nickname { get; set; }
   public string FullName { get; set; }
 
-  // TODO: more fields
+  [DbIgnore]
+  public IEnumerable<string> PermAttr { get; set; }
+  [DbIgnore]
+  public IEnumerable<string> SeasonAttr { get; set; }
+  [DbIgnore]
+  public IEnumerable<string> WeekAttr { get; set; }
+  [DbIgnore]
+  public IEnumerable<string> GameAttr { get; set; }
 }
 
 

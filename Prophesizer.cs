@@ -88,19 +88,26 @@ namespace SIBR {
       Console.WriteLine($"Found {unprocessedLogs.hourlyLogs.Count()} unprocessed hourly log(s).");
 
       if (DO_HOURLY) {
+        int i = 0;
         foreach (S3Object logObject in unprocessedLogs.hourlyLogs) {
           await FetchAndProcessHourly(logObject.Key, psqlConnection);
+          var percent = (float)i / unprocessedLogs.hourlyLogs.Count();
+          Console.WriteLine($"{percent:P0} complete");
 
           using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
             await logStatement.ExecuteNonQueryAsync();
           }
+          i++;
         }
       }
 
       if (DO_EVENTS) {
+        int i = 0;
         processor.GameComplete += Processor_GameComplete;
         foreach (S3Object logObject in unprocessedLogs.updateLogs) {
           await FetchAndProcessObject(logObject.Key, psqlConnection);
+          var percent = (float)i / unprocessedLogs.updateLogs.Count();
+          Console.WriteLine($"{percent:P0} complete");
 
           using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key)) {
             await logStatement.ExecuteNonQueryAsync();
@@ -112,6 +119,7 @@ namespace SIBR {
             await PersistGameEvents(logObject.Key, gameEvents, psqlConnection);
             await PersistTimeMap(gameEvents, psqlConnection);
           }
+          i++;
         }
         processor.GameComplete -= Processor_GameComplete;
       }
@@ -208,7 +216,7 @@ namespace SIBR {
 
       using (GetObjectResponse response = await client.GetObjectAsync(request))
       using (Stream responseStream = response.ResponseStream) {
-        Console.WriteLine($"Processing document (Key: {keyName}, Length: {response.ContentLength})...");
+        Console.Write($"Processing document (Key: {keyName}, Length: {response.ContentLength})...");
 
         await ProcessObject(keyName, responseStream);
 
@@ -378,7 +386,7 @@ namespace SIBR {
 
       using (GetObjectResponse response = await client.GetObjectAsync(request))
       using (Stream responseStream = response.ResponseStream) {
-        Console.WriteLine($"Processing document (Key: {keyName}, Length: {response.ContentLength})...");
+        Console.Write($"Processing document (Key: {keyName}, Length: {response.ContentLength})...");
 
         ProcessHourly(keyName, responseStream, psqlConnection);
 
@@ -442,7 +450,7 @@ namespace SIBR {
         return;
       }
       s.Stop();
-      if(TIMING_FILE) Console.WriteLine($"File processing took {s.ElapsedMilliseconds} ms");
+      if(TIMING_FILE) Console.Write($"({s.ElapsedMilliseconds} ms)...");
     }
 
     private Guid HashObject(HashAlgorithm hashAlgorithm, object obj) {
@@ -458,7 +466,7 @@ namespace SIBR {
       return new Guid(data);
     }
 
-    private void ProcessPlayerModAttrs(Player p, DateTime timestamp, NpgsqlConnection psqlConnection, HashAlgorithm hashAlg) {
+    private void ProcessPlayerModAttrs(Player p, DateTime timestamp, NpgsqlConnection psqlConnection) {
 
       var countCmd = new NpgsqlCommand(@"select count(modification) from data.player_modifications where player_id=@player_id and valid_until is null", psqlConnection);
       countCmd.Parameters.AddWithValue("player_id", p.Id);
@@ -543,7 +551,7 @@ namespace SIBR {
 
       }
 
-      ProcessPlayerModAttrs(p, timestamp, psqlConnection, hashAlg);
+      ProcessPlayerModAttrs(p, timestamp, psqlConnection);
     }
 
     private void ProcessPlayers(HourlyArchive hourly, DateTime timestamp, NpgsqlConnection psqlConnection) {
@@ -655,6 +663,61 @@ namespace SIBR {
       return new Guid(data);
     }
 
+    private void ProcessTeamModAttrs(Team p, DateTime timestamp, NpgsqlConnection psqlConnection) {
+
+      var countCmd = new NpgsqlCommand(@"select count(modification) from data.team_modifications where team_id=@team_id and valid_until is null", psqlConnection);
+      countCmd.Parameters.AddWithValue("team_id", p.Id);
+      //countCmd.Prepare();
+      long count = (long)countCmd.ExecuteScalar();
+      if (count == 0 && p.PermAttr == null && p.SeasonAttr == null && p.WeekAttr == null && p.GameAttr == null) {
+        return;
+      }
+
+      var allMods = new List<string>();
+      var currentMods = new List<string>();
+
+      if (p.PermAttr != null) allMods.AddRange(p.PermAttr);
+      if (p.SeasonAttr != null) allMods.AddRange(p.SeasonAttr);
+      if (p.WeekAttr != null) allMods.AddRange(p.WeekAttr);
+      if (p.GameAttr != null) allMods.AddRange(p.GameAttr);
+
+      NpgsqlCommand cmd = new NpgsqlCommand(@"select modification from data.team_modifications where team_id=@team_id and valid_until is null", psqlConnection);
+      cmd.Parameters.AddWithValue("team_id", p.Id);
+      //cmd.Prepare();
+      using (var reader = cmd.ExecuteReader()) {
+        while (reader.Read()) {
+          currentMods.Add(reader[0] as string);
+        }
+      }
+      var newMods = allMods.Except(currentMods);
+      var oldMods = currentMods.Except(allMods);
+
+      foreach (var modification in newMods) {
+
+        // Try to insert our current data
+        var insertCmd = new NpgsqlCommand(@"insert into data.team_modifications(team_id, modification, valid_from) values(@team_id, @modification, @valid_from)", psqlConnection);
+        insertCmd.Parameters.AddWithValue("team_id", p.Id);
+        insertCmd.Parameters.AddWithValue("modification", modification);
+        insertCmd.Parameters.AddWithValue("valid_from", timestamp);
+        //insertCmd.Prepare();
+        int rows = insertCmd.ExecuteNonQuery();
+        if (rows != 1) throw new InvalidOperationException($"Tried to insert but got {rows} rows affected!");
+      }
+
+      foreach (var modification in oldMods) {
+        // Update the old record
+        NpgsqlCommand update = new NpgsqlCommand(@"update data.team_modifications set valid_until=@timestamp where team_id = @team_id and modification=@modification and valid_until is null", psqlConnection);
+        update.Parameters.AddWithValue("timestamp", timestamp);
+        update.Parameters.AddWithValue("modification", modification);
+        update.Parameters.AddWithValue("team_id", p.Id);
+        //update.Prepare();
+        int rows = update.ExecuteNonQuery();
+        if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+      }
+
+    }
+
     private void ProcessAllTeams(JsonElement teamResponse, DateTime timestamp, NpgsqlConnection psqlConnection) {
       string text = teamResponse.GetRawText();
 
@@ -693,8 +756,10 @@ namespace SIBR {
 
           }
 
+          ProcessTeamModAttrs(t, timestamp, psqlConnection);
 
         }
+
         s.Stop();
         if (TIMING) Console.WriteLine($"Processed {teams.Count()} teams in {s.ElapsedMilliseconds} ms");
       }
