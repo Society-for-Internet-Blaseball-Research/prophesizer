@@ -14,6 +14,7 @@ Prophesizer runs continuously, waking every 5 minutes to check the clock. When i
 ### Hourly logs
 
 These are archives of all the standard public endpoints taken multiple times per hour (naming, eh).
+
 Prophesizer cares about the `players` and `teams` structures only at this point, and does the following:
 
 1) Add entries to `teams` for any team data changes (like name changes)
@@ -25,8 +26,11 @@ Prophesizer cares about the `players` and `teams` structures only at this point,
 ### Update logs
 
 These are logs of the individual (one every ~4seconds) `streamData` updates for gameplay.
+
 Prophesizer sends these through [Cauldron](https://github.com/Society-for-Internet-Blaseball-Research/Cauldron) to convert them into SIBR's "Game Event" format.
+
 Game Events roughly correspond to one at-bat (with some exceptions like a runner caught stealing) and are more easily queried than the raw JSON updates from the stream.
+
 These Game Events are added to the `game_events` table, with child tables `game_event_base_runners` for baserunning information and `outcomes` for Outcome (incineration, peanuts, partying, etc).
 
 ## Running Prophesizer Locally
@@ -39,4 +43,5 @@ Vague and ancient instructions from Discord pin:
 4) Get an aws key and secret and set them to `AWS_KEY` and `AWS_SECRET` respectively
 
 To set up the DB schema, run `node schema.js load` to load the schema from schema.sql.
+
 To commit changes to the schema, run `node schema.js dump` to dump the schema to schema.sql
