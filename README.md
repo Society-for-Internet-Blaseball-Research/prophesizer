@@ -1,6 +1,13 @@
 # Prophesizer
 
-Part of the SIBR Archiving Pipeline™
+Prophesizer is part of the SIBR Archiving Pipeline™.
+
+## Table of Contents
+  * [What](#what)
+    * [Hourly logs](#hourly-logs)
+    * [Update logs](#update-logs)
+  * [Installation](#installation)
+
 
 ## What
 
@@ -33,15 +40,15 @@ Game Events roughly correspond to one at-bat (with some exceptions like a runner
 
 These Game Events are added to the `game_events` table, with child tables `game_event_base_runners` for baserunning information and `outcomes` for Outcome (incineration, peanuts, partying, etc).
 
-## Running Prophesizer Locally
+## Installation
 
-Vague and ancient instructions from Discord pin:
+The following instructions are written for Windows PCs.
 
-1) install postgres (or have access to an install, I guess)
-2) get the prophesizer repo and Visual Studio / VS Code / another way to build .csproj files, as well as .NET Core
-3) Set a `PSQL_CONNECTION_STRING` environment variable in the format required by ngpsql (aka a c# connection string) - it'll be something akin to `Host=localhost;username=postgres;password=<whatever>;database=blaseball`
-4) Get an aws key and secret and set them to `AWS_KEY` and `AWS_SECRET` respectively
-
-To set up the DB schema, run `node schema.js load` to load the schema from schema.sql.
-
-To commit changes to the schema, run `node schema.js dump` to dump the schema to schema.sql
+1. Prophesizer depends on [git](https://git-scm.com/), [PostgreSQL](https://www.postgresql.org/), [Visual Studio Code](https://code.visualstudio.com/), and [Node.js](https://nodejs.org/en/). You can manually download and install all of these, but if you have the package manager [Chocolatey](https://chocolatey.org/) installed, you can automatically install these tools by opening a prompt (cmd/powershell) as administrator and running: `choco install git postgresql vscode nodejs`
+2. Use git to clone Prophesizer from github into your desired directory: `git clone https://github.com/Society-for-Internet-Blaseball-Research/prophesizer/`. 
+3. To access the S3 bucket where processed data is archived, you'll need an [AWS](https://aws.amazon.com/) account. This is different from an Amazon account. If you don't already have one, sign up (at no cost), go to your account dropdown to "My Security Credentials", and then select Access Keys. Use the dialog to create a new access key. It will display your new credentials — *don't lose them*, since they won't be shown to you again. Set them as the environment variables AWS_KEY and AWS_SECRET: `setx AWS_KEY [string]; setx AWS_SECRET [string]`
+4. Set the environment PSQL_CONNECTION_STRING to "Host=localhost;username=[postgres username, default 'postgres'];password=[postgres password];database=blaseball", with `setx`, making appropriate changes if any are necessary.
+3. Make sure psql is added to PATH (you can test by typing it in as a command), and your C# connection string and AWS key environment variables are correctly set.
+4. In the directory prophesizer\\db, run `node schema.js load` to get your database ready to receive data from Prophesizer.
+5. Compile and run Prophesizer from VS Code via File -> Open Folder, selecting Prophesizer's folder, going to 'Run' in the menu bar, and selecting "Run Without Debugging".
+6. If at some point you make changes to the schema you wish to commit to a repository using `git`, in the directory prophesizer\\db, run `node schema.js dump` to dump your database's schema to schema.sql.
