@@ -288,7 +288,7 @@ namespace SIBR {
         }
 
         foreach (var outcome in gameEvent.outcomes) {
-          if(outcome.entityId == "UNKNOWN" || outcome.entityId == null) {
+          if(outcome.entityId == "UNKNOWN") {
             Console.WriteLine($"Found an outcome with unknown entity ID in season {gameEvent.season}, day {gameEvent.day}, game {gameEvent.gameId}");
           }
 
