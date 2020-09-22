@@ -643,7 +643,8 @@ namespace SIBR {
       s.Start();
 
       var cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Batter);
-      var maxBatters = (int) await cmd.ExecuteScalarAsync() + 1;
+      var response = await cmd.ExecuteScalarAsync();
+      var maxBatters = response != null ? (int)response + 1 : 0;
 
       for(int i = 0; i < Math.Max(maxBatters, t.Lineup.Count()); i++) {
         string playerId = null;
@@ -654,7 +655,8 @@ namespace SIBR {
       }
 
       cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Pitcher);
-      maxBatters = (int)await cmd.ExecuteScalarAsync() + 1;
+      response = await cmd.ExecuteScalarAsync();
+      maxBatters = response != null ? (int)response + 1 : 0;
 
       for (int i = 0; i < Math.Max(maxBatters, t.Rotation.Count()); i++) {
         string playerId = null;
@@ -665,7 +667,8 @@ namespace SIBR {
       }
 
       cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Bullpen);
-      maxBatters = (int)await cmd.ExecuteScalarAsync() + 1;
+      response = await cmd.ExecuteScalarAsync();
+      maxBatters = response != null ? (int)response + 1 : 0;
 
       for (int i = 0; i < Math.Max(maxBatters, t.Bullpen.Count()); i++) {
         string playerId = null;
@@ -676,7 +679,8 @@ namespace SIBR {
       }
 
       cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Bench);
-      maxBatters = (int)await cmd.ExecuteScalarAsync() + 1;
+      response = await cmd.ExecuteScalarAsync();
+      maxBatters = response != null ? (int)response + 1 : 0;
 
       for (int i = 0; i < Math.Max(maxBatters, t.Bench.Count()); i++) {
         string playerId = null;
