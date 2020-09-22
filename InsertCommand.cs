@@ -22,7 +22,7 @@ internal class InsertCommand {
     m_command = new NpgsqlCommand();
     Populate(tableName, obj, extraFields);
     m_command.Connection = connection;
-    m_command.Prepare();
+    //m_command.Prepare();
   }
 
   /// <summary>
