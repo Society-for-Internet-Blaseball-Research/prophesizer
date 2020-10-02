@@ -69,8 +69,8 @@ namespace SIBR
 
 		private async Task<(int, int)> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
 		{
-			int season = 0;
-			int day = 0;
+			int season = -1;
+			int day = -1;
 
 			NpgsqlCommand cmd = new NpgsqlCommand(@"
 				select b.season, b.maxday from data.completed_days cd
@@ -126,20 +126,51 @@ namespace SIBR
 
 			int season = 0;
 			int day = 0;
+			DateTime latestTime = DateTime.UtcNow;
+			bool continueDay = false;
 
 			(season, day) = await GetLastRecordedSeasonDay(psqlConnection);
-			// Start from the next day
-			day++;
+
+			if(season == -1)
+			{
+				season = 0;
+			}
+			if (day == -1)
+			{
+				day = 0;
+			}
+			else
+			{
+				// Start from the next day
+				day++;
+			}
+
+			const int NUM_EVENTS_REQUESTED = 1000;
 
 			if (DO_EVENTS)
 			{
 				processor.GameComplete += Processor_GameComplete;
 				processor.EventComplete += Processor_EventComplete;
+
+				int numEventsForDay = 0;
+				int numPitchingResultsForDay = 0;
+				HashSet<string> gamesToday = new HashSet<string>();
+
 				while (true)
 				{
-					string query = $"games/updates?season={season}&day={day}&order=asc&started=true&count=1000";
+					string query;
+					if (continueDay)
+					{
+						query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&after={latestTime.ToString("yyyy-MM-ddTHH:mm:ssZ")}";
+					}
+					else
+					{
+						query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+					}
 
 					HttpResponseMessage response = await m_client.GetAsync(query);
+
+					int numUpdates = 0;
 
 					if (response.IsSuccessStatusCode)
 					{
@@ -147,21 +178,30 @@ namespace SIBR
 
 						// Deserialize the JSON
 						var updates = JsonSerializer.Deserialize<IEnumerable<ChroniclerUpdate>>(strResponse, serializerOptions);
+						numUpdates = updates.Count();
 
-						if(updates.Count() == 0 && day == 0)
+						if(numUpdates == NUM_EVENTS_REQUESTED)
 						{
-							// If we got no results on day 0 of a season, bail out
-							break;
+							continueDay = true;
+							// Get the timestamp of the last batch
+							var lastTime = updates.Last().Timestamp;
+							// Drop that last batch in case it was split
+							updates = updates.Where(x => x.Timestamp != lastTime);
+							// Remember the new latest time
+							latestTime = updates.Last().Timestamp;
 						}
-						if (updates.Count() == 0 )
+						else
 						{
-							// If we got no results some other time in the season, try the next season
-							day = 0;
-							season++;
+							continueDay = false;
 						}
 
 						foreach (var obj in updates)
 						{
+							if(!gamesToday.Contains(obj.GameId))
+							{
+								gamesToday.Add(obj.GameId);
+							}
+
 							await processor.ProcessGameObject(obj.Data, obj.Timestamp);
 						}
 
@@ -171,24 +211,54 @@ namespace SIBR
 						// Update the completed_days table 
 					}
 
-					Console.WriteLine($"Inserting {m_eventsToInsert.Count} game events from season {season}, day {day}");
 					// Process any game events we received
 					while(m_eventsToInsert.Count > 0)
 					{
 						var e = m_eventsToInsert.Dequeue();
 						await PersistGame(psqlConnection, e);
+						numEventsForDay++;
 					}
 
-					Console.WriteLine($"Inserting {pitcherResults.Count} pitcher records from season {season}, day {day}");
 					// Process any pitcher results from completed games
 					while (pitcherResults.Count > 0)
 					{
 						var result = pitcherResults.Dequeue();
+						//Console.WriteLine($"Game {result.Item1} was won by {result.Item2} and lost by {result.Item3}.");
 						await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
+						numPitchingResultsForDay++;
 					}
 
-					// Increment the day
-					day++;
+					if (continueDay)
+					{
+						// do nothing
+					}
+					else if (numUpdates == 0 && day == 0)
+					{
+						Console.WriteLine($"No results for season {season}; looks like we're done!");
+						// If we got no results on day 0 of a season, bail out
+						continueDay = false;
+						break;
+					}
+					else if (numUpdates == 0)
+					{
+						Console.WriteLine($"Reached apparent end of season {season} at day {day}... Onward to season {season + 1}!");
+						// If we got no results some other time in the season, try the next season
+						continueDay = false;
+						day = 0;
+						season++;
+					}
+					else
+					{
+						Console.WriteLine($"Inserted {numEventsForDay} game events and {numPitchingResultsForDay} pitching results from season {season}, day {day}.");
+						numEventsForDay = 0;
+						numPitchingResultsForDay = 0;
+						gamesToday.Clear();
+
+						// Increment the day
+						continueDay = false;
+						day++;
+					}
+
 				}
 				processor.EventComplete -= Processor_EventComplete;
 				processor.GameComplete -= Processor_GameComplete;
