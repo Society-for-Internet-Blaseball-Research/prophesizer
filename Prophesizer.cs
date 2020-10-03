@@ -67,13 +67,14 @@ namespace SIBR
 			return season * 10000 + day;
 		}
 
-		private async Task<(int, int)> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
+		private async Task<(int, int, DateTime?)> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
 		{
-			int season = -1;
-			int day = -1;
+			int season = 0;
+			int day = 0;
+			DateTime? timestamp = null;
 
 			NpgsqlCommand cmd = new NpgsqlCommand(@"
-				select b.season, b.maxday from data.completed_days cd
+				select b.season, b.maxday, cd.timestamp from data.completed_days cd
 				inner join
 				(
 					select season, max(day) as maxday from data.completed_days group by season
@@ -86,10 +87,11 @@ namespace SIBR
 				{
 					season = reader.GetInt32(0);
 					day = reader.GetInt32(1);
+					timestamp = reader.GetDateTime(2);
 				}
 			}
 
-			return (season, day);
+			return (season, day, timestamp);
 		}
 
 		public async Task Poll()
@@ -126,24 +128,10 @@ namespace SIBR
 
 			int season = 0;
 			int day = 0;
-			DateTime latestTime = DateTime.UtcNow;
-			bool continueDay = false;
+			DateTime? latestTime = null;
+			bool continueDay = true;
 
-			(season, day) = await GetLastRecordedSeasonDay(psqlConnection);
-
-			if(season == -1)
-			{
-				season = 0;
-			}
-			if (day == -1)
-			{
-				day = 0;
-			}
-			else
-			{
-				// Start from the next day
-				day++;
-			}
+			(season, day, latestTime) = await GetLastRecordedSeasonDay(psqlConnection);
 
 			const int NUM_EVENTS_REQUESTED = 1000;
 
@@ -155,20 +143,27 @@ namespace SIBR
 				int numEventsForDay = 0;
 				int numPitchingResultsForDay = 0;
 				HashSet<string> gamesToday = new HashSet<string>();
+				Stopwatch totalTimer = new Stopwatch();
+				Stopwatch insertTimer = new Stopwatch();
+				Stopwatch fetchTimer = new Stopwatch();
+				Stopwatch cauldronTimer = new Stopwatch();
 
 				while (true)
 				{
+					totalTimer.Start();
 					string query;
 					if (continueDay)
 					{
-						query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&after={latestTime.ToString("yyyy-MM-ddTHH:mm:ssZ")}";
+						query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&after={latestTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}";
 					}
 					else
 					{
 						query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
 					}
 
+					fetchTimer.Start();
 					HttpResponseMessage response = await m_client.GetAsync(query);
+					fetchTimer.Stop();
 
 					int numUpdates = 0;
 
@@ -187,14 +182,20 @@ namespace SIBR
 							var lastTime = updates.Last().Timestamp;
 							// Drop that last batch in case it was split
 							updates = updates.Where(x => x.Timestamp != lastTime);
-							// Remember the new latest time
-							latestTime = updates.Last().Timestamp;
 						}
 						else
 						{
 							continueDay = false;
 						}
 
+
+						if (numUpdates > 0)
+						{
+							// Remember the new latest time
+							latestTime = updates.Last().Timestamp;
+						}
+
+						cauldronTimer.Start();
 						foreach (var obj in updates)
 						{
 							if(!gamesToday.Contains(obj.GameId))
@@ -204,13 +205,13 @@ namespace SIBR
 
 							await processor.ProcessGameObject(obj.Data, obj.Timestamp);
 						}
+						cauldronTimer.Stop();
 
 						// TODO: Update the time map
 						//await PersistTimeMap(gameEvents, psqlConnection);
-
-						// Update the completed_days table 
 					}
 
+					insertTimer.Start();
 					// Process any game events we received
 					while(m_eventsToInsert.Count > 0)
 					{
@@ -227,6 +228,17 @@ namespace SIBR
 						await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
 						numPitchingResultsForDay++;
 					}
+
+					NpgsqlCommand updateCmd = new NpgsqlCommand(@"
+						INSERT INTO data.completed_days values (@season, @day, @timestamp)
+						ON CONFLICT (season, day) DO
+						UPDATE SET timestamp = EXCLUDED.timestamp
+						WHERE completed_days.timestamp < EXCLUDED.timestamp", psqlConnection);
+					updateCmd.Parameters.AddWithValue("season", season);
+					updateCmd.Parameters.AddWithValue("day", day);
+					updateCmd.Parameters.AddWithValue("timestamp", latestTime);
+					int updateResult = await updateCmd.ExecuteNonQueryAsync();
+					insertTimer.Stop();
 
 					if (continueDay)
 					{
@@ -249,7 +261,12 @@ namespace SIBR
 					}
 					else
 					{
-						Console.WriteLine($"Inserted {numEventsForDay} game events and {numPitchingResultsForDay} pitching results from season {season}, day {day}.");
+						Console.WriteLine($"Inserted {numEventsForDay} game events and {numPitchingResultsForDay} pitching results from season {season}, day {day}.  {fetchTimer.ElapsedMilliseconds} / {cauldronTimer.ElapsedMilliseconds} / {insertTimer.ElapsedMilliseconds} = {totalTimer.ElapsedMilliseconds}");
+						fetchTimer.Reset();
+						cauldronTimer.Reset();
+						insertTimer.Reset();
+						totalTimer.Reset();
+						
 						numEventsForDay = 0;
 						numPitchingResultsForDay = 0;
 						gamesToday.Clear();
