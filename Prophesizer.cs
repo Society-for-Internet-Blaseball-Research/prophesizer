@@ -22,20 +22,81 @@ using System.Threading.Tasks;
 namespace SIBR
 {
 
+	struct SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
+	{
+		public int Season;
+		public int Day;
+
+		public SeasonDay(int season, int day)
+		{
+			Season = season;
+			Day = day;
+		}
+
+		int IComparable<SeasonDay>.CompareTo(SeasonDay other)
+		{
+			int seasonDiff = Season - other.Season;
+
+			if(seasonDiff == 0)
+			{
+				return Day - other.Day;
+			}
+			else
+			{
+				return seasonDiff;
+			}
+		}
+
+		public override bool Equals(object other)
+		{
+			return Season == ((SeasonDay)other).Season && Day == ((SeasonDay)other).Day;
+		}
+
+		public override int GetHashCode()
+		{
+			return Season.GetHashCode() ^ Day.GetHashCode();
+		}
+
+		bool IEquatable<SeasonDay>.Equals(SeasonDay other)
+		{
+			return Season == other.Season && Day == other.Day;
+		}
+
+		public static bool operator <=(SeasonDay a, SeasonDay b)
+		{
+			if(a.Season == b.Season)
+			{
+				return a.Day <= b.Day;
+			}
+			else
+			{
+				return a.Season < b.Season;
+			}
+		}
+		public static bool operator >=(SeasonDay a, SeasonDay b)
+		{
+			if(a.Season == b.Season)
+			{
+				return a.Day >= b.Day;
+			}
+			else
+			{
+				return a.Season > b.Season;
+			}
+		}
+	}
+
 
 	class Prophesizer
 	{
 
-		private Processor processor;
+		//private Processor m_processor;
 		private Queue<GameEvent> m_eventsToInsert;
-		private Queue<(string, string, string)> pitcherResults;
+		private Queue<(string, string, string)> m_pitcherResults;
 
 		private JsonSerializerOptions serializerOptions;
 
-		private int minSeasonDay = int.MaxValue;
-		private int maxSeasonDay = int.MinValue;
-
-		private int numEvents = 0;
+		private SeasonDay m_lastKnownSeasonDay;
 
 		private const bool TIMING = false;
 		private const bool TIMING_FILE = true;
@@ -45,9 +106,9 @@ namespace SIBR
 		HttpClient m_client;
 		public Prophesizer(string bucketName)
 		{
-			processor = new Processor();
+			//m_processor = new Processor();
 			m_eventsToInsert = new Queue<GameEvent>();
-			pitcherResults = new Queue<(string, string, string)>();
+			m_pitcherResults = new Queue<(string, string, string)>();
 
 			serializerOptions = new JsonSerializerOptions();
 			serializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -74,7 +135,7 @@ namespace SIBR
 			DateTime? timestamp = null;
 
 			NpgsqlCommand cmd = new NpgsqlCommand(@"
-				select b.season, b.maxday, cd.timestamp from data.completed_days cd
+				select b.season, b.maxday from data.completed_days cd
 				inner join
 				(
 					select season, max(day) as maxday from data.completed_days group by season
@@ -87,21 +148,91 @@ namespace SIBR
 				{
 					season = reader.GetInt32(0);
 					day = reader.GetInt32(1);
-					timestamp = reader.GetDateTime(2);
+					//timestamp = reader.GetDateTime(2);
 				}
 			}
 
 			return (season, day, timestamp);
 		}
 
+		private object _locker;
+		public async Task<bool> FetchAndProcessDay(int season, int day, DateTime? latestTime)
+		{
+			bool continueDay = true;
+			int numUpdatesForDay = 0;
+
+			Processor processor = new Processor();
+			processor.EventComplete += Processor_EventComplete;
+			processor.GameComplete += Processor_GameComplete;
+
+			while (continueDay)
+			{
+				string query;
+				if (latestTime.HasValue)
+				{
+					query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&after={latestTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}";
+				}
+				else
+				{
+					query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+				}
+
+				HttpResponseMessage response = await m_client.GetAsync(query);
+
+				int numUpdates = 0;
+
+				if (response.IsSuccessStatusCode)
+				{
+					string strResponse = await response.Content.ReadAsStringAsync();
+
+					// Deserialize the JSON
+					var updates = JsonSerializer.Deserialize<IEnumerable<ChroniclerUpdate>>(strResponse, serializerOptions);
+					numUpdates = updates.Count();
+					numUpdatesForDay += numUpdates;
+
+					if (numUpdates == NUM_EVENTS_REQUESTED)
+					{
+						continueDay = true;
+						// Get the timestamp of the last batch
+						var lastTime = updates.Last().Timestamp;
+						// Drop that last batch in case it was split
+						updates = updates.Where(x => x.Timestamp != lastTime);
+					}
+					else
+					{
+						continueDay = false;
+					}
+
+
+					if (numUpdates > 0)
+					{
+						// Remember the new latest time
+						latestTime = updates.Last().Timestamp;
+					}
+
+					foreach (var obj in updates)
+					{
+						await processor.ProcessGameObject(obj.Data, obj.Timestamp);
+					}
+
+					// TODO: Update the time map
+					//await PersistTimeMap(gameEvents, psqlConnection);
+				}
+			}
+
+			processor.EventComplete -= Processor_EventComplete;
+			processor.GameComplete -= Processor_GameComplete;
+
+			Console.WriteLine($"Finished loading season {season}, day {day}.");
+			return numUpdatesForDay > 0;
+		}
+
+		static int NUM_EVENTS_REQUESTED = 1000;
+		static int NUM_TASKS = 10;
+
 		public async Task Poll()
 		{
 			ConsoleOrWebhook($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
-
-			minSeasonDay = int.MaxValue;
-			maxSeasonDay = int.MinValue;
-
-			numEvents = 0;
 
 			await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
 			await psqlConnection.OpenAsync();
@@ -129,188 +260,84 @@ namespace SIBR
 			int season = 0;
 			int day = 0;
 			DateTime? latestTime = null;
-			bool continueDay = true;
 
 			(season, day, latestTime) = await GetLastRecordedSeasonDay(psqlConnection);
-
-			const int NUM_EVENTS_REQUESTED = 1000;
+			day++;
 
 			if (DO_EVENTS)
 			{
-				processor.GameComplete += Processor_GameComplete;
-				processor.EventComplete += Processor_EventComplete;
-
-				int numEventsForDay = 0;
-				int numPitchingResultsForDay = 0;
-				HashSet<string> gamesToday = new HashSet<string>();
-				Stopwatch totalTimer = new Stopwatch();
-				Stopwatch insertTimer = new Stopwatch();
-				Stopwatch fetchTimer = new Stopwatch();
-				Stopwatch cauldronTimer = new Stopwatch();
-
-				while (true)
+				while (m_lastKnownSeasonDay >= new SeasonDay(season, day))
 				{
-					totalTimer.Start();
-					string query;
-					if (continueDay)
+					Task<bool>[] tasks = new Task<bool>[NUM_TASKS];
+
+					for(int i = 0; i < NUM_TASKS; i++)
 					{
-						query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&after={latestTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}";
-					}
-					else
-					{
-						query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+						int dayToFetch = day + i;
+						tasks[i] = Task.Run(() => FetchAndProcessDay(season, dayToFetch, latestTime));
 					}
 
-					fetchTimer.Start();
-					HttpResponseMessage response = await m_client.GetAsync(query);
-					fetchTimer.Stop();
+					Task.WaitAll(tasks);
 
-					int numUpdates = 0;
-
-					if (response.IsSuccessStatusCode)
-					{
-						string strResponse = await response.Content.ReadAsStringAsync();
-
-						// Deserialize the JSON
-						var updates = JsonSerializer.Deserialize<IEnumerable<ChroniclerUpdate>>(strResponse, serializerOptions);
-						numUpdates = updates.Count();
-
-						if(numUpdates == NUM_EVENTS_REQUESTED)
-						{
-							continueDay = true;
-							// Get the timestamp of the last batch
-							var lastTime = updates.Last().Timestamp;
-							// Drop that last batch in case it was split
-							updates = updates.Where(x => x.Timestamp != lastTime);
-						}
-						else
-						{
-							continueDay = false;
-						}
-
-
-						if (numUpdates > 0)
-						{
-							// Remember the new latest time
-							latestTime = updates.Last().Timestamp;
-						}
-
-						cauldronTimer.Start();
-						foreach (var obj in updates)
-						{
-							if(!gamesToday.Contains(obj.GameId))
-							{
-								gamesToday.Add(obj.GameId);
-							}
-
-							await processor.ProcessGameObject(obj.Data, obj.Timestamp);
-						}
-						cauldronTimer.Stop();
-
-						// TODO: Update the time map
-						//await PersistTimeMap(gameEvents, psqlConnection);
-					}
-
-					insertTimer.Start();
+					var transaction = psqlConnection.BeginTransaction();
 					// Process any game events we received
-					while(m_eventsToInsert.Count > 0)
+					Console.WriteLine($"  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
+					while (m_eventsToInsert.Count > 0)
 					{
 						var e = m_eventsToInsert.Dequeue();
 						await PersistGame(psqlConnection, e);
-						numEventsForDay++;
+						//numEventsForDay++;
 					}
 
 					// Process any pitcher results from completed games
-					while (pitcherResults.Count > 0)
+					while (m_pitcherResults.Count > 0)
 					{
-						var result = pitcherResults.Dequeue();
+						var result = m_pitcherResults.Dequeue();
 						//Console.WriteLine($"Game {result.Item1} was won by {result.Item2} and lost by {result.Item3}.");
 						await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
-						numPitchingResultsForDay++;
+						//numPitchingResultsForDay++;
 					}
 
-					NpgsqlCommand updateCmd = new NpgsqlCommand(@"
-						INSERT INTO data.completed_days values (@season, @day, @timestamp)
-						ON CONFLICT (season, day) DO
-						UPDATE SET timestamp = EXCLUDED.timestamp
-						WHERE completed_days.timestamp < EXCLUDED.timestamp", psqlConnection);
-					updateCmd.Parameters.AddWithValue("season", season);
-					updateCmd.Parameters.AddWithValue("day", day);
-					updateCmd.Parameters.AddWithValue("timestamp", latestTime);
-					int updateResult = await updateCmd.ExecuteNonQueryAsync();
-					insertTimer.Stop();
-
-					if (continueDay)
+					for(int i = 0; i < NUM_TASKS; i++)
 					{
-						// do nothing
+						if (tasks[i].Result)
+						{
+							NpgsqlCommand updateCmd = new NpgsqlCommand(@"
+								INSERT INTO data.completed_days values (@season, @day)", psqlConnection);
+							updateCmd.Parameters.AddWithValue("season", season);
+							updateCmd.Parameters.AddWithValue("day", day + i);
+							//updateCmd.Parameters.AddWithValue("timestamp", latestTime);
+							int updateResult = await updateCmd.ExecuteNonQueryAsync();
+						}
 					}
-					else if (numUpdates == 0 && day == 0)
+					await transaction.CommitAsync();
+
+					bool allDaysValid = tasks.All(t => t.Result);
+					
+					if (!allDaysValid && day == 0)
 					{
 						Console.WriteLine($"No results for season {season}; looks like we're done!");
-						// If we got no results on day 0 of a season, bail out
-						continueDay = false;
 						break;
 					}
-					else if (numUpdates == 0)
+					else if (!allDaysValid)
 					{
 						Console.WriteLine($"Reached apparent end of season {season} at day {day}... Onward to season {season + 1}!");
 						// If we got no results some other time in the season, try the next season
-						continueDay = false;
 						day = 0;
+						latestTime = null;
 						season++;
 					}
 					else
 					{
-						Console.WriteLine($"Inserted {numEventsForDay} game events and {numPitchingResultsForDay} pitching results from season {season}, day {day}.  {fetchTimer.ElapsedMilliseconds} / {cauldronTimer.ElapsedMilliseconds} / {insertTimer.ElapsedMilliseconds} = {totalTimer.ElapsedMilliseconds}");
-						fetchTimer.Reset();
-						cauldronTimer.Reset();
-						insertTimer.Reset();
-						totalTimer.Reset();
-						
-						numEventsForDay = 0;
-						numPitchingResultsForDay = 0;
-						gamesToday.Clear();
-
-						// Increment the day
-						continueDay = false;
-						day++;
+						day += NUM_TASKS;
+						latestTime = null;
 					}
 
 				}
-				processor.EventComplete -= Processor_EventComplete;
-				processor.GameComplete -= Processor_GameComplete;
+
 			}
 
-			/*
-			string msg = $"Processed {unprocessedLogs.updateLogs.Count} game update logs and {unprocessedLogs.hourlyLogs.Count} hourly logs.\n";
-			if (numEvents > 0)
-			{
-				int minDay = minSeasonDay % 10000;
-				int minSeason = minSeasonDay / 10000;
-				int maxDay = maxSeasonDay % 10000;
-				int maxSeason = maxSeasonDay / 10000;
-
-				string rangeText = $"Season {minSeason + 1}, Day {minDay + 1} to Season {maxSeason + 1}, Day {maxDay + 1}";
-				if (minSeason == maxSeason)
-				{
-					if (minDay == maxDay)
-					{
-						rangeText = $"Season {minSeason + 1}, Day {minDay + 1}";
-					}
-					else
-					{
-						rangeText = $"Season {minSeason + 1}, Day {minDay + 1} - {maxDay + 1}";
-					}
-				}
-
-				msg += $"Inserted {numEvents} game events (from {rangeText}) into the Datablase.\n";
-			}
-			else
-			{
-				msg += $"No new game events found!\n";
-			}
-			msg += $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
-			ConsoleOrWebhook(msg);*/
+			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
+			ConsoleOrWebhook(msg);
 		}
 
 		private void Processor_EventComplete(object sender, GameEventCompleteEventArgs e)
@@ -320,49 +347,9 @@ namespace SIBR
 
 		private void Processor_GameComplete(object sender, GameCompleteEventArgs e)
 		{
-			pitcherResults.Enqueue((e.GameId, e.WinningPitcherId, e.LosingPitcherId));
+			m_pitcherResults.Enqueue((e.GameId, e.WinningPitcherId, e.LosingPitcherId));
 		}
 
-	
-		//private async Task<int> PersistGameEvents(
-		//  string keyName,
-		//  IEnumerable<GameEvent> gameEvents,
-		//  NpgsqlConnection psqlConnection
-		//)
-		//{
-		//	var transaction = psqlConnection.BeginTransaction();
-
-		//	try
-		//	{
-		//		foreach (var gameEvent in gameEvents)
-		//		{
-		//			await PersistGame(psqlConnection, gameEvent, keyName);
-		//		}
-
-		//		transaction.Commit();
-
-		//		var first = gameEvents.First();
-		//		var last = gameEvents.Last();
-
-		//		minSeasonDay = Math.Min(minSeasonDay, MakeSeasonDay(first.season, first.day));
-		//		maxSeasonDay = Math.Max(maxSeasonDay, MakeSeasonDay(last.season, last.day));
-
-		//		numEvents += gameEvents.Count();
-
-		//		//Console.WriteLine($"Inserted {gameEvents.Count()} game_events (from S{first.season}D{first.day} to S{last.season}D{last.day}) into Postgres from {keyName}.");
-
-		//		return gameEvents.Count();
-		//	}
-		//	catch (Exception e)
-		//	{
-		//		transaction.Rollback();
-
-		//		ConsoleOrWebhook($"Failed to insert events from {keyName} into Postgres:");
-		//		ConsoleOrWebhook(e.Message);
-
-		//		return 0;
-		//	}
-		//}
 
 		private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent)
 		{
@@ -1076,6 +1063,8 @@ namespace SIBR
 				}
 			}
 
+			m_lastKnownSeasonDay = new SeasonDay(season, day);
+
 			Console.WriteLine($"Found games through season {season}, day {day}.");
 			// Start on the next day
 			day++;
@@ -1111,6 +1100,7 @@ namespace SIBR
 						if (day > 0)
 						{
 							// Ran out of finished games this season, try the next
+							m_lastKnownSeasonDay.Season = season;
 							season++;
 							day = 0;
 							continue;
@@ -1129,6 +1119,7 @@ namespace SIBR
 						await cmd.ExecuteNonQueryAsync();
 					}
 
+					m_lastKnownSeasonDay.Day = day;
 					day++;
 				}
 				else
@@ -1137,6 +1128,8 @@ namespace SIBR
 					return;
 				}
 			}
+
+
 		}
 
 		static void ConsoleOrWebhook(string msg)
