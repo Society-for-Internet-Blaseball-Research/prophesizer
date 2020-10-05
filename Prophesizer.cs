@@ -96,6 +96,9 @@ namespace SIBR
 
 		private JsonSerializerOptions serializerOptions;
 
+		private const int MAX_SEASON = 8;
+		private const int MAX_DAY = 135;
+
 		private SeasonDay m_lastKnownSeasonDay;
 
 		private const bool TIMING = false;
@@ -116,7 +119,7 @@ namespace SIBR
 			serializerOptions.IgnoreNullValues = true;
 
 			m_client = new HttpClient();
-			m_client.BaseAddress = new Uri("https://reblase.sibr.dev/newapi/");
+			m_client.BaseAddress = new Uri("https://api.sibr.dev/chronicler/v1/");
 			m_client.DefaultRequestHeaders.Accept.Clear();
 			m_client.DefaultRequestHeaders.Accept.Add(
 				new MediaTypeWithQualityHeaderValue("application/json"));
@@ -155,7 +158,8 @@ namespace SIBR
 			return (season, day, timestamp);
 		}
 
-		private object _locker;
+		private object _eventLocker = new object();
+		private object _pitcherLocker = new object();
 		public async Task<bool> FetchAndProcessDay(int season, int day, DateTime? latestTime)
 		{
 			bool continueDay = true;
@@ -186,7 +190,9 @@ namespace SIBR
 					string strResponse = await response.Content.ReadAsStringAsync();
 
 					// Deserialize the JSON
-					var updates = JsonSerializer.Deserialize<IEnumerable<ChroniclerUpdate>>(strResponse, serializerOptions);
+					var page = JsonSerializer.Deserialize<ChroniclerPage>(strResponse, serializerOptions);
+
+					var updates = page.Data;
 					numUpdates = updates.Count();
 					numUpdatesForDay += numUpdates;
 
@@ -218,6 +224,10 @@ namespace SIBR
 					// TODO: Update the time map
 					//await PersistTimeMap(gameEvents, psqlConnection);
 				}
+				else
+				{
+					Console.WriteLine(response.ReasonPhrase);
+				}
 			}
 
 			processor.EventComplete -= Processor_EventComplete;
@@ -237,7 +247,7 @@ namespace SIBR
 			await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
 			await psqlConnection.OpenAsync();
 
-
+			// TODO: re-introduce hourly and use COPY if possible
 			//if (DO_HOURLY)
 			//{
 			//	int i = 0;
@@ -257,6 +267,17 @@ namespace SIBR
 
 			await PopulateGameTable(psqlConnection);
 
+			var getMaxGameEventId = new NpgsqlCommand("select max(id) from data.game_events", psqlConnection);
+			var response = getMaxGameEventId.ExecuteScalar();
+			if (response is DBNull)
+			{
+				m_gameEventId = 0;
+			}
+			else
+			{
+				m_gameEventId = (int)response + 1;
+			}
+
 			int season = 0;
 			int day = 0;
 			DateTime? latestTime = null;
@@ -268,6 +289,7 @@ namespace SIBR
 			{
 				while (m_lastKnownSeasonDay >= new SeasonDay(season, day))
 				{
+					// Fetch and process 10 days at a time
 					Task<bool>[] tasks = new Task<bool>[NUM_TASKS];
 
 					for(int i = 0; i < NUM_TASKS; i++)
@@ -276,27 +298,29 @@ namespace SIBR
 						tasks[i] = Task.Run(() => FetchAndProcessDay(season, dayToFetch, latestTime));
 					}
 
+					// Wait for all 10 tasks to complete; SQL work has to be done on a single thread
 					Task.WaitAll(tasks);
 
+					// Start a transaction for all we'll update
 					var transaction = psqlConnection.BeginTransaction();
-					// Process any game events we received
+					
 					Console.WriteLine($"  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
-					while (m_eventsToInsert.Count > 0)
-					{
-						var e = m_eventsToInsert.Dequeue();
-						await PersistGame(psqlConnection, e);
-						//numEventsForDay++;
-					}
 
+					// Process any game events we received
+					if (m_eventsToInsert.Count > 0)
+					{
+						await CopyGameEvents(psqlConnection, m_eventsToInsert);
+						m_eventsToInsert.Clear();
+					}
+			
 					// Process any pitcher results from completed games
 					while (m_pitcherResults.Count > 0)
 					{
 						var result = m_pitcherResults.Dequeue();
-						//Console.WriteLine($"Game {result.Item1} was won by {result.Item2} and lost by {result.Item3}.");
 						await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
-						//numPitchingResultsForDay++;
 					}
 
+					// For each task that succeeded, record that we handled that day successfully
 					for(int i = 0; i < NUM_TASKS; i++)
 					{
 						if (tasks[i].Result)
@@ -305,7 +329,6 @@ namespace SIBR
 								INSERT INTO data.completed_days values (@season, @day)", psqlConnection);
 							updateCmd.Parameters.AddWithValue("season", season);
 							updateCmd.Parameters.AddWithValue("day", day + i);
-							//updateCmd.Parameters.AddWithValue("timestamp", latestTime);
 							int updateResult = await updateCmd.ExecuteNonQueryAsync();
 						}
 					}
@@ -342,14 +365,142 @@ namespace SIBR
 
 		private void Processor_EventComplete(object sender, GameEventCompleteEventArgs e)
 		{
-			m_eventsToInsert.Enqueue(e.GameEvent);
+			if (e.GameEvent == null)
+				Debugger.Break();
+			lock (_eventLocker)
+			{
+				m_eventsToInsert.Enqueue(e.GameEvent);
+			}
 		}
 
 		private void Processor_GameComplete(object sender, GameCompleteEventArgs e)
 		{
-			m_pitcherResults.Enqueue((e.GameId, e.WinningPitcherId, e.LosingPitcherId));
+			lock (_pitcherLocker)
+			{
+				m_pitcherResults.Enqueue((e.GameId, e.WinningPitcherId, e.LosingPitcherId));
+			}
 		}
 
+		int m_gameEventId = 0;
+		private async Task CopyGameEvents(NpgsqlConnection psqlConnection, Queue<GameEvent> gameEvents)
+		{
+			List<(int, GameEventBaseRunner)> runners = new List<(int, GameEventBaseRunner)>();
+			List<(int, Outcome)> outcomes = new List<(int, Outcome)>();
+
+			using(var writer = psqlConnection.BeginBinaryImport(
+				@"COPY data.game_events(
+					id, perceived_at, game_id, event_type, event_index, inning, top_of_inning, outs_before_play,
+					batter_id, batter_team_id, pitcher_id, pitcher_team_id, home_score, away_score,
+					home_strike_count, away_strike_count, batter_count, pitches, total_strikes,
+					total_balls, total_fouls, is_leadoff, is_pinch_hit, lineup_position,
+					is_last_event_for_plate_appearance, bases_hit, runs_batted_in, is_sacrifice_hit,
+					is_sacrifice_fly, outs_on_play, is_double_play, is_triple_play, is_wild_pitch,
+					batted_ball_type, is_bunt, errors_on_play, batter_base_after_play, is_last_game_event,
+					event_text, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list
+				)FROM STDIN (FORMAT BINARY)"))
+			{
+				foreach(var ge in gameEvents)
+				{
+					foreach(var runner in ge.baseRunners)
+					{
+						runners.Add((m_gameEventId, runner));
+					}
+					foreach(var outcome in ge.outcomes)
+					{
+						outcomes.Add((m_gameEventId, outcome));
+					}
+					writer.StartRow();
+					writer.Write(m_gameEventId, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.firstPerceivedAt);
+					writer.Write(ge.gameId);
+					writer.Write(ge.eventType);
+					writer.Write(ge.eventIndex, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.inning, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.topOfInning);
+					writer.Write(ge.outsBeforePlay, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.batterId);
+					writer.Write(ge.batterTeamId);
+					writer.Write(ge.pitcherId);
+					writer.Write(ge.pitcherTeamId);
+					writer.Write(ge.homeScore, NpgsqlTypes.NpgsqlDbType.Numeric);
+					writer.Write(ge.awayScore, NpgsqlTypes.NpgsqlDbType.Numeric);
+					writer.Write(ge.homeStrikeCount, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.awayStrikeCount, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.batterCount, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.pitchesList, NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Varchar);
+					writer.Write(ge.totalStrikes, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.totalBalls, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.totalFouls, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.isLeadoff);
+					writer.Write(ge.isPinchHit);
+					writer.Write(ge.lineupPosition, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.isLastEventForPlateAppearance);
+					writer.Write(ge.basesHit, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.runsBattedIn, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.isSacrificeHit);
+					writer.Write(ge.isSacrificeFly);
+					writer.Write(ge.outsOnPlay, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.isDoublePlay);
+					writer.Write(ge.isTriplePlay);
+					writer.Write(ge.isWildPitch);
+					writer.Write(ge.battedBallType);
+					writer.Write(ge.isBunt);
+					writer.Write(ge.errorsOnPlay, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.batterBaseAfterPlay, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.isLastGameEvent);
+					writer.Write(ge.eventText);
+					writer.Write(ge.season, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.day, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.parsingError);
+					writer.Write(ge.parsingErrorList);
+					writer.Write(ge.fixedError);
+					writer.Write(ge.fixedErrorList);
+
+					m_gameEventId++;
+				}
+
+				await writer.CompleteAsync();
+			}
+
+			using(var writer = psqlConnection.BeginBinaryImport(
+				@"COPY data.game_event_base_runners(
+					game_event_id, runner_id, responsible_pitcher_id, base_before_play, base_after_play,
+					was_base_stolen, was_caught_stealing, was_picked_off, runner_scored
+				)FROM STDIN (FORMAT BINARY)"))
+			{
+				foreach((var id, var r) in runners)
+				{
+					writer.StartRow();
+					writer.Write(id, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(r.runnerId);
+					writer.Write(r.responsiblePitcherId);
+					writer.Write(r.baseBeforePlay, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(r.baseAfterPlay, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(r.wasBaseStolen);
+					writer.Write(r.wasCaughtStealing);
+					writer.Write(r.wasPickedOff);
+					writer.Write(r.runnerScored);
+				}
+
+				await writer.CompleteAsync();
+			}
+
+			using(var writer = psqlConnection.BeginBinaryImport(
+				@"COPY data.outcomes(
+					game_event_id, entity_id, event_type, original_text
+				)FROM STDIN (FORMAT BINARY)"))
+			{
+				foreach((var id, var o) in outcomes)
+				{
+					writer.StartRow();
+					writer.Write(id, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(o.entityId);
+					writer.Write(o.eventType);
+					writer.Write(o.originalText);
+				}
+				await writer.CompleteAsync();
+			}
+		}
 
 		private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent)
 		{
