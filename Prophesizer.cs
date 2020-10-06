@@ -27,6 +27,8 @@ namespace SIBR
 		public int Season;
 		public int Day;
 
+		private const int MAX_DAY = 135;
+
 		public SeasonDay(int season, int day)
 		{
 			Season = season;
@@ -84,6 +86,25 @@ namespace SIBR
 				return a.Season > b.Season;
 			}
 		}
+
+		public static SeasonDay operator ++(SeasonDay a)
+		{
+			return a + 1;
+		}
+
+		public static SeasonDay operator +(SeasonDay a, int offset)
+		{
+			int season = a.Season;
+			int day = a.Day + offset;
+
+			if(day > MAX_DAY)
+			{
+				season++;
+				day = day % MAX_DAY;
+			}
+
+			return new SeasonDay(season, day);
+		}
 	}
 
 
@@ -126,16 +147,11 @@ namespace SIBR
 
 		}
 
-		private static int MakeSeasonDay(int season, int day)
-		{
-			return season * 10000 + day;
-		}
 
-		private async Task<(int, int, DateTime?)> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
+		private async Task<SeasonDay> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
 		{
 			int season = 0;
 			int day = 0;
-			DateTime? timestamp = null;
 
 			NpgsqlCommand cmd = new NpgsqlCommand(@"
 				select b.season, b.maxday from data.completed_days cd
@@ -151,11 +167,10 @@ namespace SIBR
 				{
 					season = reader.GetInt32(0);
 					day = reader.GetInt32(1);
-					//timestamp = reader.GetDateTime(2);
 				}
 			}
 
-			return (season, day, timestamp);
+			return new SeasonDay(season, day);
 		}
 
 		private object _eventLocker = new object();
@@ -267,6 +282,17 @@ namespace SIBR
 
 			await PopulateGameTable(psqlConnection);
 
+			if (DO_EVENTS)
+			{
+				await BatchLoadGameUpdates(psqlConnection);
+			}
+
+			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
+			ConsoleOrWebhook(msg);
+		}
+
+		private async Task BatchLoadGameUpdates(NpgsqlConnection psqlConnection)
+		{
 			var getMaxGameEventId = new NpgsqlCommand("select max(id) from data.game_events", psqlConnection);
 			var response = getMaxGameEventId.ExecuteScalar();
 			if (response is DBNull)
@@ -278,89 +304,61 @@ namespace SIBR
 				m_gameEventId = (int)response + 1;
 			}
 
-			int season = 0;
-			int day = 0;
-			DateTime? latestTime = null;
+			SeasonDay currSeasonDay;
 
-			(season, day, latestTime) = await GetLastRecordedSeasonDay(psqlConnection);
-			day++;
+			currSeasonDay = await GetLastRecordedSeasonDay(psqlConnection);
+			currSeasonDay++;
 
-			if (DO_EVENTS)
+			while (m_lastKnownSeasonDay >= currSeasonDay)
 			{
-				while (m_lastKnownSeasonDay >= new SeasonDay(season, day))
+				// Fetch and process 10 days at a time
+				Task<bool>[] tasks = new Task<bool>[NUM_TASKS];
+
+				for (int i = 0; i < NUM_TASKS; i++)
 				{
-					// Fetch and process 10 days at a time
-					Task<bool>[] tasks = new Task<bool>[NUM_TASKS];
-
-					for(int i = 0; i < NUM_TASKS; i++)
-					{
-						int dayToFetch = day + i;
-						tasks[i] = Task.Run(() => FetchAndProcessDay(season, dayToFetch, latestTime));
-					}
-
-					// Wait for all 10 tasks to complete; SQL work has to be done on a single thread
-					Task.WaitAll(tasks);
-
-					// Start a transaction for all we'll update
-					var transaction = psqlConnection.BeginTransaction();
-					
-					Console.WriteLine($"  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
-
-					// Process any game events we received
-					if (m_eventsToInsert.Count > 0)
-					{
-						await CopyGameEvents(psqlConnection, m_eventsToInsert);
-						m_eventsToInsert.Clear();
-					}
-			
-					// Process any pitcher results from completed games
-					while (m_pitcherResults.Count > 0)
-					{
-						var result = m_pitcherResults.Dequeue();
-						await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
-					}
-
-					// For each task that succeeded, record that we handled that day successfully
-					for(int i = 0; i < NUM_TASKS; i++)
-					{
-						if (tasks[i].Result)
-						{
-							NpgsqlCommand updateCmd = new NpgsqlCommand(@"
-								INSERT INTO data.completed_days values (@season, @day)", psqlConnection);
-							updateCmd.Parameters.AddWithValue("season", season);
-							updateCmd.Parameters.AddWithValue("day", day + i);
-							int updateResult = await updateCmd.ExecuteNonQueryAsync();
-						}
-					}
-					await transaction.CommitAsync();
-
-					bool allDaysValid = tasks.All(t => t.Result);
-					
-					if (!allDaysValid && day == 0)
-					{
-						Console.WriteLine($"No results for season {season}; looks like we're done!");
-						break;
-					}
-					else if (!allDaysValid)
-					{
-						Console.WriteLine($"Reached apparent end of season {season} at day {day}... Onward to season {season + 1}!");
-						// If we got no results some other time in the season, try the next season
-						day = 0;
-						latestTime = null;
-						season++;
-					}
-					else
-					{
-						day += NUM_TASKS;
-						latestTime = null;
-					}
-
+					int dayToFetch = currSeasonDay.Day + i;
+					tasks[i] = Task.Run(() => FetchAndProcessDay(currSeasonDay.Season, dayToFetch, null));
 				}
 
-			}
+				// Wait for all 10 tasks to complete; SQL work has to be done on a single thread
+				Task.WaitAll(tasks);
 
-			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
-			ConsoleOrWebhook(msg);
+				// Start a transaction for all we'll update
+				var transaction = psqlConnection.BeginTransaction();
+
+				Console.WriteLine($"  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
+
+				// Process any game events we received
+				if (m_eventsToInsert.Count > 0)
+				{
+					await CopyGameEvents(psqlConnection, m_eventsToInsert);
+					m_eventsToInsert.Clear();
+				}
+
+				// Process any pitcher results from completed games
+				while (m_pitcherResults.Count > 0)
+				{
+					var result = m_pitcherResults.Dequeue();
+					await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
+				}
+
+				// For each task that succeeded, record that we handled that day successfully
+				for (int i = 0; i < NUM_TASKS; i++)
+				{
+					if (tasks[i].Result)
+					{
+						NpgsqlCommand updateCmd = new NpgsqlCommand(@"
+							INSERT INTO data.completed_days values (@season, @day)", psqlConnection);
+						updateCmd.Parameters.AddWithValue("season", currSeasonDay.Season);
+						updateCmd.Parameters.AddWithValue("day", currSeasonDay.Day + i);
+						int updateResult = await updateCmd.ExecuteNonQueryAsync();
+					}
+				}
+				await transaction.CommitAsync();
+
+				currSeasonDay += NUM_TASKS;
+
+			}
 		}
 
 		private void Processor_EventComplete(object sender, GameEventCompleteEventArgs e)
