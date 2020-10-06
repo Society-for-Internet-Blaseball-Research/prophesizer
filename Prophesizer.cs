@@ -21,6 +21,11 @@ using System.Threading.Tasks;
 
 namespace SIBR
 {
+	struct SimulationData
+	{
+		public int Season { get; set; }
+		public int Day { get; set; }
+	}
 
 	struct SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 	{
@@ -86,6 +91,28 @@ namespace SIBR
 				return a.Season > b.Season;
 			}
 		}
+		public static bool operator <(SeasonDay a, SeasonDay b)
+		{
+			if(a.Season == b.Season)
+			{
+				return a.Day < b.Day;
+			}
+			else
+			{
+				return a.Season < b.Season;
+			}
+		}
+		public static bool operator>(SeasonDay a, SeasonDay b)
+		{
+			if(a.Season == b.Season)
+			{
+				return a.Day > b.Day;
+			}
+			else
+			{
+				return a.Season > b.Season;
+			}
+		}
 
 		public static SeasonDay operator ++(SeasonDay a)
 		{
@@ -111,7 +138,7 @@ namespace SIBR
 	class Prophesizer
 	{
 
-		//private Processor m_processor;
+		int m_gameEventId = 0;
 		private Queue<GameEvent> m_eventsToInsert;
 		private Queue<(string, string, string)> m_pitcherResults;
 
@@ -127,7 +154,14 @@ namespace SIBR
 		private const bool DO_HOURLY = true;
 		private const bool DO_EVENTS = true;
 
-		HttpClient m_client;
+		private HttpClient m_chroniclerClient;
+		private HttpClient m_blaseballClient;
+
+		private JsonSerializerOptions m_options;
+
+		private object _eventLocker = new object();
+		private object _pitcherLocker = new object();
+
 		public Prophesizer(string bucketName)
 		{
 			//m_processor = new Processor();
@@ -139,15 +173,26 @@ namespace SIBR
 			serializerOptions.PropertyNameCaseInsensitive = true;
 			serializerOptions.IgnoreNullValues = true;
 
-			m_client = new HttpClient();
-			m_client.BaseAddress = new Uri("https://api.sibr.dev/chronicler/v1/");
-			m_client.DefaultRequestHeaders.Accept.Clear();
-			m_client.DefaultRequestHeaders.Accept.Add(
+			m_chroniclerClient = new HttpClient();
+			m_chroniclerClient.BaseAddress = new Uri("https://api.sibr.dev/chronicler/v1/");
+			m_chroniclerClient.DefaultRequestHeaders.Accept.Clear();
+			m_chroniclerClient.DefaultRequestHeaders.Accept.Add(
 				new MediaTypeWithQualityHeaderValue("application/json"));
 
+			m_blaseballClient = new HttpClient();
+			m_blaseballClient.BaseAddress = new Uri("https://www.blaseball.com/database/");
+			m_blaseballClient.DefaultRequestHeaders.Accept.Clear();
+			m_blaseballClient.DefaultRequestHeaders.Accept.Add(
+				new MediaTypeWithQualityHeaderValue("application/json"));
+
+			m_options = new JsonSerializerOptions();
+			m_options.IgnoreNullValues = true;
+			m_options.PropertyNameCaseInsensitive = true;
 		}
 
-
+		/// <summary>
+		/// Get the last season & day that we've recorded in the DB
+		/// </summary>
 		private async Task<SeasonDay> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
 		{
 			int season = 0;
@@ -173,10 +218,13 @@ namespace SIBR
 			return new SeasonDay(season, day);
 		}
 
-		private object _eventLocker = new object();
-		private object _pitcherLocker = new object();
+		/// <summary>
+		/// Get all the updates for a given day and process them through Cauldron
+		/// </summary>
 		public async Task<bool> FetchAndProcessDay(int season, int day, DateTime? latestTime)
 		{
+			const int NUM_EVENTS_REQUESTED = 1000;
+
 			bool continueDay = true;
 			int numUpdatesForDay = 0;
 
@@ -196,7 +244,7 @@ namespace SIBR
 					query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
 				}
 
-				HttpResponseMessage response = await m_client.GetAsync(query);
+				HttpResponseMessage response = await m_chroniclerClient.GetAsync(query);
 
 				int numUpdates = 0;
 
@@ -252,8 +300,6 @@ namespace SIBR
 			return numUpdatesForDay > 0;
 		}
 
-		static int NUM_EVENTS_REQUESTED = 1000;
-		static int NUM_TASKS = 10;
 
 		public async Task Poll()
 		{
@@ -261,6 +307,22 @@ namespace SIBR
 
 			await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
 			await psqlConnection.OpenAsync();
+
+			SeasonDay dbSeasonDay;
+			dbSeasonDay = await GetLastRecordedSeasonDay(psqlConnection);
+			SeasonDay simSeasonDay;
+
+			var response = await m_blaseballClient.GetAsync("simulationData");
+			if (response.IsSuccessStatusCode)
+			{
+				string strResponse = await response.Content.ReadAsStringAsync();
+				var simData = JsonSerializer.Deserialize<SimulationData>(strResponse, m_options);
+				simSeasonDay = new SeasonDay(simData.Season, simData.Day);
+			}
+			else
+			{
+				throw new InvalidDataException("Couldn't get current simulation data from blaseball!");
+			}
 
 			// TODO: re-introduce hourly and use COPY if possible
 			//if (DO_HOURLY)
@@ -284,32 +346,50 @@ namespace SIBR
 
 			if (DO_EVENTS)
 			{
-				await BatchLoadGameUpdates(psqlConnection);
+				if (dbSeasonDay < simSeasonDay)
+				{
+					await BatchLoadGameUpdates(psqlConnection, dbSeasonDay, simSeasonDay);
+				}
+
+				await IncrementalUpdate(psqlConnection, simSeasonDay);
 			}
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
 			ConsoleOrWebhook(msg);
 		}
 
-		private async Task BatchLoadGameUpdates(NpgsqlConnection psqlConnection)
+		private int GetMaxGameEventId(NpgsqlConnection psqlConnection)
 		{
 			var getMaxGameEventId = new NpgsqlCommand("select max(id) from data.game_events", psqlConnection);
 			var response = getMaxGameEventId.ExecuteScalar();
 			if (response is DBNull)
 			{
-				m_gameEventId = 0;
+				return 0;
 			}
 			else
 			{
-				m_gameEventId = (int)response + 1;
+				return (int)response + 1;
 			}
+		}
 
-			SeasonDay currSeasonDay;
+		private async Task IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt)
+		{
+			m_gameEventId = GetMaxGameEventId(psqlConnection);
 
-			currSeasonDay = await GetLastRecordedSeasonDay(psqlConnection);
-			currSeasonDay++;
+			
+		}
 
-			while (m_lastKnownSeasonDay >= currSeasonDay)
+		/// <summary>
+		/// Load updates from Chronicler by going wide
+		/// </summary>
+		private async Task BatchLoadGameUpdates(NpgsqlConnection psqlConnection, SeasonDay startAfter, SeasonDay stopBefore)
+		{
+			const int NUM_TASKS = 10;
+
+			m_gameEventId = GetMaxGameEventId(psqlConnection);
+			SeasonDay currSeasonDay = startAfter+1;
+
+			while (currSeasonDay < stopBefore)
 			{
 				// Fetch and process 10 days at a time
 				Task<bool>[] tasks = new Task<bool>[NUM_TASKS];
@@ -379,7 +459,6 @@ namespace SIBR
 			}
 		}
 
-		int m_gameEventId = 0;
 		private async Task CopyGameEvents(NpgsqlConnection psqlConnection, Queue<GameEvent> gameEvents)
 		{
 			List<(int, GameEventBaseRunner)> runners = new List<(int, GameEventBaseRunner)>();
@@ -549,25 +628,14 @@ namespace SIBR
 
 		private async Task LookupIncineratedPlayer(string playerId, DateTime timestamp, NpgsqlConnection psqlConnection)
 		{
-
-			HttpClient client = new HttpClient();
-			client.BaseAddress = new Uri("https://www.blaseball.com/database/");
-			client.DefaultRequestHeaders.Accept.Clear();
-			client.DefaultRequestHeaders.Accept.Add(
-				new MediaTypeWithQualityHeaderValue("application/json"));
-
-			JsonSerializerOptions options = new JsonSerializerOptions();
-			options.IgnoreNullValues = true;
-			options.PropertyNameCaseInsensitive = true;
-
 			// Get player record
-			HttpResponseMessage response = await client.GetAsync($"players?ids={playerId}");
+			HttpResponseMessage response = await m_blaseballClient.GetAsync($"players?ids={playerId}");
 
 			if (response.IsSuccessStatusCode)
 			{
 
 				string strResponse = await response.Content.ReadAsStringAsync();
-				var playerList = JsonSerializer.Deserialize<List<Player>>(strResponse, options);
+				var playerList = JsonSerializer.Deserialize<List<Player>>(strResponse, m_options);
 
 				var player = playerList.FirstOrDefault();
 				using (MD5 md5 = MD5.Create())
@@ -1219,11 +1287,6 @@ namespace SIBR
 			day++;
 
 			// Talk to the blaseball API
-			HttpClient client = new HttpClient();
-			client.BaseAddress = new Uri("https://www.blaseball.com/database/");
-			client.DefaultRequestHeaders.Accept.Clear();
-			client.DefaultRequestHeaders.Accept.Add(
-				new MediaTypeWithQualityHeaderValue("application/json"));
 
 			JsonSerializerOptions options = new JsonSerializerOptions();
 			options.IgnoreNullValues = true;
@@ -1235,7 +1298,7 @@ namespace SIBR
 			while (true)
 			{
 				// Get games for this season & day
-				HttpResponseMessage response = await client.GetAsync($"games?day={day}&season={season}");
+				HttpResponseMessage response = await m_blaseballClient.GetAsync($"games?day={day}&season={season}");
 
 				if (response.IsSuccessStatusCode)
 				{
