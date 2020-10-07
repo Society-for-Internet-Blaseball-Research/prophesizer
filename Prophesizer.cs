@@ -40,6 +40,11 @@ namespace SIBR
 			Day = day;
 		}
 
+		public override string ToString()
+		{
+			return $"S{Season}D{Day}";
+		}
+
 		int IComparable<SeasonDay>.CompareTo(SeasonDay other)
 		{
 			int seasonDiff = Season - other.Season;
@@ -193,40 +198,49 @@ namespace SIBR
 		/// <summary>
 		/// Get the last season & day that we've recorded in the DB
 		/// </summary>
-		private async Task<SeasonDay> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
+		private async Task<(SeasonDay, DateTime?)> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
 		{
 			int season = 0;
 			int day = 0;
+			DateTime? timestamp = null;
 
-			NpgsqlCommand cmd = new NpgsqlCommand(@"
-				select b.season, b.maxday from data.completed_days cd
-				inner join
-				(
-					select season, max(day) as maxday from data.completed_days group by season
-				) b on cd.season = b.season and cd.day = b.maxday
-				order by season desc
-				limit 1", psqlConnection);
+			NpgsqlCommand cmd = new NpgsqlCommand(@"select season, day, timestamp from data.completed_days where id=0", psqlConnection);
+
+			//NpgsqlCommand cmd = new NpgsqlCommand(@"
+			//	select b.season, b.maxday, cd.timestamp from data.completed_days cd
+			//	inner join
+			//	(
+			//		select season, max(day) as maxday from data.completed_days group by season
+			//	) b on cd.season = b.season and cd.day = b.maxday
+			//	order by season desc
+			//	limit 1", psqlConnection);
 			using (var reader = await cmd.ExecuteReaderAsync())
 			{
 				while (await reader.ReadAsync())
 				{
 					season = reader.GetInt32(0);
 					day = reader.GetInt32(1);
+					if (!reader.IsDBNull(2))
+					{
+						timestamp = reader.GetDateTime(2);
+					}
 				}
 			}
 
-			return new SeasonDay(season, day);
+			return (new SeasonDay(season, day), timestamp);
 		}
+
+		const int NUM_EVENTS_REQUESTED = 1000;
 
 		/// <summary>
 		/// Get all the updates for a given day and process them through Cauldron
 		/// </summary>
-		public async Task<bool> FetchAndProcessDay(int season, int day, DateTime? latestTime)
+		public async Task<bool> FetchAndProcessFullDay(SeasonDay dayToFetch)
 		{
-			const int NUM_EVENTS_REQUESTED = 1000;
 
 			bool continueDay = true;
 			int numUpdatesForDay = 0;
+			string nextPage = null;
 
 			Processor processor = new Processor();
 			processor.EventComplete += Processor_EventComplete;
@@ -235,13 +249,13 @@ namespace SIBR
 			while (continueDay)
 			{
 				string query;
-				if (latestTime.HasValue)
+				if (nextPage != null)
 				{
-					query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&after={latestTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}";
+					query = $"games/updates?season={dayToFetch.Season}&day={dayToFetch.Day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&page={nextPage}";
 				}
 				else
 				{
-					query = $"games/updates?season={season}&day={day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+					query = $"games/updates?season={dayToFetch.Season}&day={dayToFetch.Day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
 				}
 
 				HttpResponseMessage response = await m_chroniclerClient.GetAsync(query);
@@ -262,21 +276,12 @@ namespace SIBR
 					if (numUpdates == NUM_EVENTS_REQUESTED)
 					{
 						continueDay = true;
-						// Get the timestamp of the last batch
-						var lastTime = updates.Last().Timestamp;
-						// Drop that last batch in case it was split
-						updates = updates.Where(x => x.Timestamp != lastTime);
+						nextPage = page.NextPage;
 					}
 					else
 					{
 						continueDay = false;
-					}
-
-
-					if (numUpdates > 0)
-					{
-						// Remember the new latest time
-						latestTime = updates.Last().Timestamp;
+						nextPage = null;
 					}
 
 					foreach (var obj in updates)
@@ -296,7 +301,7 @@ namespace SIBR
 			processor.EventComplete -= Processor_EventComplete;
 			processor.GameComplete -= Processor_GameComplete;
 
-			Console.WriteLine($"Finished loading season {season}, day {day}.");
+			Console.WriteLine($"Finished loading season {dayToFetch.Season}, day {dayToFetch.Day}.");
 			return numUpdatesForDay > 0;
 		}
 
@@ -308,8 +313,13 @@ namespace SIBR
 			await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
 			await psqlConnection.OpenAsync();
 
+			await PopulateGameTable(psqlConnection);
+
+			// Last day recorded in the DB
 			SeasonDay dbSeasonDay;
-			dbSeasonDay = await GetLastRecordedSeasonDay(psqlConnection);
+			DateTime? timestamp;
+			(dbSeasonDay, timestamp) = await GetLastRecordedSeasonDay(psqlConnection);
+			// Current day according to blaseball.com
 			SeasonDay simSeasonDay;
 
 			var response = await m_blaseballClient.GetAsync("simulationData");
@@ -342,16 +352,16 @@ namespace SIBR
 			//	}
 			//}
 
-			await PopulateGameTable(psqlConnection);
-
 			if (DO_EVENTS)
 			{
+				// TODO store current time
+
 				if (dbSeasonDay < simSeasonDay)
 				{
 					await BatchLoadGameUpdates(psqlConnection, dbSeasonDay, simSeasonDay);
 				}
 
-				await IncrementalUpdate(psqlConnection, simSeasonDay);
+				await IncrementalUpdate(psqlConnection, simSeasonDay, timestamp);
 			}
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
@@ -372,11 +382,100 @@ namespace SIBR
 			}
 		}
 
-		private async Task IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt)
+		private Processor m_processor = new Processor();
+
+		
+
+		private async Task IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt, DateTime? afterTime)
 		{
 			m_gameEventId = GetMaxGameEventId(psqlConnection);
 
-			
+			bool morePages = true;
+			string nextPage = null;
+			DateTime queryTime = DateTime.UtcNow;
+
+			while (morePages)
+			{
+				string query;
+				if (afterTime.HasValue)
+				{
+					if(nextPage != null)
+					{
+						query = $"games/updates?after={afterTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&page={nextPage}";
+					}
+					else
+					{
+						query = $"games/updates?after={afterTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+					}
+					
+				}
+				else
+				{
+					if (nextPage != null)
+					{
+						query = $"games/updates?season={startAt.Season}&day={startAt.Day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&page={nextPage}";
+					}
+					else
+					{
+						query = $"games/updates?season={startAt.Season}&day={startAt.Day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+					}
+				}
+
+				HttpResponseMessage response = await m_chroniclerClient.GetAsync(query);
+
+				if (response.IsSuccessStatusCode)
+				{
+					string strResponse = await response.Content.ReadAsStringAsync();
+
+					// Deserialize the JSON
+					var page = JsonSerializer.Deserialize<ChroniclerPage>(strResponse, serializerOptions);
+					nextPage = page.NextPage;
+
+					if (page.Data.Count() == 0)
+					{
+						Console.WriteLine("Got no data from Chronicler!");
+						break;
+					}
+					else if(page.Data.Count() == NUM_EVENTS_REQUESTED)
+					{
+						morePages = true;
+					}
+					else
+					{
+						morePages = false;
+					}
+
+					m_processor.EventComplete += Processor_EventComplete;
+					m_processor.GameComplete += Processor_GameComplete;
+					foreach (var update in page.Data)
+					{
+						await m_processor.ProcessGameObject(update.Data, update.Timestamp);
+					}
+					m_processor.EventComplete -= Processor_EventComplete;
+					m_processor.GameComplete -= Processor_GameComplete;
+
+					Console.WriteLine($"  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
+					// Process any game events we received
+					while (m_eventsToInsert.Count > 0)
+					{
+						var ev = m_eventsToInsert.Dequeue();
+						await PersistGame(psqlConnection, ev, m_gameEventId);
+						m_gameEventId++;
+					}
+
+					// Process any pitcher results from completed games
+					while (m_pitcherResults.Count > 0)
+					{
+						var result = m_pitcherResults.Dequeue();
+						await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
+					}
+
+				}
+			}
+
+			NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.completed_days SET timestamp=@ts WHERE id=0", psqlConnection);
+			updateCmd.Parameters.AddWithValue("ts", queryTime);
+			int updateResult = await updateCmd.ExecuteNonQueryAsync();
 		}
 
 		/// <summary>
@@ -396,8 +495,16 @@ namespace SIBR
 
 				for (int i = 0; i < NUM_TASKS; i++)
 				{
-					int dayToFetch = currSeasonDay.Day + i;
-					tasks[i] = Task.Run(() => FetchAndProcessDay(currSeasonDay.Season, dayToFetch, null));
+					SeasonDay dayToFetch = new SeasonDay(currSeasonDay.Season, currSeasonDay.Day + i);
+
+					if (dayToFetch < stopBefore)
+					{
+						tasks[i] = Task.Run(() => FetchAndProcessFullDay(dayToFetch));
+					}
+					else
+					{
+						tasks[i] = Task.Run(() => false );
+					}
 				}
 
 				// Wait for all 10 tasks to complete; SQL work has to be done on a single thread
@@ -422,18 +529,14 @@ namespace SIBR
 					await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
 				}
 
-				// For each task that succeeded, record that we handled that day successfully
-				for (int i = 0; i < NUM_TASKS; i++)
-				{
-					if (tasks[i].Result)
-					{
-						NpgsqlCommand updateCmd = new NpgsqlCommand(@"
-							INSERT INTO data.completed_days values (@season, @day)", psqlConnection);
-						updateCmd.Parameters.AddWithValue("season", currSeasonDay.Season);
-						updateCmd.Parameters.AddWithValue("day", currSeasonDay.Day + i);
-						int updateResult = await updateCmd.ExecuteNonQueryAsync();
-					}
-				}
+				NpgsqlCommand updateCmd = new NpgsqlCommand(@"
+					INSERT INTO data.completed_days(id, season, day, timestamp) values (0, @season, @day, null)
+					ON CONFLICT(id) DO UPDATE SET season=EXCLUDED.season, day=EXCLUDED.day, timestamp=null", 
+					psqlConnection);
+				updateCmd.Parameters.AddWithValue("season", currSeasonDay.Season);
+				updateCmd.Parameters.AddWithValue("day", currSeasonDay.Day + NUM_TASKS-1);
+				int updateResult = await updateCmd.ExecuteNonQueryAsync();
+
 				await transaction.CommitAsync();
 
 				currSeasonDay += NUM_TASKS;
@@ -579,9 +682,9 @@ namespace SIBR
 			}
 		}
 
-		private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent)
+		private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent, int gameEventId)
 		{
-			using (var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent))
+			using (var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent, gameEventId))
 			{
 				int id = (int)await gameEventStatement.ExecuteScalarAsync();
 
@@ -645,9 +748,11 @@ namespace SIBR
 			}
 		}
 
-		private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent)
+		private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent, int id)
 		{
-			var cmd = new InsertCommand(psqlConnection, "data.game_events", gameEvent).Command;
+			var extra = new Dictionary<string, object>();
+			extra["id"] = id;
+			var cmd = new InsertCommand(psqlConnection, "data.game_events", gameEvent, extra).Command;
 			//cmd.Prepare();
 			return cmd;
 		}
@@ -1307,7 +1412,7 @@ namespace SIBR
 					var gameList = JsonSerializer.Deserialize<IEnumerable<Game>>(strResponse, options);
 
 					// If we got no response OR we're past the minimum and we got a "game not complete" response
-					if (gameList == null || gameList.Count() == 0 || (season > MIN_SEASON && gameList.First().gameComplete == false))
+					if (gameList == null || gameList.Count() == 0) //|| (season > MIN_SEASON && gameList.First().gameComplete == false))
 					{
 						if (day > 0)
 						{
