@@ -55,7 +55,9 @@ namespace SIBR
 		private object _pitcherLocker = new object();
 
 		private SeasonDay m_dbSeasonDay;
-		private DateTime? m_dbTimestamp;
+		private DateTime? m_dbGameTimestamp;
+		private DateTime? m_dbTeamTimestamp;
+		private DateTime? m_dbPlayerTimestamp;
 
 		public Prophesizer(string bucketName)
 		{
@@ -88,13 +90,15 @@ namespace SIBR
 		/// <summary>
 		/// Get the last season & day that we've recorded in the DB
 		/// </summary>
-		private async Task<(SeasonDay, DateTime?)> GetLastRecordedSeasonDay(NpgsqlConnection psqlConnection)
+		private async Task<(SeasonDay, DateTime?, DateTime?, DateTime?)> GetChroniclerMeta(NpgsqlConnection psqlConnection)
 		{
 			int season = 0;
 			int day = 0;
-			DateTime? timestamp = null;
+			DateTime? game_time = null;
+			DateTime? team_time = null;
+			DateTime? player_time = null;
 
-			NpgsqlCommand cmd = new NpgsqlCommand(@"select season, day, timestamp from data.chronicler_meta where id=0", psqlConnection);
+			NpgsqlCommand cmd = new NpgsqlCommand(@"select season, day, game_timestamp, team_timestamp, player_timestamp from data.chronicler_meta where id=0", psqlConnection);
 
 			using (var reader = await cmd.ExecuteReaderAsync())
 			{
@@ -104,12 +108,20 @@ namespace SIBR
 					day = reader.GetInt32(1);
 					if (!reader.IsDBNull(2))
 					{
-						timestamp = reader.GetDateTime(2);
+						game_time = reader.GetDateTime(2);
+					}
+					if(!reader.IsDBNull(3))
+					{
+						team_time = reader.GetDateTime(3);
+					}
+					if(!reader.IsDBNull(4))
+					{
+						player_time = reader.GetDateTime(4);
 					}
 				}
 			}
 
-			return (new SeasonDay(season, day), timestamp);
+			return (new SeasonDay(season, day), game_time, team_time, player_time);
 		}
 
 		const int NUM_EVENTS_REQUESTED = 1000;
@@ -188,7 +200,7 @@ namespace SIBR
 			await PopulateGameTable(psqlConnection);
 
 			// Last day recorded in the DB
-			(m_dbSeasonDay, m_dbTimestamp) = await GetLastRecordedSeasonDay(psqlConnection);
+			(m_dbSeasonDay, m_dbGameTimestamp, m_dbTeamTimestamp, m_dbPlayerTimestamp) = await GetChroniclerMeta(psqlConnection);
 			// Current day according to blaseball.com
 			SeasonDay simSeasonDay;
 
@@ -220,7 +232,7 @@ namespace SIBR
 					await BatchLoadGameUpdates(psqlConnection, m_dbSeasonDay, simSeasonDay);
 				}
 
-				await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbTimestamp);
+				await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
 			}
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
@@ -251,7 +263,7 @@ namespace SIBR
 
 			bool morePages = true;
 			string nextPage = null;
-			DateTime queryTime = DateTime.UtcNow;
+			DateTime? lastSeenGameTime = null;
 
 			while (morePages)
 			{
@@ -300,12 +312,13 @@ namespace SIBR
 					foreach (var update in page.Data)
 					{
 						//Console.WriteLine($"    Processing update {update.Hash}");
+						lastSeenGameTime = update.Timestamp;
 						await m_processor.ProcessGameObject(update.Data, update.Timestamp, update.Hash);
 					}
 					m_processor.EventComplete -= Processor_EventComplete;
 					m_processor.GameComplete -= Processor_GameComplete;
 
-					Console.WriteLine($"  Processed {page.Data.Count()} updates. (through {page.Data.Last().Timestamp}).\n  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
+					Console.WriteLine($"  Processed {page.Data.Count()} updates (through {page.Data.Last().Timestamp}).\n  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
 					// Process any game events we received
 					while (m_eventsToInsert.Count > 0)
 					{
@@ -324,9 +337,12 @@ namespace SIBR
 				}
 			}
 
-			NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET timestamp=@ts WHERE id=0", psqlConnection);
-			updateCmd.Parameters.AddWithValue("ts", queryTime);
-			int updateResult = await updateCmd.ExecuteNonQueryAsync();
+			if (lastSeenGameTime.HasValue)
+			{
+				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET game_timestamp=@ts WHERE id=0", psqlConnection);
+				updateCmd.Parameters.AddWithValue("ts", lastSeenGameTime);
+				int updateResult = await updateCmd.ExecuteNonQueryAsync();
+			}
 		}
 
 		/// <summary>
@@ -654,13 +670,14 @@ namespace SIBR
 		{
 			const int NUM_REQUESTED = 250;
 			string nextPage = null;
+			DateTime? lastSeenTeamTime = null;
 
 			while (true)
 			{
 				string query = $"teams/updates?count={NUM_REQUESTED}";
-				if(m_dbTimestamp.HasValue)
+				if(m_dbTeamTimestamp.HasValue)
 				{
-					query += $"&after={TimestampQueryValue(m_dbTimestamp.Value)}";
+					query += $"&after={TimestampQueryValue(m_dbTeamTimestamp.Value)}";
 				}
 				if (nextPage != null)
 				{
@@ -678,6 +695,7 @@ namespace SIBR
 					nextPage = page.NextPage;
 
 					Console.WriteLine($"  Processing {page.Data.Count()} team updates (through {page.Data.Last().FirstSeen}).");
+					lastSeenTeamTime = page.Data.Last().FirstSeen;
 					await ProcessTeams(psqlConnection, page.Data);
 
 					// We're done!
@@ -686,6 +704,13 @@ namespace SIBR
 						break;
 					}
 				}
+			}
+
+			if (lastSeenTeamTime.HasValue)
+			{
+				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET team_timestamp=@ts WHERE id=0", psqlConnection);
+				updateCmd.Parameters.AddWithValue("ts", lastSeenTeamTime);
+				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 			}
 		}
 
@@ -736,13 +761,14 @@ namespace SIBR
 		{
 			const int NUM_REQUESTED = 1000;
 			string nextPage = null;
+			DateTime? lastSeenPlayerTime = null;
 
 			while (true)
 			{
 				string query = $"players/updates?count={NUM_REQUESTED}";
-				if (m_dbTimestamp.HasValue)
+				if (m_dbPlayerTimestamp.HasValue)
 				{
-					query += $"&after={TimestampQueryValue(m_dbTimestamp.Value)}";
+					query += $"&after={TimestampQueryValue(m_dbPlayerTimestamp.Value)}";
 				}
 				if (nextPage != null)
 				{
@@ -758,7 +784,7 @@ namespace SIBR
 				else
 				{
 					nextPage = page.NextPage;
-
+					lastSeenPlayerTime = page.Data.Last().FirstSeen;
 					Console.WriteLine($"  Processing {page.Data.Count()} player updates (through {page.Data.Last().FirstSeen}).");
 					await ProcessPlayers(psqlConnection, page.Data);
 
@@ -769,6 +795,14 @@ namespace SIBR
 					}
 				}
 			}
+
+			if (lastSeenPlayerTime.HasValue)
+			{
+				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET player_timestamp=@ts WHERE id=0", psqlConnection);
+				updateCmd.Parameters.AddWithValue("ts", lastSeenPlayerTime);
+				int updateResult = await updateCmd.ExecuteNonQueryAsync();
+			}
+
 		}
 
 		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerPlayer> players)
