@@ -27,119 +27,6 @@ namespace SIBR
 		public int Day { get; set; }
 	}
 
-	struct SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
-	{
-		public int Season;
-		public int Day;
-
-		private const int MAX_DAY = 135;
-
-		public SeasonDay(int season, int day)
-		{
-			Season = season;
-			Day = day;
-		}
-
-		public override string ToString()
-		{
-			return $"S{Season}D{Day}";
-		}
-
-		int IComparable<SeasonDay>.CompareTo(SeasonDay other)
-		{
-			int seasonDiff = Season - other.Season;
-
-			if(seasonDiff == 0)
-			{
-				return Day - other.Day;
-			}
-			else
-			{
-				return seasonDiff;
-			}
-		}
-
-		public override bool Equals(object other)
-		{
-			return Season == ((SeasonDay)other).Season && Day == ((SeasonDay)other).Day;
-		}
-
-		public override int GetHashCode()
-		{
-			return Season.GetHashCode() ^ Day.GetHashCode();
-		}
-
-		bool IEquatable<SeasonDay>.Equals(SeasonDay other)
-		{
-			return Season == other.Season && Day == other.Day;
-		}
-
-		public static bool operator <=(SeasonDay a, SeasonDay b)
-		{
-			if(a.Season == b.Season)
-			{
-				return a.Day <= b.Day;
-			}
-			else
-			{
-				return a.Season < b.Season;
-			}
-		}
-		public static bool operator >=(SeasonDay a, SeasonDay b)
-		{
-			if(a.Season == b.Season)
-			{
-				return a.Day >= b.Day;
-			}
-			else
-			{
-				return a.Season > b.Season;
-			}
-		}
-		public static bool operator <(SeasonDay a, SeasonDay b)
-		{
-			if(a.Season == b.Season)
-			{
-				return a.Day < b.Day;
-			}
-			else
-			{
-				return a.Season < b.Season;
-			}
-		}
-		public static bool operator>(SeasonDay a, SeasonDay b)
-		{
-			if(a.Season == b.Season)
-			{
-				return a.Day > b.Day;
-			}
-			else
-			{
-				return a.Season > b.Season;
-			}
-		}
-
-		public static SeasonDay operator ++(SeasonDay a)
-		{
-			return a + 1;
-		}
-
-		public static SeasonDay operator +(SeasonDay a, int offset)
-		{
-			int season = a.Season;
-			int day = a.Day + offset;
-
-			if(day > MAX_DAY)
-			{
-				season++;
-				day = day % MAX_DAY;
-			}
-
-			return new SeasonDay(season, day);
-		}
-	}
-
-
 	class Prophesizer
 	{
 
@@ -166,6 +53,9 @@ namespace SIBR
 
 		private object _eventLocker = new object();
 		private object _pitcherLocker = new object();
+
+		private SeasonDay m_dbSeasonDay;
+		private DateTime? m_dbTimestamp;
 
 		public Prophesizer(string bucketName)
 		{
@@ -204,16 +94,8 @@ namespace SIBR
 			int day = 0;
 			DateTime? timestamp = null;
 
-			NpgsqlCommand cmd = new NpgsqlCommand(@"select season, day, timestamp from data.completed_days where id=0", psqlConnection);
+			NpgsqlCommand cmd = new NpgsqlCommand(@"select season, day, timestamp from data.chronicler_meta where id=0", psqlConnection);
 
-			//NpgsqlCommand cmd = new NpgsqlCommand(@"
-			//	select b.season, b.maxday, cd.timestamp from data.completed_days cd
-			//	inner join
-			//	(
-			//		select season, max(day) as maxday from data.completed_days group by season
-			//	) b on cd.season = b.season and cd.day = b.maxday
-			//	order by season desc
-			//	limit 1", psqlConnection);
 			using (var reader = await cmd.ExecuteReaderAsync())
 			{
 				while (await reader.ReadAsync())
@@ -237,7 +119,6 @@ namespace SIBR
 		/// </summary>
 		public async Task<bool> FetchAndProcessFullDay(SeasonDay dayToFetch)
 		{
-
 			bool continueDay = true;
 			int numUpdatesForDay = 0;
 			string nextPage = null;
@@ -258,16 +139,11 @@ namespace SIBR
 					query = $"games/updates?season={dayToFetch.Season}&day={dayToFetch.Day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
 				}
 
-				HttpResponseMessage response = await m_chroniclerClient.GetAsync(query);
-
+				var page = await ChroniclerQuery<ChroniclerUpdate>(query);
 				int numUpdates = 0;
 
-				if (response.IsSuccessStatusCode)
+				if (page != null)
 				{
-					string strResponse = await response.Content.ReadAsStringAsync();
-
-					// Deserialize the JSON
-					var page = JsonSerializer.Deserialize<ChroniclerPage>(strResponse, serializerOptions);
 
 					var updates = page.Data;
 					numUpdates = updates.Count();
@@ -292,16 +168,12 @@ namespace SIBR
 					// TODO: Update the time map
 					//await PersistTimeMap(gameEvents, psqlConnection);
 				}
-				else
-				{
-					Console.WriteLine(response.ReasonPhrase);
-				}
 			}
 
 			processor.EventComplete -= Processor_EventComplete;
 			processor.GameComplete -= Processor_GameComplete;
 
-			Console.WriteLine($"Finished loading season {dayToFetch.Season}, day {dayToFetch.Day}.");
+			//Console.WriteLine($"Finished loading season {dayToFetch.Season}, day {dayToFetch.Day}.");
 			return numUpdatesForDay > 0;
 		}
 
@@ -316,9 +188,7 @@ namespace SIBR
 			await PopulateGameTable(psqlConnection);
 
 			// Last day recorded in the DB
-			SeasonDay dbSeasonDay;
-			DateTime? timestamp;
-			(dbSeasonDay, timestamp) = await GetLastRecordedSeasonDay(psqlConnection);
+			(m_dbSeasonDay, m_dbTimestamp) = await GetLastRecordedSeasonDay(psqlConnection);
 			// Current day according to blaseball.com
 			SeasonDay simSeasonDay;
 
@@ -334,34 +204,23 @@ namespace SIBR
 				throw new InvalidDataException("Couldn't get current simulation data from blaseball!");
 			}
 
-			// TODO: re-introduce hourly and use COPY if possible
-			//if (DO_HOURLY)
-			//{
-			//	int i = 0;
-			//	foreach (S3Object logObject in unprocessedLogs.hourlyLogs)
-			//	{
-			//		await FetchAndProcessHourly(logObject.Key, psqlConnection);
-			//		var percent = (float)i / unprocessedLogs.hourlyLogs.Count();
-			//		Console.WriteLine($"{percent:P0} complete");
+			if (DO_HOURLY)
+			{
+				await LoadTeamUpdates(psqlConnection);
+				await LoadPlayerUpdates(psqlConnection);
+			}
 
-			//		using (var logStatement = PersistLogRecord(psqlConnection, logObject.Key))
-			//		{
-			//			await logStatement.ExecuteNonQueryAsync();
-			//		}
-			//		i++;
-			//	}
-			//}
 
 			if (DO_EVENTS)
 			{
 				// TODO store current time
 
-				if (dbSeasonDay < simSeasonDay)
+				if (m_dbSeasonDay < simSeasonDay)
 				{
-					await BatchLoadGameUpdates(psqlConnection, dbSeasonDay, simSeasonDay);
+					await BatchLoadGameUpdates(psqlConnection, m_dbSeasonDay, simSeasonDay);
 				}
 
-				await IncrementalUpdate(psqlConnection, simSeasonDay, timestamp);
+				await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbTimestamp);
 			}
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
@@ -399,36 +258,27 @@ namespace SIBR
 				string query;
 				if (afterTime.HasValue)
 				{
-					if(nextPage != null)
+					query = $"games/updates?after={afterTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+					if (nextPage != null)
 					{
-						query = $"games/updates?after={afterTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&page={nextPage}";
-					}
-					else
-					{
-						query = $"games/updates?after={afterTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+						query += $"&page={nextPage}";
 					}
 					
 				}
 				else
 				{
+					query = $"games/updates?season={startAt.Season}&day={startAt.Day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
 					if (nextPage != null)
 					{
-						query = $"games/updates?season={startAt.Season}&day={startAt.Day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}&page={nextPage}";
-					}
-					else
-					{
-						query = $"games/updates?season={startAt.Season}&day={startAt.Day}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+						query += $"&page={nextPage}";
 					}
 				}
 
+				var page = await ChroniclerQuery<ChroniclerUpdate>(query);
 				HttpResponseMessage response = await m_chroniclerClient.GetAsync(query);
 
-				if (response.IsSuccessStatusCode)
+				if (page != null)
 				{
-					string strResponse = await response.Content.ReadAsStringAsync();
-
-					// Deserialize the JSON
-					var page = JsonSerializer.Deserialize<ChroniclerPage>(strResponse, serializerOptions);
 					nextPage = page.NextPage;
 
 					if (page.Data.Count() == 0)
@@ -449,12 +299,13 @@ namespace SIBR
 					m_processor.GameComplete += Processor_GameComplete;
 					foreach (var update in page.Data)
 					{
-						await m_processor.ProcessGameObject(update.Data, update.Timestamp);
+						//Console.WriteLine($"    Processing update {update.Hash}");
+						await m_processor.ProcessGameObject(update.Data, update.Timestamp, update.Hash);
 					}
 					m_processor.EventComplete -= Processor_EventComplete;
 					m_processor.GameComplete -= Processor_GameComplete;
 
-					Console.WriteLine($"  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
+					Console.WriteLine($"  Processed {page.Data.Count()} updates. (through {page.Data.Last().Timestamp}).\n  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
 					// Process any game events we received
 					while (m_eventsToInsert.Count > 0)
 					{
@@ -473,7 +324,7 @@ namespace SIBR
 				}
 			}
 
-			NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.completed_days SET timestamp=@ts WHERE id=0", psqlConnection);
+			NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET timestamp=@ts WHERE id=0", psqlConnection);
 			updateCmd.Parameters.AddWithValue("ts", queryTime);
 			int updateResult = await updateCmd.ExecuteNonQueryAsync();
 		}
@@ -530,7 +381,7 @@ namespace SIBR
 				}
 
 				NpgsqlCommand updateCmd = new NpgsqlCommand(@"
-					INSERT INTO data.completed_days(id, season, day, timestamp) values (0, @season, @day, null)
+					INSERT INTO data.chronicler_meta(id, season, day, timestamp) values (0, @season, @day, null)
 					ON CONFLICT(id) DO UPDATE SET season=EXCLUDED.season, day=EXCLUDED.day, timestamp=null", 
 					psqlConnection);
 				updateCmd.Parameters.AddWithValue("season", currSeasonDay.Season);
@@ -708,45 +559,45 @@ namespace SIBR
 						await playerEventStatement.ExecuteNonQueryAsync();
 					}
 
-					if (outcome.eventType == OutcomeType.INCINERATION)
-					{
-						var playerId = outcome.entityId;
+					//if (outcome.eventType == OutcomeType.INCINERATION)
+					//{
+					//	var playerId = outcome.entityId;
 
-						DateTime timestamp;
-						if (gameEvent.firstPerceivedAt.Year == 1970)
-						{
-							// TODO is this a problem
-							timestamp = gameEvent.firstPerceivedAt;
-						}
-						else
-						{
-							timestamp = gameEvent.firstPerceivedAt;
-						}
+					//	DateTime timestamp;
+					//	if (gameEvent.firstPerceivedAt.Year == 1970)
+					//	{
+					//		// TODO is this a problem
+					//		timestamp = gameEvent.firstPerceivedAt;
+					//	}
+					//	else
+					//	{
+					//		timestamp = gameEvent.firstPerceivedAt;
+					//	}
 
-						await LookupIncineratedPlayer(playerId, timestamp, psqlConnection);
-					}
+					//	await LookupIncineratedPlayer(playerId, timestamp, psqlConnection);
+					//}
 				}
 			}
 		}
 
-		private async Task LookupIncineratedPlayer(string playerId, DateTime timestamp, NpgsqlConnection psqlConnection)
-		{
-			// Get player record
-			HttpResponseMessage response = await m_blaseballClient.GetAsync($"players?ids={playerId}");
+		//private async Task LookupIncineratedPlayer(string playerId, DateTime timestamp, NpgsqlConnection psqlConnection)
+		//{
+		//	// Get player record
+		//	HttpResponseMessage response = await m_blaseballClient.GetAsync($"players?ids={playerId}");
 
-			if (response.IsSuccessStatusCode)
-			{
+		//	if (response.IsSuccessStatusCode)
+		//	{
 
-				string strResponse = await response.Content.ReadAsStringAsync();
-				var playerList = JsonSerializer.Deserialize<List<Player>>(strResponse, m_options);
+		//		string strResponse = await response.Content.ReadAsStringAsync();
+		//		var playerList = JsonSerializer.Deserialize<List<Player>>(strResponse, m_options);
 
-				var player = playerList.FirstOrDefault();
-				using (MD5 md5 = MD5.Create())
-				{
-					ProcessPlayer(player, timestamp, psqlConnection, md5);
-				}
-			}
-		}
+		//		var player = playerList.FirstOrDefault();
+		//		using (MD5 md5 = MD5.Create())
+		//		{
+		//			ProcessPlayer(player, timestamp, psqlConnection, md5);
+		//		}
+		//	}
+		//}
 
 		private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent, int id)
 		{
@@ -775,113 +626,190 @@ namespace SIBR
 			return cmd;
 		}
 
-		private NpgsqlCommand PersistLogRecord(NpgsqlConnection psqlConnection, string keyName)
+		/// <summary>
+		/// Helper function to do a query to Chronicler and return a page with generic data
+		/// </summary>
+		private async Task<ChroniclerPage<T>> ChroniclerQuery<T>(string query)
 		{
-			var persistLogStatement = new NpgsqlCommand(@"
-        INSERT INTO data.imported_logs(
-          key,
-          imported_at
-        ) VALUES (
-          @key,
-          @imported_at
-        );
-      ", psqlConnection);
+			HttpResponseMessage response = await m_chroniclerClient.GetAsync(query);
 
-			persistLogStatement.Parameters.AddWithValue("key", keyName);
-			persistLogStatement.Parameters.AddWithValue("imported_at", DateTime.UtcNow);
-			//persistLogStatement.Prepare();
-			return persistLogStatement;
-		}
-
-		//private async Task FetchAndProcessHourly(string keyName, NpgsqlConnection psqlConnection)
-		//{
-		//	GetObjectRequest request = new GetObjectRequest
-		//	{
-		//		BucketName = bucketName,
-		//		Key = keyName
-		//	};
-
-		//	using (GetObjectResponse response = await client.GetObjectAsync(request))
-		//	using (Stream responseStream = response.ResponseStream)
-		//	{
-		//		Console.Write($"Processing document (Key: {keyName}, Length: {response.ContentLength})...");
-
-		//		await ProcessHourly(keyName, responseStream, psqlConnection);
-
-		//		return;
-		//	}
-		//}
-
-		private static DateTime DateTimeFromKeyName(string keyName)
-		{
-			var dash = keyName.LastIndexOf('-');
-			var dot = keyName.IndexOf('.');
-
-			string timeStr = keyName.Substring(dash + 1, dot - dash - 1);
-			long timeNum = long.Parse(timeStr);
-			DateTime timestamp = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-			return timestamp.AddMilliseconds(timeNum);
-		}
-
-		private async Task ProcessHourly(string keyName, Stream responseStream, NpgsqlConnection psqlConnection)
-		{
-			Stopwatch s = new Stopwatch();
-			s.Start();
-			try
+			if (response.IsSuccessStatusCode)
 			{
+				string strResponse = await response.Content.ReadAsStringAsync();
+				return JsonSerializer.Deserialize<ChroniclerPage<T>>(strResponse, serializerOptions);
+			}
+			else
+			{
+				Console.WriteLine($"Query [{query}] failed: {response.ReasonPhrase}");
+				return null;
+			}
+		}
 
-				using (GZipStream decompressionStream = new GZipStream(responseStream, CompressionMode.Decompress))
-				using (MemoryStream decompressedStream = new MemoryStream())
+		static string TimestampQueryValue(DateTime dt)
+		{
+			return dt.ToString("yyyy-MM-ddTHH:mm:ssZ");
+		}
+
+		private async Task LoadTeamUpdates(NpgsqlConnection psqlConnection)
+		{
+			const int NUM_REQUESTED = 250;
+			string nextPage = null;
+
+			while (true)
+			{
+				string query = $"teams/updates?count={NUM_REQUESTED}";
+				if(m_dbTimestamp.HasValue)
 				{
-					decompressionStream.CopyTo(decompressedStream);
-					decompressedStream.Seek(0, SeekOrigin.Begin);
+					query += $"&after={TimestampQueryValue(m_dbTimestamp.Value)}";
+				}
+				if (nextPage != null)
+				{
+					query += $"&page={nextPage}";
+				}
 
+				ChroniclerPage<ChroniclerTeam> page = await ChroniclerQuery<ChroniclerTeam>(query);
 
-					using (StreamReader reader = new StreamReader(decompressedStream))
+				if (page == null || page.Data.Count() == 0)
+				{
+					break;
+				}
+				else
+				{
+					nextPage = page.NextPage;
+
+					Console.WriteLine($"  Processing {page.Data.Count()} team updates (through {page.Data.Last().FirstSeen}).");
+					await ProcessTeams(psqlConnection, page.Data);
+
+					// We're done!
+					if(page.Data.Count() != NUM_REQUESTED)
 					{
-						while (!reader.EndOfStream)
-						{
-							string json = reader.ReadLine();
-							var hourly = JsonSerializer.Deserialize<HourlyArchive>(json, serializerOptions);
-
-							DateTime timestamp;
-
-							if (hourly.ClientMeta == null || hourly.ClientMeta.timestamp == null)
-							{
-								timestamp = DateTimeFromKeyName(keyName);
-							}
-							else
-							{
-								timestamp = hourly.ClientMeta.timestamp;
-							}
-
-							switch (hourly.Endpoint)
-							{
-								case "players":
-									ProcessPlayers(hourly, timestamp, psqlConnection);
-									break;
-								case "allTeams":
-									await ProcessAllTeams((JsonElement)hourly.Data, timestamp, psqlConnection);
-									break;
-								case "offseasonSetup":
-									break;
-								case "globalEvents":
-									break;
-							}
-						}
+						break;
 					}
 				}
 			}
-			catch (Exception e)
-			{
-				ConsoleOrWebhook($"Failed to process {keyName}: {e.Message}");
-				Console.WriteLine(e.StackTrace);
-				return;
-			}
-			s.Stop();
-			if (TIMING_FILE) Console.Write($"({s.ElapsedMilliseconds} ms)...");
 		}
 
+		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerTeam> teams)
+		{
+			using (MD5 md5 = MD5.Create())
+			{
+				foreach (var t in teams)
+				{
+					await ProcessRoster(t.Data, t.FirstSeen, psqlConnection);
+
+					var hash = HashTeamAttrs(md5, t.Data);
+					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.teams where hash=@hash and valid_until is null", psqlConnection);
+					cmd.Parameters.AddWithValue("hash", hash);
+					//cmd.Prepare();
+					var count = (long)await cmd.ExecuteScalarAsync();
+
+					if (count == 1)
+					{
+						// Record exists
+					}
+					else
+					{
+						// Update the old record
+						NpgsqlCommand update = new NpgsqlCommand(@"update data.teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
+						update.Parameters.AddWithValue("timestamp", t.FirstSeen);
+						update.Parameters.AddWithValue("team_id", t.TeamId);
+						//update.Prepare();
+						int rows = await update.ExecuteNonQueryAsync();
+						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+						var extra = new Dictionary<string, object>();
+						extra["valid_from"] = t.FirstSeen;
+						extra["hash"] = hash;
+						// Try to insert our current data
+						InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.teams", t.Data, extra);
+						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
+
+					}
+
+					await ProcessTeamModAttrs(t.Data, t.FirstSeen, psqlConnection);
+
+				}
+			}
+		}
+
+		private async Task LoadPlayerUpdates(NpgsqlConnection psqlConnection)
+		{
+			const int NUM_REQUESTED = 1000;
+			string nextPage = null;
+
+			while (true)
+			{
+				string query = $"players/updates?count={NUM_REQUESTED}";
+				if (m_dbTimestamp.HasValue)
+				{
+					query += $"&after={TimestampQueryValue(m_dbTimestamp.Value)}";
+				}
+				if (nextPage != null)
+				{
+					query += $"&page={nextPage}";
+				}
+
+				ChroniclerPage<ChroniclerPlayer> page = await ChroniclerQuery<ChroniclerPlayer>(query);
+
+				if (page == null || page.Data.Count() == 0)
+				{
+					break;
+				}
+				else
+				{
+					nextPage = page.NextPage;
+
+					Console.WriteLine($"  Processing {page.Data.Count()} player updates (through {page.Data.Last().FirstSeen}).");
+					await ProcessPlayers(psqlConnection, page.Data);
+
+					// We're done!
+					if (page.Data.Count() != NUM_REQUESTED)
+					{
+						break;
+					}
+				}
+			}
+		}
+
+		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerPlayer> players)
+		{
+			using (MD5 md5 = MD5.Create())
+			{
+				foreach (var p in players)
+				{
+					// TODO move hashing into Player
+					var hash = HashObject(md5, p.Data);
+
+					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.players where hash=@hash and valid_until is null", psqlConnection);
+					cmd.Parameters.AddWithValue("hash", hash);
+					var count = (long)cmd.ExecuteScalar();
+
+					if (count == 1)
+					{
+						// Record exists
+					}
+					else
+					{
+						// Update the old record
+						NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
+						update.Parameters.AddWithValue("timestamp", p.FirstSeen);
+						update.Parameters.AddWithValue("player_id", p.PlayerId);
+						int rows = await update.ExecuteNonQueryAsync();
+						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+						var extra = new Dictionary<string, object>();
+						extra["hash"] = hash;
+						extra["valid_from"] = p.FirstSeen;
+						// Try to insert our current data
+						InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.players", p.Data, extra);
+						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
+
+					}
+				}
+			}
+		}
+
+	
 		private Guid HashObject(HashAlgorithm hashAlgorithm, object obj)
 		{
 			StringBuilder sb = new StringBuilder();
@@ -956,65 +884,6 @@ namespace SIBR
 
 			}
 
-		}
-
-		private void ProcessPlayer(Player p, DateTime timestamp, NpgsqlConnection psqlConnection, HashAlgorithm hashAlg)
-		{
-
-			// TODO move hashing into Player
-			var hash = HashObject(hashAlg, p);
-
-			NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.players where hash=@hash and valid_until is null", psqlConnection);
-			cmd.Parameters.AddWithValue("hash", hash);
-			//cmd.Prepare();
-			var count = (long)cmd.ExecuteScalar();
-
-			if (count == 1)
-			{
-				// Record exists
-			}
-			else
-			{
-				// Update the old record
-				NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
-				update.Parameters.AddWithValue("timestamp", timestamp);
-				update.Parameters.AddWithValue("player_id", p.Id);
-				//update.Prepare();
-				int rows = update.ExecuteNonQuery();
-				if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
-
-				var extra = new Dictionary<string, object>();
-				extra["hash"] = hash;
-				extra["valid_from"] = timestamp;
-				// Try to insert our current data
-				InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.players", p, extra);
-				var newId = insertCmd.Command.ExecuteNonQuery();
-
-			}
-
-			ProcessPlayerModAttrs(p, timestamp, psqlConnection);
-		}
-
-		private void ProcessPlayers(HourlyArchive hourly, DateTime timestamp, NpgsqlConnection psqlConnection)
-		{
-			string text = ((JsonElement)hourly.Data).GetRawText();
-
-			IEnumerable<string> playerIds = hourly.Params["ids"];
-
-			Stopwatch s = new Stopwatch();
-			using (MD5 md5 = MD5.Create())
-			{
-				s.Start();
-
-				var playerList = JsonSerializer.Deserialize<IEnumerable<Player>>(text, serializerOptions);
-
-				foreach (var p in playerList)
-				{
-					ProcessPlayer(p, timestamp, psqlConnection, md5);
-				}
-				s.Stop();
-				//Console.WriteLine($"Processed {playerList.Count()} players in {s.ElapsedMilliseconds} ms");
-			}
 		}
 
 
