@@ -177,8 +177,6 @@ namespace SIBR
 						await processor.ProcessGameObject(obj.Data, obj.Timestamp);
 					}
 
-					// TODO: Update the time map
-					//await PersistTimeMap(gameEvents, psqlConnection);
 				}
 			}
 
@@ -387,8 +385,10 @@ namespace SIBR
 				if (m_eventsToInsert.Count > 0)
 				{
 					await CopyGameEvents(psqlConnection, m_eventsToInsert);
+					await PersistTimeMap(m_eventsToInsert, psqlConnection);
 					m_eventsToInsert.Clear();
 				}
+
 
 				// Process any pitcher results from completed games
 				while (m_pitcherResults.Count > 0)
