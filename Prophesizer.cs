@@ -810,6 +810,8 @@ namespace SIBR
 						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
 
 					}
+
+					ProcessPlayerModAttrs(p.Data, p.FirstSeen, psqlConnection);
 				}
 			}
 		}
