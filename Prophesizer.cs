@@ -262,6 +262,7 @@ namespace SIBR
 			bool morePages = true;
 			string nextPage = null;
 			DateTime? lastSeenGameTime = null;
+			int lastSeenDay = 0;
 
 			while (morePages)
 			{
@@ -311,6 +312,7 @@ namespace SIBR
 					{
 						//Console.WriteLine($"    Processing update {update.Hash}");
 						lastSeenGameTime = update.Timestamp;
+						lastSeenDay = update.Data.day;
 						await m_processor.ProcessGameObject(update.Data, update.Timestamp, update.Hash);
 					}
 					m_processor.EventComplete -= Processor_EventComplete;
@@ -337,8 +339,9 @@ namespace SIBR
 
 			if (lastSeenGameTime.HasValue)
 			{
-				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET game_timestamp=@ts WHERE id=0", psqlConnection);
+				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET day=@day, game_timestamp=@ts WHERE id=0", psqlConnection);
 				updateCmd.Parameters.AddWithValue("ts", lastSeenGameTime);
+				updateCmd.Parameters.AddWithValue("day", lastSeenDay);
 				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 			}
 		}
@@ -358,12 +361,14 @@ namespace SIBR
 				// Fetch and process 10 days at a time
 				Task<bool>[] tasks = new Task<bool>[NUM_TASKS];
 
+				int lastValidDay = currSeasonDay.Day;
 				for (int i = 0; i < NUM_TASKS; i++)
 				{
 					SeasonDay dayToFetch = new SeasonDay(currSeasonDay.Season, currSeasonDay.Day + i);
 
 					if (dayToFetch < stopBefore)
 					{
+						lastValidDay = dayToFetch.Day;
 						tasks[i] = Task.Run(() => FetchAndProcessFullDay(dayToFetch));
 					}
 					else
@@ -372,7 +377,7 @@ namespace SIBR
 					}
 				}
 
-				Console.WriteLine($"Processing Season {currSeasonDay.Season}, Days {currSeasonDay.Day}-{currSeasonDay.Day+NUM_TASKS-1}");
+				Console.WriteLine($"Processing Season {currSeasonDay.Season}, Days {currSeasonDay.Day}-{lastValidDay}");
 				// Wait for all 10 tasks to complete; SQL work has to be done on a single thread
 				Task.WaitAll(tasks);
 
@@ -390,7 +395,6 @@ namespace SIBR
 					m_eventsToInsert.Clear();
 				}
 
-
 				// Process any pitcher results from completed games
 				while (m_pitcherResults.Count > 0)
 				{
@@ -403,7 +407,7 @@ namespace SIBR
 					ON CONFLICT(id) DO UPDATE SET season=EXCLUDED.season, day=EXCLUDED.day, game_timestamp=null", 
 					psqlConnection);
 				updateCmd.Parameters.AddWithValue("season", currSeasonDay.Season);
-				updateCmd.Parameters.AddWithValue("day", currSeasonDay.Day + NUM_TASKS-1);
+				updateCmd.Parameters.AddWithValue("day", lastValidDay);
 				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 
 				await transaction.CommitAsync();
