@@ -397,8 +397,8 @@ namespace SIBR
 				}
 
 				NpgsqlCommand updateCmd = new NpgsqlCommand(@"
-					INSERT INTO data.chronicler_meta(id, season, day, timestamp) values (0, @season, @day, null)
-					ON CONFLICT(id) DO UPDATE SET season=EXCLUDED.season, day=EXCLUDED.day, timestamp=null", 
+					INSERT INTO data.chronicler_meta(id, season, day, game_timestamp) values (0, @season, @day, null)
+					ON CONFLICT(id) DO UPDATE SET season=EXCLUDED.season, day=EXCLUDED.day, game_timestamp=null", 
 					psqlConnection);
 				updateCmd.Parameters.AddWithValue("season", currSeasonDay.Season);
 				updateCmd.Parameters.AddWithValue("day", currSeasonDay.Day + NUM_TASKS-1);
@@ -575,46 +575,11 @@ namespace SIBR
 						await playerEventStatement.ExecuteNonQueryAsync();
 					}
 
-					//if (outcome.eventType == OutcomeType.INCINERATION)
-					//{
-					//	var playerId = outcome.entityId;
-
-					//	DateTime timestamp;
-					//	if (gameEvent.firstPerceivedAt.Year == 1970)
-					//	{
-					//		// TODO is this a problem
-					//		timestamp = gameEvent.firstPerceivedAt;
-					//	}
-					//	else
-					//	{
-					//		timestamp = gameEvent.firstPerceivedAt;
-					//	}
-
-					//	await LookupIncineratedPlayer(playerId, timestamp, psqlConnection);
-					//}
 				}
 			}
 		}
 
-		//private async Task LookupIncineratedPlayer(string playerId, DateTime timestamp, NpgsqlConnection psqlConnection)
-		//{
-		//	// Get player record
-		//	HttpResponseMessage response = await m_blaseballClient.GetAsync($"players?ids={playerId}");
-
-		//	if (response.IsSuccessStatusCode)
-		//	{
-
-		//		string strResponse = await response.Content.ReadAsStringAsync();
-		//		var playerList = JsonSerializer.Deserialize<List<Player>>(strResponse, m_options);
-
-		//		var player = playerList.FirstOrDefault();
-		//		using (MD5 md5 = MD5.Create())
-		//		{
-		//			ProcessPlayer(player, timestamp, psqlConnection, md5);
-		//		}
-		//	}
-		//}
-
+		
 		private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent, int id)
 		{
 			var extra = new Dictionary<string, object>();
@@ -695,7 +660,7 @@ namespace SIBR
 					nextPage = page.NextPage;
 
 					Console.WriteLine($"  Processing {page.Data.Count()} team updates (through {page.Data.Last().FirstSeen}).");
-					lastSeenTeamTime = page.Data.Last().FirstSeen;
+					lastSeenTeamTime = page.Data.Last().LastSeen;
 					await ProcessTeams(psqlConnection, page.Data);
 
 					// We're done!
@@ -784,7 +749,7 @@ namespace SIBR
 				else
 				{
 					nextPage = page.NextPage;
-					lastSeenPlayerTime = page.Data.Last().FirstSeen;
+					lastSeenPlayerTime = page.Data.Last().LastSeen;
 					Console.WriteLine($"  Processing {page.Data.Count()} player updates (through {page.Data.Last().FirstSeen}).");
 					await ProcessPlayers(psqlConnection, page.Data);
 
