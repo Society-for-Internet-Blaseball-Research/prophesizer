@@ -374,6 +374,7 @@ namespace SIBR
 					}
 				}
 
+				Console.WriteLine($"Processing Season {currSeasonDay.Season}, Days {currSeasonDay.Day}-{currSeasonDay.Day+NUM_TASKS-1}");
 				// Wait for all 10 tasks to complete; SQL work has to be done on a single thread
 				Task.WaitAll(tasks);
 
