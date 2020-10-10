@@ -32,7 +32,7 @@ namespace SIBR
 
 		int m_gameEventId = 0;
 		private Queue<GameEvent> m_eventsToInsert;
-		private Queue<(string, string, string)> m_pitcherResults;
+		private Queue<(string, string, string, GameEvent)> m_pitcherResults;
 
 		private JsonSerializerOptions serializerOptions;
 
@@ -63,7 +63,7 @@ namespace SIBR
 		{
 			//m_processor = new Processor();
 			m_eventsToInsert = new Queue<GameEvent>();
-			m_pitcherResults = new Queue<(string, string, string)>();
+			m_pitcherResults = new Queue<(string, string, string, GameEvent)>();
 
 			serializerOptions = new JsonSerializerOptions();
 			serializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -188,9 +188,9 @@ namespace SIBR
 		}
 
 
-		public async Task Poll()
+		public async Task<SeasonDay> Poll()
 		{
-			ConsoleOrWebhook($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
+			Console.WriteLine($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
 
 			await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
 			await psqlConnection.OpenAsync();
@@ -220,7 +220,7 @@ namespace SIBR
 				await LoadPlayerUpdates(psqlConnection);
 			}
 
-
+			SeasonDay lastUpdated;
 			if (DO_EVENTS)
 			{
 				// TODO store current time
@@ -230,11 +230,12 @@ namespace SIBR
 					await BatchLoadGameUpdates(psqlConnection, m_dbSeasonDay, simSeasonDay);
 				}
 
-				await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
+				lastUpdated = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
 			}
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
-			ConsoleOrWebhook(msg);
+			Console.WriteLine(msg);
+			return lastUpdated;
 		}
 
 		private int GetMaxGameEventId(NpgsqlConnection psqlConnection)
@@ -255,7 +256,7 @@ namespace SIBR
 
 		
 
-		private async Task IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt, DateTime? afterTime)
+		private async Task<SeasonDay> IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt, DateTime? afterTime)
 		{
 			m_gameEventId = GetMaxGameEventId(psqlConnection);
 
@@ -319,6 +320,7 @@ namespace SIBR
 					m_processor.GameComplete -= Processor_GameComplete;
 
 					Console.WriteLine($"  Processed {page.Data.Count()} updates (through {page.Data.Last().Timestamp}).\n  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
+					await PersistTimeMap(m_eventsToInsert, psqlConnection);
 					// Process any game events we received
 					while (m_eventsToInsert.Count > 0)
 					{
@@ -331,7 +333,7 @@ namespace SIBR
 					while (m_pitcherResults.Count > 0)
 					{
 						var result = m_pitcherResults.Dequeue();
-						await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
+						await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3, result.Item4);
 					}
 
 				}
@@ -344,6 +346,8 @@ namespace SIBR
 				updateCmd.Parameters.AddWithValue("day", lastSeenDay);
 				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 			}
+
+			return new SeasonDay(startAt.Season, lastSeenDay);
 		}
 
 		/// <summary>
@@ -399,7 +403,7 @@ namespace SIBR
 				while (m_pitcherResults.Count > 0)
 				{
 					var result = m_pitcherResults.Dequeue();
-					await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3);
+					await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3, result.Item4);
 				}
 
 				NpgsqlCommand updateCmd = new NpgsqlCommand(@"
@@ -431,7 +435,7 @@ namespace SIBR
 		{
 			lock (_pitcherLocker)
 			{
-				m_pitcherResults.Enqueue((e.GameId, e.WinningPitcherId, e.LosingPitcherId));
+				m_pitcherResults.Enqueue((e.GameId, e.WinningPitcherId, e.LosingPitcherId, e.GameEvents.Last()));
 			}
 		}
 
@@ -1221,16 +1225,24 @@ namespace SIBR
 			return insertGameStatement;
 		}
 
-		private async Task PersistPitcherResults(NpgsqlConnection psqlConnection, string gameId, string winPitcher, string losePitcher)
+		private async Task PersistPitcherResults(NpgsqlConnection psqlConnection, string gameId, string winPitcher, string losePitcher, GameEvent lastEvent)
 		{
 			using (var updateCommand = new NpgsqlCommand(@"
-        UPDATE data.games SET winning_pitcher_id=@winPitcher, losing_pitcher_id=@losePitcher
+        UPDATE data.games SET 
+			winning_pitcher_id=@winPitcher, 
+			losing_pitcher_id=@losePitcher,
+			home_score=@homeScore,
+			away_score=@awayScore,
+			number_of_innings=@numInnings
         WHERE game_id=@gameId",
 			  psqlConnection))
 			{
 				updateCommand.Parameters.AddWithValue("winPitcher", winPitcher);
 				updateCommand.Parameters.AddWithValue("losePitcher", losePitcher);
 				updateCommand.Parameters.AddWithValue("gameId", gameId);
+				updateCommand.Parameters.AddWithValue("homeScore", lastEvent.homeScore);
+				updateCommand.Parameters.AddWithValue("awayScore", lastEvent.awayScore);
+				updateCommand.Parameters.AddWithValue("numInnings", lastEvent.inning);
 
 				await updateCommand.ExecuteNonQueryAsync();
 			}
@@ -1262,6 +1274,7 @@ namespace SIBR
 			}
 
 			m_lastKnownSeasonDay = new SeasonDay(season, day);
+			SeasonDay currSeasonDay = new SeasonDay(season, day);
 
 			Console.WriteLine($"Found games through season {season}, day {day}.");
 			// Start on the next day
@@ -1271,9 +1284,6 @@ namespace SIBR
 
 			JsonSerializerOptions options = new JsonSerializerOptions();
 			options.IgnoreNullValues = true;
-
-			// Okay we know we have completed at least this many full seasons
-			int MIN_SEASON = 5;
 
 			// Loop until we break out
 			while (true)
@@ -1287,8 +1297,8 @@ namespace SIBR
 					string strResponse = await response.Content.ReadAsStringAsync();
 					var gameList = JsonSerializer.Deserialize<IEnumerable<Game>>(strResponse, options);
 
-					// If we got no response OR we're past the minimum and we got a "game not complete" response
-					if (gameList == null || gameList.Count() == 0) //|| (season > MIN_SEASON && gameList.First().gameComplete == false))
+					// If we got no response 
+					if (gameList == null || gameList.Count() == 0)
 					{
 						if (day > 0)
 						{
@@ -1325,7 +1335,7 @@ namespace SIBR
 
 		}
 
-		static void ConsoleOrWebhook(string msg)
+		public static void ConsoleOrWebhook(string msg)
 		{
 			Console.WriteLine(msg);
 

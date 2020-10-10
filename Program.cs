@@ -9,18 +9,15 @@ namespace SIBR
 		{
 			Prophesizer prophesizer = new Prophesizer("blaseball-archive-iliana");
 
-			bool firstRun = true;
-			// Don't put this where it wraps across zero. Just don't.
-			//const int BASE_MINUTE = 45;
-
+			int lastHour = -1;
 			while (true)
 			{
-				//var minutes = DateTime.UtcNow.Minute;
-				// Only run Prophesizer around the X:50 mark each hour
-				//if (firstRun || (minutes >= BASE_MINUTE && minutes <= (BASE_MINUTE + 5)))
+				var hour = DateTime.UtcNow.Hour;
+				SeasonDay latest = await prophesizer.Poll();
+				if ((hour > lastHour) || (hour==0 && lastHour == 23))
 				{
-					firstRun = false;
-					await prophesizer.Poll();
+					Prophesizer.ConsoleOrWebhook($"Processed games through Season {latest.Season+1}, Day {latest.Day+1} in the past hour.");
+					lastHour = hour;
 				}
 				await Task.Delay(1 * 60 * 1000);
 
