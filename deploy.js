@@ -28,7 +28,6 @@ async function execWithOutput(command) {
   
   if (versionExists && process.argv.indexOf('--force') === -1) {
     console.error(`${imageName} already exists! Did you forget to bump the version number?`);
-    process.exit(1);
   }
 
   if (!await execWithOutput(`docker build -t ${imageName} .`)) process.exit(1)
