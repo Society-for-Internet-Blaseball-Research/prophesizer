@@ -4,25 +4,27 @@ Prophesizer is part of the SIBR Archiving Pipeline™.
 
 ## Table of Contents
   * [What](#what)
-    * [Hourly logs](#hourly-logs)
-    * [Update logs](#update-logs)
+    * [Non-Update Data](#non-update-data)
+    * [Update Data](#update-data)
   * [Installation](#installation)
 
 
 ## What
 
-Prophesizer runs continuously, waking every 5 minutes to check the clock. When it wakes in the :45-:50 window of an hour, it does the following:
+Prophesizer runs continuously, waking every minute to ask Chronicler (https://github.com/xSke/Chronicler) for new data.
+It does the following:
 
 1) Get the latest data from the Blaseball `/games` endpoint and store it in the `games` table
-2) Query S3 for all available log files
-3) Check these against the database (`imported_logs` table) to see which are new
-4) Process the log files in two big batches: "hourly" logs and "update" logs:
+2) Check the DB's `chronicler_meta` table to see what the last day/time processed was
+3) Check Blaseball's `/simulationData` endpoint to see what the current season/day is
+4) Batch-process any updates for days up to the current day
+5) Incrementally ask Chronicler for updates from the current day
 
-### Hourly logs
+Typically on first run Prophesizer will batch-process many seasons of data into the DB, and only grab a minute's worth of updates every minute after that.
 
-These are archives of all the standard public endpoints taken multiple times per hour (naming, eh).
+### Non-Update Data
 
-Prophesizer cares about the `players` and `teams` structures only at this point, and does the following:
+Prophesizer also asks Chronicler for updates to `players` and `teams`:
 
 1) Add entries to `teams` for any team data changes (like name changes)
 2) Add entries to `team_roster` to reflect any lineup/rotation/etc changes
@@ -30,13 +32,13 @@ Prophesizer cares about the `players` and `teams` structures only at this point,
 4) Add entries to `players` for any player data changes (names, attributes)
 5) Add entries to `player_modifications` for any new "tags" (like SHELLED) for a player
 
-### Update logs
+### Update data
 
 These are logs of the individual (one every ~4seconds) `streamData` updates for gameplay.
 
 Prophesizer sends these through [Cauldron](https://github.com/Society-for-Internet-Blaseball-Research/Cauldron) to convert them into SIBR's "Game Event" format.
 
-Game Events roughly correspond to one at-bat (with some exceptions like a runner caught stealing) and are more easily queried than the raw JSON updates from the stream.
+Game Events roughly correspond to one at-bat (with some exceptions like a runner caught stealing) and are more easily queried for statistics than the raw JSON updates from the stream.
 
 These Game Events are added to the `game_events` table, with child tables `game_event_base_runners` for baserunning information and `outcomes` for Outcome (incineration, peanuts, partying, etc).
 
