@@ -4,8 +4,8 @@ Prophesizer is part of the SIBR Archiving Pipeline™.
 
 ## Table of Contents
   * [What](#what)
-    * [Hourly logs](#hourly-logs)
-    * [Update logs](#update-logs)
+    * [Non-Update Data](#non-update-data)
+    * [Update Data](#update-data)
   * [Installation](#installation)
 
 
