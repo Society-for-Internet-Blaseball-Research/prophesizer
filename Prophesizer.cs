@@ -263,7 +263,7 @@ namespace SIBR
 			bool morePages = true;
 			string nextPage = null;
 			DateTime? lastSeenGameTime = null;
-			int lastSeenDay = 0;
+			SeasonDay lastSeenDay = startAt;
 
 			while (morePages)
 			{
@@ -313,7 +313,8 @@ namespace SIBR
 					{
 						//Console.WriteLine($"    Processing update {update.Hash}");
 						lastSeenGameTime = update.Timestamp;
-						lastSeenDay = update.Data.day;
+						lastSeenDay.Season = update.Data.season;
+						lastSeenDay.Day = update.Data.day;
 						await m_processor.ProcessGameObject(update.Data, update.Timestamp, update.Hash);
 					}
 					m_processor.EventComplete -= Processor_EventComplete;
@@ -325,7 +326,14 @@ namespace SIBR
 					while (m_eventsToInsert.Count > 0)
 					{
 						var ev = m_eventsToInsert.Dequeue();
-						await PersistGame(psqlConnection, ev, m_gameEventId);
+						try
+						{
+							await PersistGame(psqlConnection, ev, m_gameEventId);
+						}
+						catch(Exception ex)
+						{
+							Console.WriteLine(ex);
+						}
 						m_gameEventId++;
 					}
 
@@ -341,13 +349,14 @@ namespace SIBR
 
 			if (lastSeenGameTime.HasValue)
 			{
-				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET day=@day, game_timestamp=@ts WHERE id=0", psqlConnection);
+				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET season=@season, day=@day, game_timestamp=@ts WHERE id=0", psqlConnection);
 				updateCmd.Parameters.AddWithValue("ts", lastSeenGameTime);
-				updateCmd.Parameters.AddWithValue("day", lastSeenDay);
+				updateCmd.Parameters.AddWithValue("season", lastSeenDay.Season);
+				updateCmd.Parameters.AddWithValue("day", lastSeenDay.Day);
 				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 			}
 
-			return new SeasonDay(startAt.Season, lastSeenDay);
+			return lastSeenDay;
 		}
 
 		/// <summary>
