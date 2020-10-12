@@ -325,7 +325,14 @@ namespace SIBR
 					while (m_eventsToInsert.Count > 0)
 					{
 						var ev = m_eventsToInsert.Dequeue();
-						await PersistGame(psqlConnection, ev, m_gameEventId);
+						try
+						{
+							await PersistGame(psqlConnection, ev, m_gameEventId);
+						}
+						catch(Exception ex)
+						{
+							Console.WriteLine(ex);
+						}
 						m_gameEventId++;
 					}
 
