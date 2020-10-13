@@ -17,6 +17,7 @@ namespace SIBR
 				if ((hour > lastHour) || (hour==0 && lastHour == 23))
 				{
 					Prophesizer.ConsoleOrWebhook($"Processed games through Season {latest.Season+1}, Day {latest.Day+1} in the past hour.");
+					Prophesizer.ConsoleOrWebhook($"    {prophesizer.NumNetworkOutcomes} games used the network outcomes.json file, {prophesizer.NumLocalOutcomes} did not.");
 					lastHour = hour;
 				}
 				await Task.Delay(1 * 60 * 1000);

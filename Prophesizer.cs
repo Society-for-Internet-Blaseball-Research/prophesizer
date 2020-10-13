@@ -59,6 +59,9 @@ namespace SIBR
 		private DateTime? m_dbTeamTimestamp;
 		private DateTime? m_dbPlayerTimestamp;
 
+		public int NumNetworkOutcomes => m_processor.NumNetworkOutcomes;
+		public int NumLocalOutcomes => m_processor.NumLocalOutcomes;
+
 		public Prophesizer(string bucketName)
 		{
 			//m_processor = new Processor();
@@ -321,6 +324,7 @@ namespace SIBR
 					m_processor.GameComplete -= Processor_GameComplete;
 
 					Console.WriteLine($"  Processed {page.Data.Count()} updates (through {page.Data.Last().Timestamp}).\n  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
+					Console.WriteLine($"    {m_processor.NumNetworkOutcomes} games used the network outcomes.json file, {m_processor.NumLocalOutcomes} did not.");
 					await PersistTimeMap(m_eventsToInsert, psqlConnection);
 					// Process any game events we received
 					while (m_eventsToInsert.Count > 0)
