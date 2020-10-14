@@ -318,7 +318,8 @@ namespace SIBR
 						lastSeenGameTime = update.Timestamp;
 						lastSeenDay.Season = update.Data.season;
 						lastSeenDay.Day = update.Data.day;
-						await m_processor.ProcessGameObject(update.Data, update.Timestamp, update.Hash);
+						update.Data.chroniclerHash = update.Hash;
+						await m_processor.ProcessGameObject(update.Data, update.Timestamp);
 					}
 					m_processor.EventComplete -= Processor_EventComplete;
 					m_processor.GameComplete -= Processor_GameComplete;
