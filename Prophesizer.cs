@@ -1131,7 +1131,7 @@ namespace SIBR
 			countCmd.Parameters.AddWithValue("team_id", p.Id);
 			//countCmd.Prepare();
 			long count = (long)await countCmd.ExecuteScalarAsync();
-			if (count == 0 && p.PermAttr == null && p.SeasonAttr == null && p.WeekAttr == null && p.GameAttr == null)
+			if (count == 0 && p.PermAttr == null && p.SeasAttr == null && p.WeekAttr == null && p.GameAttr == null)
 			{
 				return;
 			}
@@ -1140,7 +1140,7 @@ namespace SIBR
 			var currentMods = new List<string>();
 
 			if (p.PermAttr != null) allMods.AddRange(p.PermAttr);
-			if (p.SeasonAttr != null) allMods.AddRange(p.SeasonAttr);
+			if (p.SeasAttr != null) allMods.AddRange(p.SeasAttr);
 			if (p.WeekAttr != null) allMods.AddRange(p.WeekAttr);
 			if (p.GameAttr != null) allMods.AddRange(p.GameAttr);
 

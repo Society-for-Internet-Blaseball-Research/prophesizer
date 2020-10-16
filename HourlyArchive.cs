@@ -117,7 +117,7 @@ public class Team {
   [DbIgnore]
   public IEnumerable<string> PermAttr { get; set; }
   [DbIgnore]
-  public IEnumerable<string> SeasonAttr { get; set; }
+  public IEnumerable<string> SeasAttr { get; set; }
   [DbIgnore]
   public IEnumerable<string> WeekAttr { get; set; }
   [DbIgnore]
