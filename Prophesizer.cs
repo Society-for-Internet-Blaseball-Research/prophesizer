@@ -54,6 +54,7 @@ namespace SIBR
 		private object _eventLocker = new object();
 		private object _pitcherLocker = new object();
 
+		private SeasonDay m_lastMaterializedRefresh;
 		private SeasonDay m_dbSeasonDay;
 		private DateTime? m_dbGameTimestamp;
 		private DateTime? m_dbTeamTimestamp;
@@ -177,6 +178,7 @@ namespace SIBR
 
 					foreach (var obj in updates)
 					{
+						obj.Data.chroniclerHash = obj.Hash;
 						await processor.ProcessGameObject(obj.Data, obj.Timestamp);
 					}
 
@@ -236,9 +238,42 @@ namespace SIBR
 				lastUpdated = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
 			}
 
+
+			await RefreshMaterializedViews(psqlConnection);
+
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
 			Console.WriteLine(msg);
 			return lastUpdated;
+		}
+
+		private async Task RefreshMaterializedViews(NpgsqlConnection psqlConnection)
+		{
+			// If it's been at least one day since the last refresh
+			if (m_dbSeasonDay > m_lastMaterializedRefresh)
+			{
+				// Count how many of today's games are finished
+				var cmd = new NpgsqlCommand("SELECT COUNT(1) FROM data.game_events WHERE season=@season AND day=@day AND is_last_game_event", psqlConnection);
+				cmd.Parameters.AddWithValue("season", m_dbSeasonDay.Season);
+				cmd.Parameters.AddWithValue("day", m_dbSeasonDay.Day);
+				var response = cmd.ExecuteScalar();
+
+				if (response is DBNull)
+				{
+					return;
+				}
+				else
+				{
+					Int64 numFinishedGames = (Int64)response;
+					// If all 10 games are done, refresh our materialized views
+					if (numFinishedGames == 10)
+					{
+						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
+						await refreshCmd.ExecuteNonQueryAsync();
+
+						m_lastMaterializedRefresh = m_dbSeasonDay;
+					}
+				}
+			}
 		}
 
 		private int GetMaxGameEventId(NpgsqlConnection psqlConnection)
@@ -267,6 +302,8 @@ namespace SIBR
 			string nextPage = null;
 			DateTime? lastSeenGameTime = null;
 			SeasonDay lastSeenDay = startAt;
+
+			var transaction = psqlConnection.BeginTransaction();
 
 			while (morePages)
 			{
@@ -360,6 +397,8 @@ namespace SIBR
 				updateCmd.Parameters.AddWithValue("day", lastSeenDay.Day);
 				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 			}
+
+			await transaction.CommitAsync();
 
 			return lastSeenDay;
 		}
@@ -457,6 +496,7 @@ namespace SIBR
 		{
 			List<(int, GameEventBaseRunner)> runners = new List<(int, GameEventBaseRunner)>();
 			List<(int, Outcome)> outcomes = new List<(int, Outcome)>();
+			List<(int, string)> hashes = new List<(int, string)>();
 
 			using(var writer = psqlConnection.BeginBinaryImport(
 				@"COPY data.game_events(
@@ -479,6 +519,11 @@ namespace SIBR
 					foreach(var outcome in ge.outcomes)
 					{
 						outcomes.Add((m_gameEventId, outcome));
+					}
+					foreach(var hash in ge.updateHashes)
+					{
+						if (hash != null)
+							hashes.Add((m_gameEventId, hash));
 					}
 					writer.StartRow();
 					writer.Write(m_gameEventId, NpgsqlTypes.NpgsqlDbType.Integer);
@@ -571,6 +616,23 @@ namespace SIBR
 				}
 				await writer.CompleteAsync();
 			}
+
+			if (hashes.Count() > 0)
+			{
+				using (var writer = psqlConnection.BeginBinaryImport(
+					@"COPY data.chronicler_hash_game_event(
+					update_hash, game_event_id
+				) FROM STDIN (FORMAT BINARY)"))
+				{
+					foreach ((var id, var hash) in hashes)
+					{
+						writer.StartRow();
+						writer.Write(Guid.Parse(hash), NpgsqlTypes.NpgsqlDbType.Uuid);
+						writer.Write(id, NpgsqlTypes.NpgsqlDbType.Integer);
+					}
+					await writer.CompleteAsync();
+				}
+			}
 		}
 
 		private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent, int gameEventId)
@@ -578,6 +640,14 @@ namespace SIBR
 			using (var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent, gameEventId))
 			{
 				int id = (int)await gameEventStatement.ExecuteScalarAsync();
+
+				foreach(var hash in gameEvent.updateHashes)
+				{
+					var cmd = new NpgsqlCommand(@"INSERT INTO data.chronicler_hash_game_event(update_hash, game_event_id) values(@hash, @geid)", psqlConnection);
+					cmd.Parameters.AddWithValue("hash", Guid.Parse(hash));
+					cmd.Parameters.AddWithValue("geid", id);
+					await cmd.ExecuteNonQueryAsync();
+				}
 
 				foreach (var baseRunner in gameEvent.baseRunners)
 				{
