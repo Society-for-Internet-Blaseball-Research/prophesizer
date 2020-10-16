@@ -639,9 +639,18 @@ namespace SIBR
 		{
 			using (var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent, gameEventId))
 			{
-				int id = (int)await gameEventStatement.ExecuteScalarAsync();
+				int id = -1;
+				var response = await gameEventStatement.ExecuteScalarAsync();
+				if(response == null)
+				{
+					return;
+				}
+				else
+				{
+					id = (int)response;
+				}
 
-				foreach(var hash in gameEvent.updateHashes)
+				foreach (var hash in gameEvent.updateHashes)
 				{
 					var cmd = new NpgsqlCommand(@"INSERT INTO data.chronicler_hash_game_event(update_hash, game_event_id) values(@hash, @geid)", psqlConnection);
 					cmd.Parameters.AddWithValue("hash", Guid.Parse(hash));
@@ -678,7 +687,8 @@ namespace SIBR
 		{
 			var extra = new Dictionary<string, object>();
 			extra["id"] = id;
-			var cmd = new InsertCommand(psqlConnection, "data.game_events", gameEvent, extra).Command;
+			string onConflict = "ON CONFLICT ON CONSTRAINT no_dupes DO NOTHING";
+			var cmd = new InsertCommand(psqlConnection, "data.game_events", gameEvent, extra, onConflict).Command;
 			//cmd.Prepare();
 			return cmd;
 		}
