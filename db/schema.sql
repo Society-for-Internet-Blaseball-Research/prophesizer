@@ -47,6 +47,7 @@ ALTER TABLE IF EXISTS ONLY data.game_events DROP CONSTRAINT IF EXISTS game_event
 ALTER TABLE IF EXISTS ONLY data.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_pkey;
 ALTER TABLE IF EXISTS ONLY data.chronicler_meta DROP CONSTRAINT IF EXISTS chronicler_meta_pk;
 ALTER TABLE IF EXISTS taxa.vibe_to_arrows ALTER COLUMN vibe_to_arrow_id DROP DEFAULT;
+ALTER TABLE IF EXISTS taxa.time_event_type ALTER COLUMN time_event_type_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.team_url_slugs ALTER COLUMN team_url_slug_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.team_divine_favor ALTER COLUMN team_divine_favor_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.player_url_slugs ALTER COLUMN player_url_slug_id DROP DEFAULT;
@@ -69,6 +70,8 @@ ALTER TABLE IF EXISTS data.chronicler_hash_game_event ALTER COLUMN chronicler_ha
 DROP TABLE IF EXISTS taxa.weather;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq;
 DROP TABLE IF EXISTS taxa.vibe_to_arrows;
+DROP SEQUENCE IF EXISTS taxa.time_event_type_time_event_type_id_seq;
+DROP TABLE IF EXISTS taxa.time_event_type;
 DROP SEQUENCE IF EXISTS taxa.team_url_slugs_team_url_slug_id_seq;
 DROP TABLE IF EXISTS taxa.team_url_slugs;
 DROP SEQUENCE IF EXISTS taxa.team_divine_favor_team_divine_favor_id_seq;
@@ -83,6 +86,7 @@ DROP SEQUENCE IF EXISTS taxa.attributes_attribute_id_seq;
 DROP TABLE IF EXISTS taxa.attributes;
 DROP SEQUENCE IF EXISTS data.time_map_time_map_id_seq;
 DROP TABLE IF EXISTS data.time_map;
+DROP VIEW IF EXISTS data.testing_players_info_super_expanded_all_details;
 DROP SEQUENCE IF EXISTS data.teams_id_seq;
 DROP SEQUENCE IF EXISTS data.team_positions_team_position_id_seq;
 DROP SEQUENCE IF EXISTS data.team_modifications_team_modifications_id_seq;
@@ -91,10 +95,9 @@ DROP VIEW IF EXISTS data.stars_team_all_current;
 DROP VIEW IF EXISTS data.running_stats_player_season;
 DROP VIEW IF EXISTS data.running_stats_player_lifetime;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events;
+DROP VIEW IF EXISTS data.players_info_expanded_all;
 DROP VIEW IF EXISTS data.rosters_extended_current;
 DROP VIEW IF EXISTS data.rosters_current;
-DROP VIEW IF EXISTS data.players_info_super_expanded_all_details;
-DROP VIEW IF EXISTS data.players_info_expanded_all;
 DROP SEQUENCE IF EXISTS data.players_id_seq;
 DROP VIEW IF EXISTS data.players_current;
 DROP SEQUENCE IF EXISTS data.player_modifications_player_modifications_id_seq;
@@ -1885,7 +1888,8 @@ CREATE TABLE data.game_event_base_runners (
     was_base_stolen boolean,
     was_caught_stealing boolean,
     was_picked_off boolean,
-    runner_scored boolean DEFAULT false
+    runner_scored boolean DEFAULT false,
+    runs_scored numeric
 );
 
 
@@ -1906,8 +1910,8 @@ CREATE TABLE data.games (
     is_postseason boolean,
     home_team character varying(36),
     away_team character varying(36),
-    home_score real,
-    away_score real,
+    home_score numeric,
+    away_score numeric,
     number_of_innings integer,
     ended_on_top_of_inning boolean,
     ended_in_shame boolean,
@@ -2519,8 +2523,7 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
 --
 
 CREATE VIEW data.pitching_stats_player_season AS
- SELECT pl.player_name,
-    p.player_id,
+ SELECT p.player_id,
     p.team_id,
     p.season,
     count(1) AS games,
@@ -2534,10 +2537,9 @@ CREATE VIEW data.pitching_stats_player_season AS
     sum(p.walks) AS walks,
     sum(p.hrs_allowed) AS hrs_allowed,
     sum(p.hits_allowed) AS hits_allowed
-   FROM (data.pitching_stats_all_appearances p
-     JOIN data.players_extended_current pl ON (((pl.player_id)::text = (p.player_id)::text)))
+   FROM data.pitching_stats_all_appearances p
   WHERE (NOT p.is_postseason)
-  GROUP BY p.player_id, pl.player_name, p.team_id, p.season;
+  GROUP BY p.player_id, p.team_id, p.season;
 
 
 --
@@ -2655,7 +2657,7 @@ CREATE VIEW data.players_current AS
      LEFT JOIN data.team_roster tr ON ((((p.player_id)::text = (tr.player_id)::text) AND (tr.valid_until IS NULL))))
      LEFT JOIN data.teams_current t ON (((tr.team_id)::text = (t.team_id)::text)))
      LEFT JOIN taxa.position_types xp ON ((tr.position_type_id = (xp.position_type_id)::numeric)))
-  WHERE (((p.valid_until IS NULL) OR (p.deceased = true)) AND (tr.position_type_id < (2)::numeric) AND ((p.player_id)::text <> 'bc4187fa-459a-4c06-bbf2-4e0e013d27ce'::text));
+  WHERE ((p.valid_until IS NULL) AND (tr.position_type_id < (2)::numeric) AND ((p.player_id)::text <> 'bc4187fa-459a-4c06-bbf2-4e0e013d27ce'::text));
 
 
 --
@@ -2676,157 +2678,6 @@ CREATE SEQUENCE data.players_id_seq
 --
 
 ALTER SEQUENCE data.players_id_seq OWNED BY data.players.id;
-
-
---
--- Name: players_info_expanded_all; Type: VIEW; Schema: data; Owner: -
---
-
-CREATE VIEW data.players_info_expanded_all AS
- SELECT p.player_id,
-    p.valid_from,
-    p.valid_until,
-    p.player_name,
-    ( SELECT rosters_from_timestamp.team_id
-           FROM data.rosters_from_timestamp(COALESCE(p.valid_from, (now())::timestamp without time zone)) rosters_from_timestamp(team_roster_id, team_id, position_id, valid_from, valid_until, player_id, position_type_id)
-          WHERE ((rosters_from_timestamp.player_id)::text = (p.player_id)::text)) AS team_id,
-    ( SELECT t.nickname
-           FROM (data.rosters_from_timestamp(COALESCE(p.valid_from, (now())::timestamp without time zone)) r(team_roster_id, team_id, position_id, valid_from, valid_until, player_id, position_type_id)
-             JOIN data.teams_current t ON (((r.team_id)::text = (t.team_id)::text)))
-          WHERE ((r.player_id)::text = (p.player_id)::text)) AS team,
-    ( SELECT gameday_from_timestamp.season
-           FROM data.gameday_from_timestamp(COALESCE(p.valid_from, (now())::timestamp without time zone)) gameday_from_timestamp(season, gameday)) AS season_from,
-    ( SELECT gameday_from_timestamp.gameday
-           FROM data.gameday_from_timestamp(COALESCE(p.valid_from, (now())::timestamp without time zone)) gameday_from_timestamp(season, gameday)) AS gameday_from,
-    p.deceased,
-    p.anticapitalism,
-    p.base_thirst,
-    p.buoyancy,
-    p.chasiness,
-    p.coldness,
-    p.continuation,
-    p.divinity,
-    p.ground_friction,
-    p.indulgence,
-    p.laserlikeness,
-    p.martyrdom,
-    p.moxie,
-    p.musclitude,
-    p.omniscience,
-    p.overpowerment,
-    p.patheticism,
-    p.ruthlessness,
-    p.shakespearianism,
-    p.suppression,
-    p.tenaciousness,
-    p.thwackability,
-    p.tragicness,
-    p.unthwackability,
-    p.watchfulness,
-    p.pressurization,
-    p.cinnamon,
-    p.total_fingers,
-    p.soul,
-    p.fate,
-    p.peanut_allergy,
-    p.armor,
-    p.bat,
-    p.ritual,
-    p.coffee,
-    p.blood,
-    p.url_slug,
-    data.batting_rating(p.player_id, COALESCE(p.valid_from, (now())::timestamp without time zone)) AS batting_rating,
-    data.baserunning_rating(p.player_id, COALESCE(p.valid_from, (now())::timestamp without time zone)) AS baserunning_rating,
-    data.defense_rating(p.player_id, COALESCE(p.valid_from, (now())::timestamp without time zone)) AS defense_rating,
-    data.pitching_rating(p.player_id, COALESCE(p.valid_from, (now())::timestamp without time zone)) AS pitching_rating,
-    data.rating_to_star(data.batting_rating(p.player_id, COALESCE(p.valid_from, (now())::timestamp without time zone))) AS batting_stars,
-    data.rating_to_star(data.baserunning_rating(p.player_id, COALESCE(p.valid_from, (now())::timestamp without time zone))) AS baserunning_stars,
-    data.rating_to_star(data.defense_rating(p.player_id, COALESCE(p.valid_from, (now())::timestamp without time zone))) AS defense_stars,
-    data.rating_to_star(data.pitching_rating(p.player_id, COALESCE(p.valid_from, (now())::timestamp without time zone))) AS pitching_stars
-   FROM data.players p;
-
-
---
--- Name: players_info_super_expanded_all_details; Type: VIEW; Schema: data; Owner: -
---
-
-CREATE VIEW data.players_info_super_expanded_all_details AS
- SELECT y.player_id,
-    y.timestampd AS valid_from,
-    lead(y.timestampd) OVER (PARTITION BY y.player_id ORDER BY y.timestampd) AS valid_until,
-    ( SELECT gg.gameday
-           FROM data.gameday_from_timestamp(y.timestampd) gg(season, gameday)) AS gameday_from,
-    ( SELECT gs.season
-           FROM data.gameday_from_timestamp(y.timestampd) gs(season, gameday)) AS season_from,
-    p.player_name,
-    p.deceased,
-    p.anticapitalism,
-    p.base_thirst,
-    p.buoyancy,
-    p.chasiness,
-    p.coldness,
-    p.continuation,
-    p.divinity,
-    p.ground_friction,
-    p.indulgence,
-    p.laserlikeness,
-    p.martyrdom,
-    p.moxie,
-    p.musclitude,
-    p.omniscience,
-    p.overpowerment,
-    p.patheticism,
-    p.ruthlessness,
-    p.shakespearianism,
-    p.suppression,
-    p.tenaciousness,
-    p.thwackability,
-    p.tragicness,
-    p.unthwackability,
-    p.watchfulness,
-    p.pressurization,
-    p.cinnamon,
-    p.total_fingers,
-    p.soul,
-    p.fate,
-    p.peanut_allergy AS lean,
-    p.armor,
-    p.bat,
-    p.ritual,
-    p.coffee,
-    p.blood,
-    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
-    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
-    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
-    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
-    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
-    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
-    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
-    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars,
-    ( SELECT array_agg(DISTINCT pm.modification) AS array_agg
-           FROM data.player_mods_from_timestamp(y.timestampd) pm(player_modifications_id, player_id, modification, valid_from, valid_until)
-          WHERE ((pm.player_id)::text = (y.player_id)::text)
-          GROUP BY pm.player_id) AS modifications_array,
-    xp.position_type,
-    r.position_id,
-    t.nickname AS team
-   FROM ((((( SELECT DISTINCT x.player_id,
-            (unnest(x.a))::timestamp without time zone AS timestampd
-           FROM ( SELECT DISTINCT players.player_id,
-                    ARRAY[(players.valid_from)::timestamp with time zone, COALESCE((players.valid_until)::timestamp with time zone, now())] AS a
-                   FROM data.players
-                UNION
-                 SELECT DISTINCT player_modifications.player_id,
-                    ARRAY[(player_modifications.valid_from)::timestamp with time zone, COALESCE((player_modifications.valid_until)::timestamp with time zone, now())] AS a
-                   FROM data.player_modifications
-                UNION
-                 SELECT DISTINCT team_roster.player_id,
-                    ARRAY[(team_roster.valid_from)::timestamp with time zone, COALESCE((team_roster.valid_until)::timestamp with time zone, now())] AS a
-                   FROM data.team_roster) x) y
-     JOIN data.players p ON ((((y.player_id)::text = (p.player_id)::text) AND (p.valid_from <= (y.timestampd + '00:00:00.001'::interval)) AND (y.timestampd < COALESCE((p.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))))
-     LEFT JOIN data.team_roster r ON ((((y.player_id)::text = (r.player_id)::text) AND (r.valid_from <= (y.timestampd + '00:00:00.001'::interval)) AND (y.timestampd < COALESCE((r.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))))
-     LEFT JOIN data.teams_current t ON (((r.team_id)::text = (t.team_id)::text)))
-     LEFT JOIN taxa.position_types xp ON ((r.position_type_id = (xp.position_type_id)::numeric)));
 
 
 --
@@ -2875,6 +2726,94 @@ CREATE VIEW data.rosters_extended_current AS
      JOIN taxa.position_types xp ON ((r.position_type_id = (xp.position_type_id)::numeric)))
   WHERE (r.valid_until IS NULL)
   ORDER BY t.nickname, r.position_type_id, r.position_id;
+
+
+--
+-- Name: players_info_expanded_all; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.players_info_expanded_all AS
+ SELECT p.player_id,
+    p.valid_from,
+    p.valid_until,
+    p.player_name,
+    r.team_id,
+    t.nickname AS team,
+    r.position_id,
+    xp.position_type,
+    ( SELECT gameday_from_timestamp.season
+           FROM data.gameday_from_timestamp(COALESCE(p.valid_from, (now())::timestamp without time zone)) gameday_from_timestamp(season, gameday)) AS season_from,
+    ( SELECT gameday_from_timestamp.gameday
+           FROM data.gameday_from_timestamp(COALESCE(p.valid_from, (now())::timestamp without time zone)) gameday_from_timestamp(season, gameday)) AS gameday_from,
+        CASE
+            WHEN (EXISTS ( SELECT 1
+               FROM data.rosters_current rc
+              WHERE ((rc.player_id)::text = (p.player_id)::text))) THEN true
+            ELSE false
+        END AS active,
+    p.deceased,
+        CASE
+            WHEN (EXISTS ( SELECT 1
+               FROM data.team_roster tr
+              WHERE (((tr.player_id)::text = (p.player_id)::text) AND (tr.position_type_id < (2)::numeric)))) THEN false
+            ELSE true
+        END AS forbidden,
+        CASE
+            WHEN (EXISTS ( SELECT 1
+               FROM data.rosters_extended_current rc
+              WHERE (((rc.player_id)::text = (p.player_id)::text) AND ((rc.position_type)::text = ANY (ARRAY[('BULLPEN'::character varying)::text, ('BENCH'::character varying)::text]))))) THEN true
+            ELSE false
+        END AS shadows,
+    p.anticapitalism,
+    p.base_thirst,
+    p.buoyancy,
+    p.chasiness,
+    p.coldness,
+    p.continuation,
+    p.divinity,
+    p.ground_friction,
+    p.indulgence,
+    p.laserlikeness,
+    p.martyrdom,
+    p.moxie,
+    p.musclitude,
+    p.omniscience,
+    p.overpowerment,
+    p.patheticism,
+    p.ruthlessness,
+    p.shakespearianism,
+    p.suppression,
+    p.tenaciousness,
+    p.thwackability,
+    p.tragicness,
+    p.unthwackability,
+    p.watchfulness,
+    p.pressurization,
+    p.cinnamon,
+    p.total_fingers,
+    p.soul,
+    p.fate,
+    p.peanut_allergy,
+    p.armor,
+    p.bat,
+    p.ritual,
+    p.coffee,
+    p.blood,
+    p.url_slug,
+    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
+    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
+    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
+    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
+    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
+    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
+    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
+    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
+   FROM (((((data.players p
+     JOIN LATERAL data.rosters_from_timestamp(COALESCE(p.valid_from, (now())::timestamp without time zone)) r(team_roster_id, team_id, position_id, valid_from, valid_until, player_id, position_type_id) ON (((p.player_id)::text = (r.player_id)::text)))
+     JOIN data.teams_current t ON (((r.team_id)::text = (t.team_id)::text)))
+     LEFT JOIN taxa.blood xb ON ((p.blood = xb.blood_id)))
+     LEFT JOIN taxa.coffee xc ON ((p.coffee = xc.coffee_id)))
+     LEFT JOIN taxa.position_types xp ON ((r.position_type_id = (xp.position_type_id)::numeric)));
 
 
 --
@@ -3035,6 +2974,89 @@ ALTER SEQUENCE data.teams_id_seq OWNED BY data.teams.id;
 
 
 --
+-- Name: testing_players_info_super_expanded_all_details; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.testing_players_info_super_expanded_all_details AS
+ SELECT y.player_id,
+    y.timestampd AS valid_from,
+    lead(y.timestampd) OVER (PARTITION BY y.player_id ORDER BY y.timestampd) AS valid_until,
+    ( SELECT gg.gameday
+           FROM data.gameday_from_timestamp(y.timestampd) gg(season, gameday)) AS gameday_from,
+    ( SELECT gs.season
+           FROM data.gameday_from_timestamp(y.timestampd) gs(season, gameday)) AS season_from,
+    p.player_name,
+    p.deceased,
+    p.anticapitalism,
+    p.base_thirst,
+    p.buoyancy,
+    p.chasiness,
+    p.coldness,
+    p.continuation,
+    p.divinity,
+    p.ground_friction,
+    p.indulgence,
+    p.laserlikeness,
+    p.martyrdom,
+    p.moxie,
+    p.musclitude,
+    p.omniscience,
+    p.overpowerment,
+    p.patheticism,
+    p.ruthlessness,
+    p.shakespearianism,
+    p.suppression,
+    p.tenaciousness,
+    p.thwackability,
+    p.tragicness,
+    p.unthwackability,
+    p.watchfulness,
+    p.pressurization,
+    p.cinnamon,
+    p.total_fingers,
+    p.soul,
+    p.fate,
+    p.peanut_allergy AS lean,
+    p.armor,
+    p.bat,
+    p.ritual,
+    p.coffee,
+    p.blood,
+    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
+    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
+    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
+    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
+    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
+    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
+    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
+    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars,
+    ( SELECT array_agg(DISTINCT pm.modification) AS array_agg
+           FROM data.player_mods_from_timestamp(y.timestampd) pm(player_modifications_id, player_id, modification, valid_from, valid_until)
+          WHERE ((pm.player_id)::text = (y.player_id)::text)
+          GROUP BY pm.player_id) AS modifications_array,
+    xp.position_type,
+    r.position_id,
+    t.nickname AS team
+   FROM ((((( SELECT DISTINCT x.player_id,
+            (unnest(x.a))::timestamp without time zone AS timestampd
+           FROM ( SELECT DISTINCT players.player_id,
+                    ARRAY[(players.valid_from)::timestamp with time zone, COALESCE((players.valid_until)::timestamp with time zone, now())] AS a
+                   FROM data.players
+                UNION
+                 SELECT DISTINCT player_modifications.player_id,
+                    ARRAY[(player_modifications.valid_from)::timestamp with time zone, COALESCE((player_modifications.valid_until)::timestamp with time zone, now())] AS a
+                   FROM data.player_modifications
+                UNION
+                 SELECT DISTINCT team_roster.player_id,
+                    ARRAY[(team_roster.valid_from)::timestamp with time zone, COALESCE((team_roster.valid_until)::timestamp with time zone, now())] AS a
+                   FROM data.team_roster) x) y
+     JOIN data.players p ON ((((y.player_id)::text = (p.player_id)::text) AND (p.valid_from <= (y.timestampd + '00:00:00.001'::interval)) AND (y.timestampd < COALESCE((p.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))))
+     LEFT JOIN data.team_roster r ON ((((y.player_id)::text = (r.player_id)::text) AND (r.valid_from <= (y.timestampd + '00:00:00.001'::interval)) AND (y.timestampd < COALESCE((r.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))))
+     LEFT JOIN data.teams_current t ON (((r.team_id)::text = (t.team_id)::text)))
+     LEFT JOIN taxa.position_types xp ON ((r.position_type_id = (xp.position_type_id)::numeric)));
+
+
+--
 -- Name: time_map; Type: TABLE; Schema: data; Owner: -
 --
 
@@ -3042,7 +3064,8 @@ CREATE TABLE data.time_map (
     season integer NOT NULL,
     day integer NOT NULL,
     first_time timestamp without time zone,
-    time_map_id integer NOT NULL
+    time_map_id integer NOT NULL,
+    time_event_type character varying
 );
 
 
@@ -3278,6 +3301,36 @@ ALTER SEQUENCE taxa.team_url_slugs_team_url_slug_id_seq OWNED BY taxa.team_url_s
 
 
 --
+-- Name: time_event_type; Type: TABLE; Schema: taxa; Owner: -
+--
+
+CREATE TABLE taxa.time_event_type (
+    time_event_type_id integer NOT NULL,
+    time_event_type character varying
+);
+
+
+--
+-- Name: time_event_type_time_event_type_id_seq; Type: SEQUENCE; Schema: taxa; Owner: -
+--
+
+CREATE SEQUENCE taxa.time_event_type_time_event_type_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: time_event_type_time_event_type_id_seq; Type: SEQUENCE OWNED BY; Schema: taxa; Owner: -
+--
+
+ALTER SEQUENCE taxa.time_event_type_time_event_type_id_seq OWNED BY taxa.time_event_type.time_event_type_id;
+
+
+--
 -- Name: vibe_to_arrows; Type: TABLE; Schema: taxa; Owner: -
 --
 
@@ -3453,6 +3506,13 @@ ALTER TABLE ONLY taxa.team_url_slugs ALTER COLUMN team_url_slug_id SET DEFAULT n
 
 
 --
+-- Name: time_event_type time_event_type_id; Type: DEFAULT; Schema: taxa; Owner: -
+--
+
+ALTER TABLE ONLY taxa.time_event_type ALTER COLUMN time_event_type_id SET DEFAULT nextval('taxa.time_event_type_time_event_type_id_seq'::regclass);
+
+
+--
 -- Name: vibe_to_arrows vibe_to_arrow_id; Type: DEFAULT; Schema: taxa; Owner: -
 --
 
@@ -3480,7 +3540,7 @@ COPY data.chronicler_meta (id, season, day, game_timestamp, team_timestamp, play
 -- Data for Name: game_event_base_runners; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY data.game_event_base_runners (id, game_event_id, runner_id, responsible_pitcher_id, base_before_play, base_after_play, was_base_stolen, was_caught_stealing, was_picked_off, runner_scored) FROM stdin;
+COPY data.game_event_base_runners (id, game_event_id, runner_id, responsible_pitcher_id, base_before_play, base_after_play, was_base_stolen, was_caught_stealing, was_picked_off, runner_scored, runs_scored) FROM stdin;
 \.
 
 
@@ -3560,7 +3620,7 @@ COPY data.teams (id, team_id, location, nickname, full_name, valid_from, valid_u
 -- Data for Name: time_map; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY data.time_map (season, day, first_time, time_map_id) FROM stdin;
+COPY data.time_map (season, day, first_time, time_map_id, time_event_type) FROM stdin;
 \.
 
 
@@ -4521,6 +4581,19 @@ COPY taxa.team_url_slugs (team_url_slug_id, team_id, url_slug, nickname) FROM st
 
 
 --
+-- Data for Name: time_event_type; Type: TABLE DATA; Schema: taxa; Owner: -
+--
+
+COPY taxa.time_event_type (time_event_type_id, time_event_type) FROM stdin;
+1	GAMEDAY
+2	SIESTA
+3	BOSS_FIGHT
+4	ELECTIONS
+5	END_REGULAR_SEASON
+\.
+
+
+--
 -- Data for Name: vibe_to_arrows; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
@@ -4541,7 +4614,6 @@ COPY taxa.vibe_to_arrows (vibe_to_arrow_id, arrow_count, min_vibe, max_vibe) FRO
 
 COPY taxa.weather (weather_id, weather_text) FROM stdin;
 0	Void
-1	Sunny
 2	Overcast
 3	Rainy
 4	Sandstorm
@@ -4554,6 +4626,8 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 11	Birds
 12	Feedback
 13	Reverb
+14	Black Hole
+1	Sun 2
 \.
 
 
@@ -4561,14 +4635,14 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 -- Name: chronicler_hash_game_event_chronicler_hash_game_event_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.chronicler_hash_game_event_chronicler_hash_game_event_id_seq', 4901058, true);
+SELECT pg_catalog.setval('data.chronicler_hash_game_event_chronicler_hash_game_event_id_seq', 2459001, true);
 
 
 --
 -- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 9545929, true);
+SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 9021088, true);
 
 
 --
@@ -4589,49 +4663,49 @@ SELECT pg_catalog.setval('data.imported_logs_id_seq', 34207, true);
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_events_id_seq', 61688, true);
+SELECT pg_catalog.setval('data.player_events_id_seq', 56738, true);
 
 
 --
 -- Name: player_modifications_player_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 4598, true);
+SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 4083, true);
 
 
 --
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.players_id_seq', 97762, true);
+SELECT pg_catalog.setval('data.players_id_seq', 92798, true);
 
 
 --
 -- Name: team_modifications_team_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 687, true);
+SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 572, true);
 
 
 --
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 22113, true);
+SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 21192, true);
 
 
 --
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.teams_id_seq', 778, true);
+SELECT pg_catalog.setval('data.teams_id_seq', 743, true);
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 11011283, true);
+SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 10376415, true);
 
 
 --
@@ -4688,6 +4762,13 @@ SELECT pg_catalog.setval('taxa.team_divine_favor_team_divine_favor_id_seq', 99, 
 --
 
 SELECT pg_catalog.setval('taxa.team_url_slugs_team_url_slug_id_seq', 22, true);
+
+
+--
+-- Name: time_event_type_time_event_type_id_seq; Type: SEQUENCE SET; Schema: taxa; Owner: -
+--
+
+SELECT pg_catalog.setval('taxa.time_event_type_time_event_type_id_seq', 5, true);
 
 
 --
