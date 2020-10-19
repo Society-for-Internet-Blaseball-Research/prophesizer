@@ -1,6 +1,3 @@
-using Amazon;
-using Amazon.S3;
-using Amazon.S3.Model;
 using Cauldron;
 using Npgsql;
 using prophesizer;
@@ -581,7 +578,7 @@ namespace SIBR
 			using(var writer = psqlConnection.BeginBinaryImport(
 				@"COPY data.game_event_base_runners(
 					game_event_id, runner_id, responsible_pitcher_id, base_before_play, base_after_play,
-					was_base_stolen, was_caught_stealing, was_picked_off, runner_scored
+					was_base_stolen, was_caught_stealing, was_picked_off, runs_scored
 				)FROM STDIN (FORMAT BINARY)"))
 			{
 				foreach((var id, var r) in runners)
@@ -595,7 +592,7 @@ namespace SIBR
 					writer.Write(r.wasBaseStolen);
 					writer.Write(r.wasCaughtStealing);
 					writer.Write(r.wasPickedOff);
-					writer.Write(r.runnerScored);
+					writer.Write(r.runsScored, NpgsqlTypes.NpgsqlDbType.Numeric);
 				}
 
 				await writer.CompleteAsync();
