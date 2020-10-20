@@ -28,6 +28,7 @@ namespace prophesizer
 		public DateTime FirstSeen { get; set; }
 		public DateTime LastSeen { get; set; }
 
+		public string Hash { get; set; }
 		public Team Data { get; set; }
 	}
 
@@ -37,6 +38,7 @@ namespace prophesizer
 		public string PlayerId { get; set; }
 		public DateTime FirstSeen { get; set; }
 		public DateTime LastSeen { get; set; }
+		public string Hash { get; set; }
 		public Player Data { get; set; }
 	}
 }

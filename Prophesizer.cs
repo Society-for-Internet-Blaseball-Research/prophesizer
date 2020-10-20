@@ -222,7 +222,7 @@ namespace SIBR
 				await LoadPlayerUpdates(psqlConnection);
 			}
 
-			SeasonDay lastUpdated;
+			SeasonDay lastUpdated = m_dbSeasonDay;
 			if (DO_EVENTS)
 			{
 				// TODO store current time
@@ -235,7 +235,7 @@ namespace SIBR
 				lastUpdated = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
 			}
 
-
+			m_dbSeasonDay = lastUpdated;
 			await RefreshMaterializedViews(psqlConnection);
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
@@ -261,9 +261,11 @@ namespace SIBR
 				else
 				{
 					Int64 numFinishedGames = (Int64)response;
+					Console.WriteLine($"{numFinishedGames} games complete for Season {m_dbSeasonDay.Season+1}, Day {m_dbSeasonDay.Day+1}...");
 					// If all 10 games are done, refresh our materialized views
 					if (numFinishedGames == 10)
 					{
+						Console.WriteLine($"All games complete for Season {m_dbSeasonDay.Season + 1}, Day {m_dbSeasonDay.Day + 1}, refreshing materialized views!");
 						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
 						await refreshCmd.ExecuteNonQueryAsync();
 
@@ -800,6 +802,8 @@ namespace SIBR
 					}
 					else
 					{
+						Console.WriteLine($"    Found an update {t.Hash} for {t.Data.FullName} ({t.Data.Id})");
+
 						// Update the old record
 						NpgsqlCommand update = new NpgsqlCommand(@"update data.teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
 						update.Parameters.AddWithValue("timestamp", t.FirstSeen);
@@ -890,6 +894,8 @@ namespace SIBR
 					}
 					else
 					{
+						Console.WriteLine($"    Processing player update {p.Hash} for {p.Data.Name} ({p.Data.Id})");
+
 						// Update the old record
 						NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
 						update.Parameters.AddWithValue("timestamp", p.FirstSeen);
@@ -960,6 +966,11 @@ namespace SIBR
 			var newMods = allMods.Except(currentMods);
 			var oldMods = currentMods.Except(allMods);
 
+			if (newMods.Count() > 0)
+				Console.WriteLine($"    Adding new attrs for {p.Name} ({p.Id})");
+			if (oldMods.Count() > 0)
+				Console.WriteLine($"    Removing old attrs for {p.Name} ({p.Id})");
+
 			foreach (var modification in newMods)
 			{
 
@@ -989,13 +1000,13 @@ namespace SIBR
 		}
 
 
-		private async Task ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime timestamp, string teamId, string playerId, int rosterPosition, PositionType positionTypeEnum)
+		private async Task ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime timestamp, Team team, string playerId, int rosterPosition, PositionType positionTypeEnum)
 		{
 
 			int positionType = (int)positionTypeEnum;
 
 			NpgsqlCommand cmd = new NpgsqlCommand(@"select player_id from data.team_roster where team_id=@team_id and position_id=@position_id and position_type_id=@position_type and valid_until is null", psqlConnection);
-			cmd.Parameters.AddWithValue("team_id", teamId);
+			cmd.Parameters.AddWithValue("team_id", team.Id);
 			cmd.Parameters.AddWithValue("position_id", rosterPosition);
 			cmd.Parameters.AddWithValue("position_type", positionType);
 			//cmd.Prepare();
@@ -1007,10 +1018,12 @@ namespace SIBR
 			}
 			else
 			{
+				Console.WriteLine($"    Updating roster entry for {team.FullName} ({team.Id})");
+
 				// Update the old record
 				NpgsqlCommand update = new NpgsqlCommand(@"update data.team_roster set valid_until=@timestamp where team_id = @team_id and position_id = @position_id and position_type_id=@position_type and valid_until is null", psqlConnection);
 				update.Parameters.AddWithValue("timestamp", timestamp);
-				update.Parameters.AddWithValue("team_id", teamId);
+				update.Parameters.AddWithValue("team_id", team.Id);
 				update.Parameters.AddWithValue("position_id", rosterPosition);
 				update.Parameters.AddWithValue("position_type", positionType);
 				//update.Prepare();
@@ -1020,7 +1033,7 @@ namespace SIBR
 				if (playerId != null)
 				{
 					NpgsqlCommand insert = new NpgsqlCommand(@"insert into data.team_roster(team_id, position_id, player_id, position_type_id, valid_from) values(@team_id, @position_id, @player_id, @position_type, @valid_from)", psqlConnection);
-					insert.Parameters.AddWithValue("team_id", teamId);
+					insert.Parameters.AddWithValue("team_id", team.Id);
 					insert.Parameters.AddWithValue("position_id", rosterPosition);
 					insert.Parameters.AddWithValue("player_id", playerId);
 					insert.Parameters.AddWithValue("valid_from", timestamp);
@@ -1067,7 +1080,7 @@ namespace SIBR
 				{
 					playerId = t.Lineup.ElementAt(i);
 				}
-				await ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, i, PositionType.Batter);
+				await ProcessRosterEntry(psqlConnection, timestamp, t, playerId, i, PositionType.Batter);
 			}
 
 			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Pitcher);
@@ -1081,7 +1094,7 @@ namespace SIBR
 				{
 					playerId = t.Rotation.ElementAt(i);
 				}
-				await ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, i, PositionType.Pitcher);
+				await ProcessRosterEntry(psqlConnection, timestamp, t, playerId, i, PositionType.Pitcher);
 			}
 
 			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Bullpen);
@@ -1095,7 +1108,7 @@ namespace SIBR
 				{
 					playerId = t.Bullpen.ElementAt(i);
 				}
-				await ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, i, PositionType.Bullpen);
+				await ProcessRosterEntry(psqlConnection, timestamp, t, playerId, i, PositionType.Bullpen);
 			}
 
 			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Bench);
@@ -1109,7 +1122,7 @@ namespace SIBR
 				{
 					playerId = t.Bench.ElementAt(i);
 				}
-				await ProcessRosterEntry(psqlConnection, timestamp, t.Id, playerId, i, PositionType.Bench);
+				await ProcessRosterEntry(psqlConnection, timestamp, t, playerId, i, PositionType.Bench);
 			}
 
 			s.Stop();
@@ -1164,6 +1177,11 @@ namespace SIBR
 			var newMods = allMods.Except(currentMods);
 			var oldMods = currentMods.Except(allMods);
 
+			if(newMods.Count() > 0)
+				Console.WriteLine($"    Adding new attrs for {p.FullName} ({p.Id})");
+			if(oldMods.Count() > 0)
+				Console.WriteLine($"    Removing old attrs for {p.FullName} ({p.Id}");
+
 			foreach (var modification in newMods)
 			{
 
@@ -1191,60 +1209,6 @@ namespace SIBR
 			}
 
 		}
-
-		private async Task ProcessAllTeams(JsonElement teamResponse, DateTime timestamp, NpgsqlConnection psqlConnection)
-		{
-			string text = teamResponse.GetRawText();
-
-			var teams = JsonSerializer.Deserialize<IEnumerable<Team>>(text, serializerOptions);
-
-			using (MD5 md5 = MD5.Create())
-			{
-				Stopwatch s = new Stopwatch();
-				s.Start();
-				foreach (var t in teams)
-				{
-					await ProcessRoster(t, timestamp, psqlConnection);
-
-					var hash = HashTeamAttrs(md5, t);
-					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.teams where hash=@hash and valid_until is null", psqlConnection);
-					cmd.Parameters.AddWithValue("hash", hash);
-					//cmd.Prepare();
-					var count = (long)await cmd.ExecuteScalarAsync();
-
-					if (count == 1)
-					{
-						// Record exists
-					}
-					else
-					{
-						// Update the old record
-						NpgsqlCommand update = new NpgsqlCommand(@"update data.teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
-						update.Parameters.AddWithValue("timestamp", timestamp);
-						update.Parameters.AddWithValue("team_id", t.Id);
-						//update.Prepare();
-						int rows = await update.ExecuteNonQueryAsync();
-						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
-
-						var extra = new Dictionary<string, object>();
-						extra["valid_from"] = timestamp;
-						extra["hash"] = hash;
-						// Try to insert our current data
-						InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.teams", t, extra);
-						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
-
-					}
-
-					await ProcessTeamModAttrs(t, timestamp, psqlConnection);
-
-				}
-
-				s.Stop();
-				if (TIMING) Console.WriteLine($"Processed {teams.Count()} teams in {s.ElapsedMilliseconds} ms");
-			}
-		}
-
-
 
 		private async Task PersistTimeMap(IEnumerable<GameEvent> events, NpgsqlConnection psqlConnection)
 		{
