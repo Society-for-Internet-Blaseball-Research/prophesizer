@@ -265,7 +265,7 @@ namespace SIBR
 					// If all 10 games are done, refresh our materialized views
 					if (numFinishedGames == 10)
 					{
-						Console.WriteLine($"All games complete for Season {m_dbSeasonDay.Season + 1}, Day {m_dbSeasonDay.Day + 1}, refreshing materialized views!");
+						ConsoleOrWebhook($"All games complete for Season {m_dbSeasonDay.Season + 1}, Day {m_dbSeasonDay.Day + 1}, refreshing materialized views!");
 						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
 						await refreshCmd.ExecuteNonQueryAsync();
 
@@ -487,6 +487,7 @@ namespace SIBR
 		{
 			lock (_pitcherLocker)
 			{
+				Console.WriteLine($"      Game Complete! {e.GameId}");
 				m_pitcherResults.Enqueue((e.GameId, e.WinningPitcherId, e.LosingPitcherId, e.GameEvents.Last()));
 			}
 		}
