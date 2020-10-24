@@ -248,6 +248,12 @@ namespace SIBR
 			// If it's been at least one day since the last refresh
 			if (m_dbSeasonDay > m_lastMaterializedRefresh)
 			{
+				// Count how many games were today
+				var countCmd = new NpgsqlCommand("SELECT COUNT(DISTINCT(game_id)) FROM data.game_events WHERE season=@season AND day=@day", psqlConnection);
+				countCmd.Parameters.AddWithValue("season", m_dbSeasonDay.Season);
+				countCmd.Parameters.AddWithValue("day", m_dbSeasonDay.Day);
+				var gameCountResponse = countCmd.ExecuteScalar();
+
 				// Count how many of today's games are finished
 				var cmd = new NpgsqlCommand("SELECT COUNT(1) FROM data.game_events WHERE season=@season AND day=@day AND is_last_game_event", psqlConnection);
 				cmd.Parameters.AddWithValue("season", m_dbSeasonDay.Season);
@@ -260,10 +266,11 @@ namespace SIBR
 				}
 				else
 				{
+					Int64 numGames = (Int64)gameCountResponse;
 					Int64 numFinishedGames = (Int64)response;
-					Console.WriteLine($"{numFinishedGames} games complete for Season {m_dbSeasonDay.Season+1}, Day {m_dbSeasonDay.Day+1}...");
+					Console.WriteLine($"{numFinishedGames} of {numGames} games complete for Season {m_dbSeasonDay.Season+1}, Day {m_dbSeasonDay.Day+1}...");
 					// If all 10 games are done, refresh our materialized views
-					if (numFinishedGames == 10)
+					if (numFinishedGames >= numGames)
 					{
 						ConsoleOrWebhook($"All games complete for Season {m_dbSeasonDay.Season + 1}, Day {m_dbSeasonDay.Day + 1}, refreshing materialized views!");
 						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
@@ -361,7 +368,7 @@ namespace SIBR
 					m_processor.GameComplete -= Processor_GameComplete;
 
 					Console.WriteLine($"  Processed {page.Data.Count()} updates (through {page.Data.Last().Timestamp}).\n  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
-					Console.WriteLine($"    {m_processor.NumNetworkOutcomes} games used the network outcomes.json file, {m_processor.NumLocalOutcomes} did not.");
+					//Console.WriteLine($"    {m_processor.NumNetworkOutcomes} games used the network outcomes.json file, {m_processor.NumLocalOutcomes} did not.");
 					await PersistTimeMap(m_eventsToInsert, psqlConnection);
 					// Process any game events we received
 					while (m_eventsToInsert.Count > 0)
