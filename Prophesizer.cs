@@ -11,6 +11,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -238,9 +239,69 @@ namespace SIBR
 			m_dbSeasonDay = lastUpdated;
 			await RefreshMaterializedViews(psqlConnection);
 
+			ApplyDbPatches(psqlConnection);
+
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
 			Console.WriteLine(msg);
 			return lastUpdated;
+		}
+
+		// Run any unapplied DB patches
+		private void ApplyDbPatches(NpgsqlConnection psqlConnection)
+		{
+			var cmd = new NpgsqlCommand("SELECT patch_hash FROM data.applied_patches", psqlConnection);
+
+			HashSet<Guid> existingPatches = new HashSet<Guid>();
+			using (var reader = cmd.ExecuteReader())
+			{
+				while(reader.Read())
+				{
+					existingPatches.Add((Guid)reader[0]);
+				}
+			}
+
+			var trans = psqlConnection.BeginTransaction();
+			HashSet<Guid> newPatches = new HashSet<Guid>();
+			foreach (var patchFilename in Directory.GetFiles(Path.Combine(GetExecutingDirectoryName(), "patch")))
+			{
+				using (var md5 = MD5.Create())
+				{
+					using (var sr = new StreamReader(patchFilename))
+					{
+						string cmdText = sr.ReadToEnd();
+						var hashBytes = md5.ComputeHash(Encoding.UTF8.GetBytes(cmdText));
+						var hash = new Guid(hashBytes);
+
+						if(!existingPatches.Contains(hash))
+						{
+							newPatches.Add(hash);
+
+							Console.WriteLine($"Applying patch from {Path.GetFileName(patchFilename)}:");
+							Console.WriteLine(cmdText);
+							var patchCmd = new NpgsqlCommand(cmdText, psqlConnection);
+							patchCmd.ExecuteNonQuery();
+						}
+						else
+						{
+							Console.WriteLine($"Patch from {Path.GetFileName(patchFilename)} is already applied.");
+						}
+					}
+				}
+			}
+
+			foreach(var patchHash in newPatches)
+			{
+				var insertCmd = new NpgsqlCommand("INSERT INTO data.applied_patches(patch_hash) VALUES(@hash)", psqlConnection);
+				insertCmd.Parameters.AddWithValue("hash", NpgsqlTypes.NpgsqlDbType.Uuid, patchHash);
+				insertCmd.ExecuteNonQuery();
+			}
+			trans.Commit();
+		}
+
+		public static string GetExecutingDirectoryName()
+		{
+			var location = new Uri(Assembly.GetEntryAssembly().GetName().CodeBase);
+			return new FileInfo(location.AbsolutePath).Directory.FullName;
 		}
 
 		private async Task RefreshMaterializedViews(NpgsqlConnection psqlConnection)
@@ -269,8 +330,8 @@ namespace SIBR
 					Int64 numGames = (Int64)gameCountResponse;
 					Int64 numFinishedGames = (Int64)response;
 					Console.WriteLine($"{numFinishedGames} of {numGames} games complete for Season {m_dbSeasonDay.Season+1}, Day {m_dbSeasonDay.Day+1}...");
-					// If all 10 games are done, refresh our materialized views
-					if (numFinishedGames >= numGames)
+					// If all games are done, refresh our materialized views
+					if (numGames > 0 && numFinishedGames >= numGames)
 					{
 						ConsoleOrWebhook($"All games complete for Season {m_dbSeasonDay.Season + 1}, Day {m_dbSeasonDay.Day + 1}, refreshing materialized views!");
 						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
