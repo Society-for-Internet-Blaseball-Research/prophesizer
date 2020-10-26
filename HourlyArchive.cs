@@ -119,7 +119,6 @@ public class Team
 	public string FullName { get; set; }
 
 	// Tarot card index from S11 election
-	[DbIgnore]
 	public int Card { get; set; }
 
 	[DbIgnore]
