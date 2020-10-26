@@ -119,7 +119,19 @@ public class Team
 	public string FullName { get; set; }
 
 	// Tarot card index from S11 election
-	public int Card { get; set; }
+	// DbIgnore this entry because it might not exist
+	[DbIgnore]
+	public int? Card { get; set; }
+
+	// Insert this property into the DB as 'card'
+	[DbAlias("card")]
+	public int CardIndex 
+	{ 
+		get
+		{
+			return Card.HasValue ? Card.Value : -1;
+		}
+	}
 
 	[DbIgnore]
 	public IEnumerable<string> PermAttr { get; set; }
