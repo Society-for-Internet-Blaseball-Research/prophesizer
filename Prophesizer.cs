@@ -1207,6 +1207,7 @@ namespace SIBR
 			sb.Append(obj.Location);
 			sb.Append(obj.Nickname);
 			sb.Append(obj.FullName);
+			sb.Append(obj.CardIndex);
 
 			// Convert the input string to a byte array and compute the hash.
 			byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
@@ -1409,6 +1410,7 @@ namespace SIBR
 			JsonSerializerOptions options = new JsonSerializerOptions();
 			options.IgnoreNullValues = true;
 
+			Console.WriteLine($"Adding game records...");
 			// Loop until we break out
 			while (true)
 			{
@@ -1439,7 +1441,7 @@ namespace SIBR
 						}
 					}
 
-					Console.WriteLine($"Inserting games from season {season}, day {day}...");
+					//Console.WriteLine($"Storing blaseball.com game results from season {season}, day {day}...");
 					foreach (var game in gameList)
 					{
 						var cmd = InsertGameCommand(psqlConnection, game);
@@ -1455,6 +1457,7 @@ namespace SIBR
 					return;
 				}
 			}
+			Console.WriteLine($"Done!");
 
 
 		}
