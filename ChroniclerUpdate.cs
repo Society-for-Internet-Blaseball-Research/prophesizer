@@ -41,4 +41,19 @@ namespace prophesizer
 		public string Hash { get; set; }
 		public Player Data { get; set; }
 	}
+
+	class SimData
+	{
+		public int Phase { get; set; }
+		public int Season { get; set; }
+		public int Day { get; set; }
+
+	}
+
+	class ChroniclerSimData
+	{
+		public SimData Data { get; set; }
+		public DateTime FirstSeen { get; set; }
+		public DateTime LastSeen { get; set; }
+	}
 }

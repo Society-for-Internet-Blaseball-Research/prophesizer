@@ -221,6 +221,7 @@ namespace SIBR
 			{
 				await LoadTeamUpdates(psqlConnection);
 				await LoadPlayerUpdates(psqlConnection);
+				await StoreTimeMapEvents(psqlConnection);
 			}
 
 			SeasonDay lastUpdated = m_dbSeasonDay;
@@ -470,6 +471,87 @@ namespace SIBR
 			return lastSeenDay;
 		}
 
+		// Election results show up in phase 0
+		private const int PHASE_ELECTIONS = 0;
+		// Boss Fights are phase 9
+		private const int PHASE_BOSS_FIGHT = 9;
+
+		private const int PHASE_REG_SEASON = 2;
+
+		// See https://docs.sibr.dev/docs/apis/docs/phases.md
+		// Regular season is phase 2
+		// Then 3 and 7 are gaps before postseason
+		// 10 is wild card games
+		// 11 is between rounds of playoffs
+		// 4 is playoffs in progress
+		// 9 is boss fights
+		// 5 is after playoffs, before elections
+		// 6 is the same as 5 and we don't know why
+		// 0 is elections
+
+		// Find all the "special" times in the season and add them to time_map
+		private async Task StoreTimeMapEvents(NpgsqlConnection psqlConnection)
+		{
+			string nextPage = null;
+
+			var trans = psqlConnection.BeginTransaction();
+
+			while (true)
+			{
+				string query = $"sim/updates?count=1000";
+				if (nextPage != null)
+				{
+					query += $"&page={nextPage}";
+				}
+
+				ChroniclerPage<ChroniclerSimData> page = await ChroniclerQuery<ChroniclerSimData>(query);
+
+				if (page == null || page.Data.Count() == 0)
+				{
+					break;
+				}
+				else
+				{
+					nextPage = page.NextPage;
+
+					foreach(var chronData in page.Data)
+					{
+						SimData simData = chronData.Data;
+						switch(simData.Phase)
+						{
+							case PHASE_ELECTIONS:
+								StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.FirstSeen, "ELECTIONS");
+								break;
+							case PHASE_BOSS_FIGHT:
+								StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.FirstSeen, "BOSS_FIGHT");
+								break;
+							case PHASE_REG_SEASON:
+								// Do nothing, PersistTimeMap will do all days here
+								break;
+							// TODO: figure out "end of regular season"
+						}
+
+					}
+				}
+			}
+
+			trans.Commit();
+		}
+
+		// Store time_map data about a sim phase
+		private void StoreSimDataPhase(NpgsqlConnection psqlConnection, int season, int day, DateTime firstTime, string type)
+		{
+			Console.WriteLine($"Storing {type} for season {season}, day {day} starting at {firstTime}.");
+			NpgsqlCommand insertCmd = new NpgsqlCommand(@"
+								INSERT INTO data.time_map(season, day, first_time, time_event_type) values(@season, @day, @first_time, @type)
+								ON CONFLICT ON CONSTRAINT season_day_type_unique DO UPDATE SET first_time=EXCLUDED.first_time
+								WHERE EXCLUDED.first_time < data.time_map.first_time", psqlConnection);
+			insertCmd.Parameters.AddWithValue("season", season);
+			insertCmd.Parameters.AddWithValue("day", day);
+			insertCmd.Parameters.AddWithValue("first_time", firstTime);
+			insertCmd.Parameters.AddWithValue("type", type);
+			insertCmd.ExecuteNonQuery();
+		}
 		/// <summary>
 		/// Load updates from Chronicler by going wide
 		/// </summary>
@@ -1291,8 +1373,8 @@ namespace SIBR
 
 					// Record the first time seen for each season and day
 					var updateTimeMap = new NpgsqlCommand(@"
-        insert into data.time_map values(@season, @day, @first_time)
-        on conflict (season, day)  do
+        insert into data.time_map(season, day, first_time, time_event_type) values(@season, @day, @first_time, 'GAMEDAY')
+        on conflict on constraint season_day_type_unique do
         update set first_time = EXCLUDED.first_time
         where time_map.first_time > EXCLUDED.first_time;
         ", psqlConnection);
