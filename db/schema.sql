@@ -27,6 +27,7 @@ DROP INDEX IF EXISTS data.running_stats_all_events_indx_player_id;
 DROP INDEX IF EXISTS data.game_events_indx_event_type;
 DROP INDEX IF EXISTS data.fielder_stats_all_events_indx_player_id;
 DROP INDEX IF EXISTS data.chronicler_hash_game_event_indx_game_event_id;
+DROP INDEX IF EXISTS data.batting_stats_all_events_indx_season;
 DROP INDEX IF EXISTS data.batting_stats_all_events_indx_player_id;
 ALTER TABLE IF EXISTS ONLY taxa.event_types DROP CONSTRAINT IF EXISTS event_types_pkey;
 ALTER TABLE IF EXISTS ONLY taxa.event_types DROP CONSTRAINT IF EXISTS event_types_event_type_key;
@@ -36,7 +37,7 @@ ALTER TABLE IF EXISTS ONLY data.time_map DROP CONSTRAINT IF EXISTS time_map_pkey
 ALTER TABLE IF EXISTS ONLY data.teams DROP CONSTRAINT IF EXISTS teams_pkey;
 ALTER TABLE IF EXISTS ONLY data.team_roster DROP CONSTRAINT IF EXISTS team_roster_pkey;
 ALTER TABLE IF EXISTS ONLY data.team_modifications DROP CONSTRAINT IF EXISTS team_modifications_pkey;
-ALTER TABLE IF EXISTS ONLY data.time_map DROP CONSTRAINT IF EXISTS season_day_type_unique;
+ALTER TABLE IF EXISTS ONLY data.time_map DROP CONSTRAINT IF EXISTS season_day_unique;
 ALTER TABLE IF EXISTS ONLY data.players DROP CONSTRAINT IF EXISTS players_pkey;
 ALTER TABLE IF EXISTS ONLY data.player_modifications DROP CONSTRAINT IF EXISTS player_modifications_pkey;
 ALTER TABLE IF EXISTS ONLY data.outcomes DROP CONSTRAINT IF EXISTS player_events_pkey;
@@ -46,10 +47,11 @@ ALTER TABLE IF EXISTS ONLY data.games DROP CONSTRAINT IF EXISTS game_pkey;
 ALTER TABLE IF EXISTS ONLY data.game_events DROP CONSTRAINT IF EXISTS game_events_pkey;
 ALTER TABLE IF EXISTS ONLY data.game_event_base_runners DROP CONSTRAINT IF EXISTS game_event_base_runners_pkey;
 ALTER TABLE IF EXISTS ONLY data.chronicler_meta DROP CONSTRAINT IF EXISTS chronicler_meta_pk;
+ALTER TABLE IF EXISTS ONLY data.chronicler_hash_game_event DROP CONSTRAINT IF EXISTS chronicler_hash_game_event_pkey;
+ALTER TABLE IF EXISTS ONLY data.applied_patches DROP CONSTRAINT IF EXISTS applied_patches_pkey;
 ALTER TABLE IF EXISTS taxa.vibe_to_arrows ALTER COLUMN vibe_to_arrow_id DROP DEFAULT;
-ALTER TABLE IF EXISTS taxa.time_event_type ALTER COLUMN time_event_type_id DROP DEFAULT;
-ALTER TABLE IF EXISTS taxa.team_url_slugs ALTER COLUMN team_url_slug_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.team_divine_favor ALTER COLUMN team_divine_favor_id DROP DEFAULT;
+ALTER TABLE IF EXISTS taxa.team_abbreviations ALTER COLUMN team_abbreviation_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.player_url_slugs ALTER COLUMN player_url_slug_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.leagues ALTER COLUMN league_db_id DROP DEFAULT;
 ALTER TABLE IF EXISTS taxa.event_types ALTER COLUMN event_type_id DROP DEFAULT;
@@ -73,10 +75,10 @@ DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq;
 DROP TABLE IF EXISTS taxa.vibe_to_arrows;
 DROP SEQUENCE IF EXISTS taxa.time_event_type_time_event_type_id_seq;
 DROP TABLE IF EXISTS taxa.time_event_type;
-DROP SEQUENCE IF EXISTS taxa.team_url_slugs_team_url_slug_id_seq;
-DROP TABLE IF EXISTS taxa.team_url_slugs;
 DROP SEQUENCE IF EXISTS taxa.team_divine_favor_team_divine_favor_id_seq;
 DROP TABLE IF EXISTS taxa.team_divine_favor;
+DROP SEQUENCE IF EXISTS taxa.team_abbreviations_team_abbreviation_id_seq;
+DROP TABLE IF EXISTS taxa.team_abbreviations;
 DROP SEQUENCE IF EXISTS taxa.player_url_slugs_player_url_slug_id_seq;
 DROP TABLE IF EXISTS taxa.pitch_types;
 DROP SEQUENCE IF EXISTS taxa.leagues_league_id_seq;
@@ -362,7 +364,6 @@ CREATE FUNCTION data.current_season() RETURNS integer
     AS $$
 
 SELECT max(season) from data.games;
-
 $$;
 
 
@@ -403,7 +404,6 @@ CREATE FUNCTION data.earned_run_average(in_runs numeric, in_outs numeric) RETURN
     AS $$
 
 SELECT round(9*(in_runs/((in_outs::DECIMAL)/3)::DECIMAL) ,2)
-
 $$;
 
 
@@ -452,7 +452,6 @@ CREATE FUNCTION data.innings_from_outs(in_outs numeric) RETURNS numeric
     AS $$
 
 select ((round(in_outs/3,0))::TEXT || '.' ||  (mod(in_outs,3))::text)::numeric
-
 $$;
 
 
@@ -477,7 +476,6 @@ CREATE FUNCTION data.on_base_percentage(in_hits bigint, in_raw_at_bats bigint, i
     AS $$
 
 SELECT ((in_hits + in_walks)/ (in_raw_at_bats +in_walks + in_sacs)::numeric)::numeric(10,3)
-
 $$;
 
 
@@ -653,8 +651,6 @@ SELECT 0.5 * data.round_half_even((
 
 
 (in_rating)* 10),0);
-
-
 $$;
 
 
@@ -3245,7 +3241,7 @@ CREATE TABLE data.time_map (
     day integer NOT NULL,
     first_time timestamp without time zone,
     time_map_id integer NOT NULL,
-    time_event_type character varying
+    phase_id integer
 );
 
 
@@ -3427,6 +3423,37 @@ ALTER SEQUENCE taxa.player_url_slugs_player_url_slug_id_seq OWNED BY taxa.player
 
 
 --
+-- Name: team_abbreviations; Type: TABLE; Schema: taxa; Owner: -
+--
+
+CREATE TABLE taxa.team_abbreviations (
+    team_abbreviation_id integer NOT NULL,
+    team_id character varying,
+    team_abbrevation character varying
+);
+
+
+--
+-- Name: team_abbreviations_team_abbreviation_id_seq; Type: SEQUENCE; Schema: taxa; Owner: -
+--
+
+CREATE SEQUENCE taxa.team_abbreviations_team_abbreviation_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: team_abbreviations_team_abbreviation_id_seq; Type: SEQUENCE OWNED BY; Schema: taxa; Owner: -
+--
+
+ALTER SEQUENCE taxa.team_abbreviations_team_abbreviation_id_seq OWNED BY taxa.team_abbreviations.team_abbreviation_id;
+
+
+--
 -- Name: team_divine_favor; Type: TABLE; Schema: taxa; Owner: -
 --
 
@@ -3460,44 +3487,13 @@ ALTER SEQUENCE taxa.team_divine_favor_team_divine_favor_id_seq OWNED BY taxa.tea
 
 
 --
--- Name: team_url_slugs; Type: TABLE; Schema: taxa; Owner: -
---
-
-CREATE TABLE taxa.team_url_slugs (
-    team_url_slug_id integer NOT NULL,
-    team_id character varying,
-    url_slug character varying,
-    nickname character varying
-);
-
-
---
--- Name: team_url_slugs_team_url_slug_id_seq; Type: SEQUENCE; Schema: taxa; Owner: -
---
-
-CREATE SEQUENCE taxa.team_url_slugs_team_url_slug_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: team_url_slugs_team_url_slug_id_seq; Type: SEQUENCE OWNED BY; Schema: taxa; Owner: -
---
-
-ALTER SEQUENCE taxa.team_url_slugs_team_url_slug_id_seq OWNED BY taxa.team_url_slugs.team_url_slug_id;
-
-
---
 -- Name: time_event_type; Type: TABLE; Schema: taxa; Owner: -
 --
 
 CREATE TABLE taxa.time_event_type (
     time_event_type_id integer NOT NULL,
-    time_event_type character varying
+    time_event_type character varying,
+    event_order integer
 );
 
 
@@ -3690,24 +3686,17 @@ ALTER TABLE ONLY taxa.player_url_slugs ALTER COLUMN player_url_slug_id SET DEFAU
 
 
 --
+-- Name: team_abbreviations team_abbreviation_id; Type: DEFAULT; Schema: taxa; Owner: -
+--
+
+ALTER TABLE ONLY taxa.team_abbreviations ALTER COLUMN team_abbreviation_id SET DEFAULT nextval('taxa.team_abbreviations_team_abbreviation_id_seq'::regclass);
+
+
+--
 -- Name: team_divine_favor team_divine_favor_id; Type: DEFAULT; Schema: taxa; Owner: -
 --
 
 ALTER TABLE ONLY taxa.team_divine_favor ALTER COLUMN team_divine_favor_id SET DEFAULT nextval('taxa.team_divine_favor_team_divine_favor_id_seq'::regclass);
-
-
---
--- Name: team_url_slugs team_url_slug_id; Type: DEFAULT; Schema: taxa; Owner: -
---
-
-ALTER TABLE ONLY taxa.team_url_slugs ALTER COLUMN team_url_slug_id SET DEFAULT nextval('taxa.team_url_slugs_team_url_slug_id_seq'::regclass);
-
-
---
--- Name: time_event_type time_event_type_id; Type: DEFAULT; Schema: taxa; Owner: -
---
-
-ALTER TABLE ONLY taxa.time_event_type ALTER COLUMN time_event_type_id SET DEFAULT nextval('taxa.time_event_type_time_event_type_id_seq'::regclass);
 
 
 --
@@ -3826,7 +3815,7 @@ COPY data.teams (id, team_id, location, nickname, full_name, valid_from, valid_u
 -- Data for Name: time_map; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY data.time_map (season, day, first_time, time_map_id, time_event_type) FROM stdin;
+COPY data.time_map (season, day, first_time, time_map_id, phase_id) FROM stdin;
 \.
 
 
@@ -4706,6 +4695,14 @@ COPY taxa.position_types (position_type_id, position_type) FROM stdin;
 
 
 --
+-- Data for Name: team_abbreviations; Type: TABLE DATA; Schema: taxa; Owner: -
+--
+
+COPY taxa.team_abbreviations (team_abbreviation_id, team_id, team_abbrevation) FROM stdin;
+\.
+
+
+--
 -- Data for Name: team_divine_favor; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
@@ -4794,45 +4791,23 @@ COPY taxa.team_divine_favor (team_divine_favor_id, team_id, valid_from, valid_un
 
 
 --
--- Data for Name: team_url_slugs; Type: TABLE DATA; Schema: taxa; Owner: -
---
-
-COPY taxa.team_url_slugs (team_url_slug_id, team_id, url_slug, nickname) FROM stdin;
-1	979aee4a-6d80-4863-bf1c-ee1a78e06024	fridays	Fridays
-2	b72f3061-f573-40d7-832a-5ad475bd7909	lovers	Lovers
-3	a37f9158-7f82-46bc-908c-c9e2dda7c33b	jazz-hands	Jazz Hands
-4	b63be8c2-576a-4d6e-8daf-814f8bcea96f	dale	Dalé
-5	9debc64f-74b7-4ae1-a4d6-fce0144b6ea5	spies	Spies
-6	7966eb04-efcc-499b-8f03-d13916330531	magic	Magic
-7	eb67ae5e-c4bf-46ca-bbbc-425cd34182ff	moist-talkers	Moist Talkers
-8	36569151-a2fb-43c1-9df7-2df512424c82	millennials	Millennials
-9	105bc3ff-1320-4e37-8ef0-8d595cb95dd0	garages	Garages
-10	747b8e4a-7e50-4638-a973-ea7950a3e739	tigers	Tigers
-11	bfd38797-8404-4b38-8b82-341da28b1f83	shoe-thieves	Shoe Thieves
-12	ca3f1c8c-c025-4d8e-8eef-5be6accbeb16	firefighters	Firefighters
-13	f02aeae2-5e6a-4098-9842-02d2273f25c7	sunbeams	Sunbeams
-14	57ec08cc-0411-4643-b304-0e80dbc15ac7	wild-wings	Wild Wings
-15	23e4cbc1-e9cd-47fa-a35b-bfa06f726cb7	pies	Pies
-16	b024e975-1c4a-4575-8936-a3754a08806a	steaks	Steaks
-17	878c1bf6-0d21-4659-bfee-916c8314d69c	tacos	Tacos
-18	adc5b394-8f76-416d-9ce9-813706877b84	breath-mints	Breath Mints
-19	b63be8c2-576a-4d6e-8daf-814f8bcea96f	dale	Dale
-20	57ec08cc-0411-4643-b304-0e80dbc15ac7	mild-wings	Mild Wings
-21	8d87c468-699a-47a8-b40d-cfb73a5660ad	crabs	Crabs
-22	3f8bbb15-61c0-4e3f-8e4a-907a5fb1565e	flowers	Flowers
-\.
-
-
---
 -- Data for Name: time_event_type; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
-COPY taxa.time_event_type (time_event_type_id, time_event_type) FROM stdin;
-1	GAMEDAY
-2	SIESTA
-3	BOSS_FIGHT
-4	ELECTIONS
-5	END_REGULAR_SEASON
+COPY taxa.time_event_type (time_event_type_id, time_event_type, event_order) FROM stdin;
+1	PRESEASON	0
+2	GAMEDAY	1
+3	END_REGULAR_SEASON	2
+7	END_REGULAR_SEASON	2
+10	POSTSEASON	3
+11	POSTSEASON	3
+4	POSTSEASON	3
+9	BOSS_FIGHT	4
+8	UNKNOWN_THE_OCHO	99
+99	SIESTA	99
+5	END_POSTSEASON	5
+6	END_POSTSEASON	5
+0	ELECTION_RESULTS	5
 \.
 
 
@@ -4885,14 +4860,14 @@ SELECT pg_catalog.setval('data.applied_patches_patch_id_seq', 1, false);
 -- Name: chronicler_hash_game_event_chronicler_hash_game_event_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.chronicler_hash_game_event_chronicler_hash_game_event_id_seq', 10234346, true);
+SELECT pg_catalog.setval('data.chronicler_hash_game_event_chronicler_hash_game_event_id_seq', 8312721, true);
 
 
 --
 -- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 10710756, true);
+SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 10288215, true);
 
 
 --
@@ -4913,49 +4888,49 @@ SELECT pg_catalog.setval('data.imported_logs_id_seq', 34207, true);
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_events_id_seq', 67608, true);
+SELECT pg_catalog.setval('data.player_events_id_seq', 67226, true);
 
 
 --
 -- Name: player_modifications_player_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 7390, true);
+SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 5582, true);
 
 
 --
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.players_id_seq', 119579, true);
+SELECT pg_catalog.setval('data.players_id_seq', 103702, true);
 
 
 --
 -- Name: team_modifications_team_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 2094, true);
+SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 1059, true);
 
 
 --
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 27840, true);
+SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 23404, true);
 
 
 --
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.teams_id_seq', 1017, true);
+SELECT pg_catalog.setval('data.teams_id_seq', 821, true);
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 12423909, true);
+SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 11932267, true);
 
 
 --
@@ -5001,17 +4976,17 @@ SELECT pg_catalog.setval('taxa.player_url_slugs_player_url_slug_id_seq', 3808, t
 
 
 --
+-- Name: team_abbreviations_team_abbreviation_id_seq; Type: SEQUENCE SET; Schema: taxa; Owner: -
+--
+
+SELECT pg_catalog.setval('taxa.team_abbreviations_team_abbreviation_id_seq', 1, false);
+
+
+--
 -- Name: team_divine_favor_team_divine_favor_id_seq; Type: SEQUENCE SET; Schema: taxa; Owner: -
 --
 
 SELECT pg_catalog.setval('taxa.team_divine_favor_team_divine_favor_id_seq', 99, true);
-
-
---
--- Name: team_url_slugs_team_url_slug_id_seq; Type: SEQUENCE SET; Schema: taxa; Owner: -
---
-
-SELECT pg_catalog.setval('taxa.team_url_slugs_team_url_slug_id_seq', 22, true);
 
 
 --
@@ -5026,6 +5001,22 @@ SELECT pg_catalog.setval('taxa.time_event_type_time_event_type_id_seq', 5, true)
 --
 
 SELECT pg_catalog.setval('taxa.vibe_to_arrows_vibe_to_arrow_id_seq', 13, true);
+
+
+--
+-- Name: applied_patches applied_patches_pkey; Type: CONSTRAINT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.applied_patches
+    ADD CONSTRAINT applied_patches_pkey PRIMARY KEY (patch_id);
+
+
+--
+-- Name: chronicler_hash_game_event chronicler_hash_game_event_pkey; Type: CONSTRAINT; Schema: data; Owner: -
+--
+
+ALTER TABLE ONLY data.chronicler_hash_game_event
+    ADD CONSTRAINT chronicler_hash_game_event_pkey PRIMARY KEY (chronicler_hash_game_event_id);
 
 
 --
@@ -5101,11 +5092,11 @@ ALTER TABLE ONLY data.players
 
 
 --
--- Name: time_map season_day_type_unique; Type: CONSTRAINT; Schema: data; Owner: -
+-- Name: time_map season_day_unique; Type: CONSTRAINT; Schema: data; Owner: -
 --
 
 ALTER TABLE ONLY data.time_map
-    ADD CONSTRAINT season_day_type_unique UNIQUE (season, day, time_event_type);
+    ADD CONSTRAINT season_day_unique UNIQUE (season, day, phase_id);
 
 
 --
@@ -5177,6 +5168,13 @@ ALTER TABLE ONLY taxa.event_types
 --
 
 CREATE INDEX batting_stats_all_events_indx_player_id ON data.batting_stats_all_events USING btree (player_id);
+
+
+--
+-- Name: batting_stats_all_events_indx_season; Type: INDEX; Schema: data; Owner: -
+--
+
+CREATE INDEX batting_stats_all_events_indx_season ON data.batting_stats_all_events USING btree (season);
 
 
 --
@@ -5265,6 +5263,34 @@ ALTER TABLE ONLY data.outcomes
 --
 
 REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
+
+
+--
+-- Name: fielder_stats_all_events; Type: MATERIALIZED VIEW DATA; Schema: data; Owner: -
+--
+
+REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
+
+
+--
+-- Name: pitching_stats_all_appearances; Type: MATERIALIZED VIEW DATA; Schema: data; Owner: -
+--
+
+REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
+
+
+--
+-- Name: players_info_expanded_all; Type: MATERIALIZED VIEW DATA; Schema: data; Owner: -
+--
+
+REFRESH MATERIALIZED VIEW data.players_info_expanded_all;
+
+
+--
+-- Name: running_stats_all_events; Type: MATERIALIZED VIEW DATA; Schema: data; Owner: -
+--
+
+REFRESH MATERIALIZED VIEW data.running_stats_all_events;
 
 
 --
