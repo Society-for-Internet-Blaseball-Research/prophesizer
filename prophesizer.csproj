@@ -19,6 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="patch\crabs_to_fridays.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="patch\pods.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

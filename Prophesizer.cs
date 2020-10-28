@@ -237,10 +237,11 @@ namespace SIBR
 				lastUpdated = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
 			}
 
+			ApplyDbPatches(psqlConnection);
+
 			m_dbSeasonDay = lastUpdated;
 			await RefreshMaterializedViews(psqlConnection);
 
-			ApplyDbPatches(psqlConnection);
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
 			Console.WriteLine(msg);
