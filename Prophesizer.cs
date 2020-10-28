@@ -585,7 +585,7 @@ namespace SIBR
 				{
 					await CopyGameEvents(psqlConnection, m_eventsToInsert);
 					// TODO filter to the earliest timestamp for a SeasonDay in LINQ first instead of doing it in SQL
-					await PersistTimeMap(m_eventsToInsert, psqlConnection);
+					//await PersistTimeMap(m_eventsToInsert, psqlConnection);
 					m_eventsToInsert.Clear();
 				}
 
