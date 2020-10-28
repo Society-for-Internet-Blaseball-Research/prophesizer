@@ -431,7 +431,7 @@ namespace SIBR
 
 					Console.WriteLine($"  Processed {page.Data.Count()} updates (through {page.Data.Last().Timestamp}).\n  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
 					//Console.WriteLine($"    {m_processor.NumNetworkOutcomes} games used the network outcomes.json file, {m_processor.NumLocalOutcomes} did not.");
-					await PersistTimeMap(m_eventsToInsert, psqlConnection);
+					//await PersistTimeMap(m_eventsToInsert, psqlConnection);
 					// Process any game events we received
 					while (m_eventsToInsert.Count > 0)
 					{
@@ -517,20 +517,7 @@ namespace SIBR
 					foreach(var chronData in page.Data)
 					{
 						SimData simData = chronData.Data;
-						switch(simData.Phase)
-						{
-							case PHASE_ELECTIONS:
-								StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.FirstSeen, "ELECTIONS");
-								break;
-							case PHASE_BOSS_FIGHT:
-								StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.FirstSeen, "BOSS_FIGHT");
-								break;
-							case PHASE_REG_SEASON:
-								// Do nothing, PersistTimeMap will do all days here
-								break;
-							// TODO: figure out "end of regular season"
-						}
-
+						StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.FirstSeen, simData.Phase);
 					}
 				}
 			}
@@ -539,17 +526,17 @@ namespace SIBR
 		}
 
 		// Store time_map data about a sim phase
-		private void StoreSimDataPhase(NpgsqlConnection psqlConnection, int season, int day, DateTime firstTime, string type)
+		private void StoreSimDataPhase(NpgsqlConnection psqlConnection, int season, int day, DateTime firstTime, int phaseId)
 		{
-			Console.WriteLine($"Storing {type} for season {season}, day {day} starting at {firstTime}.");
+			Console.WriteLine($"Storing phase {phaseId} for season {season}, day {day} starting at {firstTime}.");
 			NpgsqlCommand insertCmd = new NpgsqlCommand(@"
-								INSERT INTO data.time_map(season, day, first_time, time_event_type) values(@season, @day, @first_time, @type)
-								ON CONFLICT ON CONSTRAINT season_day_type_unique DO UPDATE SET first_time=EXCLUDED.first_time
+								INSERT INTO data.time_map(season, day, first_time, phase_id) values(@season, @day, @first_time, @phaseId)
+								ON CONFLICT ON CONSTRAINT season_day_unique DO UPDATE SET first_time=EXCLUDED.first_time
 								WHERE EXCLUDED.first_time < data.time_map.first_time", psqlConnection);
 			insertCmd.Parameters.AddWithValue("season", season);
 			insertCmd.Parameters.AddWithValue("day", day);
 			insertCmd.Parameters.AddWithValue("first_time", firstTime);
-			insertCmd.Parameters.AddWithValue("type", type);
+			insertCmd.Parameters.AddWithValue("phaseId", phaseId);
 			insertCmd.ExecuteNonQuery();
 		}
 		/// <summary>
@@ -1372,9 +1359,10 @@ namespace SIBR
 				{
 
 					// Record the first time seen for each season and day
+					// Note that the phase is 2 which is regular season games
 					var updateTimeMap = new NpgsqlCommand(@"
-        insert into data.time_map(season, day, first_time, time_event_type) values(@season, @day, @first_time, 'GAMEDAY')
-        on conflict on constraint season_day_type_unique do
+        insert into data.time_map(season, day, first_time, phase_id) values(@season, @day, @first_time, 2)
+        on conflict on constraint season_day_unique do
         update set first_time = EXCLUDED.first_time
         where time_map.first_time > EXCLUDED.first_time;
         ", psqlConnection);
