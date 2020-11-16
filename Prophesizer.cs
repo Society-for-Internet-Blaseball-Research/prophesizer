@@ -25,6 +25,12 @@ namespace SIBR
 		public int Day { get; set; }
 	}
 
+	struct PollResult
+	{
+		public SeasonDay Latest;
+		public int NumUpdatesProcessed;
+	}
+
 	class Prophesizer
 	{
 
@@ -191,8 +197,10 @@ namespace SIBR
 		}
 
 
-		public async Task<SeasonDay> Poll()
+		public async Task<PollResult> Poll()
 		{
+			PollResult result = new PollResult();
+
 			Console.WriteLine($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
 
 			await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
@@ -224,7 +232,6 @@ namespace SIBR
 				await StoreTimeMapEvents(psqlConnection);
 			}
 
-			SeasonDay lastUpdated = m_dbSeasonDay;
 			if (DO_EVENTS)
 			{
 				// TODO store current time
@@ -234,18 +241,19 @@ namespace SIBR
 					await BatchLoadGameUpdates(psqlConnection, m_dbSeasonDay, simSeasonDay);
 				}
 
-				lastUpdated = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
+				result = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
 			}
 
 			ApplyDbPatches(psqlConnection);
 
-			m_dbSeasonDay = lastUpdated;
+			m_dbSeasonDay = result.Latest;
 			await RefreshMaterializedViews(psqlConnection);
 
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
 			Console.WriteLine(msg);
-			return lastUpdated;
+
+			return result;
 		}
 
 		// Run any unapplied DB patches
@@ -363,8 +371,9 @@ namespace SIBR
 
 		
 
-		private async Task<SeasonDay> IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt, DateTime? afterTime)
+		private async Task<PollResult> IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt, DateTime? afterTime)
 		{
+			PollResult pollResult = new PollResult();
 			m_gameEventId = GetMaxGameEventId(psqlConnection);
 
 			bool morePages = true;
@@ -426,6 +435,7 @@ namespace SIBR
 						lastSeenDay.Day = update.Data.day;
 						update.Data.chroniclerHash = update.Hash;
 						await m_processor.ProcessGameObject(update.Data, update.Timestamp);
+						pollResult.NumUpdatesProcessed++;
 					}
 					m_processor.EventComplete -= Processor_EventComplete;
 					m_processor.GameComplete -= Processor_GameComplete;
@@ -469,7 +479,8 @@ namespace SIBR
 
 			await transaction.CommitAsync();
 
-			return lastSeenDay;
+			pollResult.Latest = lastSeenDay;
+			return pollResult;
 		}
 
 		// Election results show up in phase 0
