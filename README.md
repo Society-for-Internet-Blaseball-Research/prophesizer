@@ -49,7 +49,9 @@ The following instructions are written for Windows PCs.
 1. Prophesizer depends on [git](https://git-scm.com/), [PostgreSQL](https://www.postgresql.org/), [Visual Studio Code](https://code.visualstudio.com/), and [Node.js](https://nodejs.org/en/). You can manually download and install all of these, but if you have the package manager [Chocolatey](https://chocolatey.org/) installed, you can automatically install these tools by opening a prompt (cmd/powershell) as administrator and running: `choco install git postgresql vscode nodejs`
 2. Use git to clone Prophesizer from github into your desired directory: `git clone https://github.com/Society-for-Internet-Blaseball-Research/prophesizer/`. 
 3. Set the environment PSQL_CONNECTION_STRING to "Host=localhost;username=[postgres username, default 'postgres'];password=[postgres password];database=blaseball", with `setx`, making appropriate changes if any are necessary.
-4. Make sure psql is added to PATH (you can test by typing it in as a command), and your C# connection string and AWS key environment variables are correctly set.
-5. In the directory prophesizer\\db, run `node schema.js load` to get your database ready to receive data from Prophesizer.
-6. Compile and run Prophesizer from VS Code via File -> Open Folder, selecting Prophesizer's folder, going to 'Run' in the menu bar, and selecting "Run Without Debugging".
-7. If at some point you make changes to the schema you wish to commit to a repository using `git`, in the directory prophesizer\\db, run `node schema.js dump` to dump your database's schema to schema.sql.
+4. Make sure psql is added to PATH (you can test by typing it in as a command), and your C# connection string environment variable is correctly set.
+5. Using pgAdmin or `psql`, create a database named `blaseball`.
+6. Run the command `create extension unaccent` on the `blaseball` database.
+7. In the directory prophesizer\\db, run `node schema.js load` to load the schema Prophesizer expects into the database.
+8. Compile and run Prophesizer from VS Code via File -> Open Folder, selecting Prophesizer's folder, going to 'Run' in the menu bar, and selecting "Run Without Debugging".
+9. If at some point you make changes to the schema you wish to commit to a repository using `git`, in the directory prophesizer\\db, run `node schema.js dump` to dump your database's schema to schema.sql.
