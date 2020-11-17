@@ -238,7 +238,35 @@ CREATE FUNCTION data.bankers_round(in_val numeric, in_prec integer) RETURNS nume
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 declare
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -252,7 +280,35 @@ declare
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     difference numeric;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -266,7 +322,35 @@ declare
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 begin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -280,7 +364,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     difference := retval-in_val;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -294,7 +406,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         even := (retval * (10::numeric^in_prec)) % 2::numeric = 0::numeric;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -308,7 +448,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             retval := round(val-difference,in_prec);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -322,7 +490,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	end if;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -336,7 +532,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -359,7 +583,35 @@ CREATE FUNCTION data.baserunning_rating(in_player_id character varying, in_times
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -373,7 +625,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    	power(p.continuation * p.base_thirst * p.indulgence * p.ground_friction, 0.1),15)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -387,7 +667,35 @@ FROM data.players_from_timestamp(in_timestamp) p
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 WHERE p.player_id = in_player_id
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -410,7 +718,35 @@ CREATE FUNCTION data.baserunning_rating_raw(in_laserlikeness numeric, in_continu
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -424,7 +760,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	power(in_continuation * in_base_thirst * in_indulgence * in_ground_friction, 0.1),15);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -447,7 +811,35 @@ CREATE FUNCTION data.batter_idol_coins(in_player_id character varying, in_season
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -461,7 +853,35 @@ SUM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -475,7 +895,35 @@ SUM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	  WHEN ge.event_type IN ('SINGLE','DOUBLE','TRIPLE') THEN 200
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -489,7 +937,35 @@ SUM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	  ELSE 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -503,7 +979,35 @@ SUM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ) AS coins
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -517,7 +1021,35 @@ FROM data.game_events ge
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 WHERE ge.season = 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -531,7 +1063,35 @@ CASE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   when in_season = -1 then (SELECT data.current_season())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -545,6 +1105,20 @@ CASE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 END
 
 
@@ -552,7 +1126,35 @@ END
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 AND ge.batter_id = in_player_id;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -575,7 +1177,35 @@ CREATE FUNCTION data.batting_average(in_hits bigint, in_raw_at_bats bigint) RETU
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT (in_hits::numeric/ in_raw_at_bats::numeric)::numeric(10,3)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -598,7 +1228,35 @@ CREATE FUNCTION data.batting_rating(in_player_id character varying, in_timestamp
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -612,7 +1270,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    power((1 - p.patheticism),0.05) *
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -626,7 +1312,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    power((p.moxie * p.musclitude),0.075) * 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -640,6 +1354,20 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 FROM data.players_from_timestamp(in_timestamp) p
 
 
@@ -647,7 +1375,35 @@ FROM data.players_from_timestamp(in_timestamp) p
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 WHERE player_id = in_player_id;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -670,7 +1426,35 @@ CREATE FUNCTION data.batting_rating_raw(in_tragicness numeric, in_patheticism nu
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -684,7 +1468,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    power((1 - in_patheticism),0.05) *
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -698,6 +1510,20 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    power((in_moxie * in_musclitude),0.075) * 
 
 
@@ -705,7 +1531,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    power(in_martyrdom,0.02),15);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -728,6 +1582,20 @@ CREATE FUNCTION data.current_gameday() RETURNS integer
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT max(day) FROM data.game_events WHERE
 
 
@@ -735,7 +1603,35 @@ SELECT max(day) FROM data.game_events WHERE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 season = (SELECT data.current_season());
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -765,7 +1661,49 @@ CREATE FUNCTION data.current_season() RETURNS integer
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT max(season) from data.games;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -788,7 +1726,35 @@ CREATE FUNCTION data.defense_rating(in_player_id character varying, in_timestamp
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -802,7 +1768,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    	power((p.watchfulness * p.anticapitalism * p.chasiness),0.1),15)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -816,7 +1810,35 @@ FROM data.players_from_timestamp(in_timestamp) p
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 WHERE p.player_id = in_player_id;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -839,7 +1861,35 @@ CREATE FUNCTION data.defense_rating_raw(in_omniscience numeric, in_tenaciousness
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -853,7 +1903,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
    	power((in_watchfulness * in_anticapitalism * in_chasiness),0.1),15);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -883,7 +1961,49 @@ CREATE FUNCTION data.earned_run_average(in_runs numeric, in_outs numeric) RETURN
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT round(9*(in_runs/((in_outs::DECIMAL)/3)::DECIMAL) ,2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -905,7 +2025,31 @@ CREATE FUNCTION data.gameday_from_timestamp(in_timestamp timestamp without time 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -917,13 +2061,49 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	SELECT COALESCE
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -935,7 +2115,31 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
   			SELECT season FROM data.time_map WHERE first_time = 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -947,7 +2151,31 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 				SELECT max(first_time)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -959,7 +2187,31 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 				WHERE first_time < in_timestamp
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -971,13 +2223,49 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		)
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	,0)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -989,7 +2277,31 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	SELECT COALESCE
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1001,7 +2313,31 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
   		(
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1013,7 +2349,31 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 			(
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1025,7 +2385,31 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 				FROM data.time_map 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1037,7 +2421,31 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 			)	
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1049,13 +2457,49 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	,0)
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 );
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1084,7 +2528,49 @@ CREATE FUNCTION data.innings_from_outs(in_outs numeric) RETURNS numeric
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 select ((round(in_outs/3,0))::TEXT || '.' ||  (mod(in_outs,3))::text)::numeric
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1107,6 +2593,20 @@ CREATE FUNCTION data.last_position_in_string(in_string text, in_search text) RET
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Select length(in_string) - 
 
 
@@ -1114,7 +2614,35 @@ Select length(in_string) -
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 position(reverse(in_search) in reverse(in_string)) - length(in_search);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1144,7 +2672,49 @@ CREATE FUNCTION data.on_base_percentage(in_hits bigint, in_raw_at_bats bigint, i
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT ((in_hits + in_walks)/ (in_raw_at_bats +in_walks + in_sacs)::numeric)::numeric(10,3)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1167,6 +2737,20 @@ CREATE FUNCTION data.pitcher_idol_coins(in_player_id character varying, in_seaso
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 select
 
 
@@ -1174,7 +2758,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1188,7 +2800,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	(count(1)) * 200
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1202,7 +2842,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	WHERE ge.season = 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1216,7 +2884,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   	  when in_season = -1 then (SELECT data.current_season())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1230,7 +2926,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1244,7 +2968,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	AND ge.pitcher_id = in_player_id
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1258,7 +3010,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 +
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1272,6 +3052,20 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	SELECT coalesce(SUM(shutout),0) FROM
 
 
@@ -1279,7 +3073,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		(
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1293,7 +3115,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		FROM DATA.game_events ge
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1307,7 +3157,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		CASE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1321,7 +3199,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		  else in_season
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1335,7 +3241,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		AND ge.pitcher_id = in_player_id 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1349,7 +3283,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		HAVING 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1363,7 +3325,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		  WHEN top_of_inning THEN MAX(away_score)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1377,7 +3367,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		END = 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1391,7 +3409,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		/*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1405,7 +3451,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		SUM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1419,7 +3493,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		  CASE 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1433,7 +3535,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		    THEN 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1447,7 +3577,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		  END 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1461,7 +3619,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1475,7 +3661,35 @@ select
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1498,7 +3712,35 @@ CREATE FUNCTION data.pitching_rating(in_player_id character varying, in_timestam
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1512,7 +3754,35 @@ round(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 power(p.unthwackability,0.5) * 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1526,7 +3796,35 @@ power(p.ruthlessness,0.4) *
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 power(p.overpowerment,0.15) * 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1540,7 +3838,35 @@ power(p.shakespearianism,0.1) *
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 power(p.coldness,0.025),15)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1554,6 +3880,20 @@ FROM data.players_from_timestamp(in_timestamp) p
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 WHERE 
 
 
@@ -1561,7 +3901,35 @@ WHERE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 p.player_id = in_player_id;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1584,7 +3952,35 @@ CREATE FUNCTION data.pitching_rating_raw(in_unthwackability numeric, in_ruthless
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1598,7 +3994,35 @@ round(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	power(in_unthwackability,0.5) * 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1612,7 +4036,35 @@ round(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	power(in_overpowerment,0.15) * 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1626,7 +4078,35 @@ round(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	power(in_coldness,0.025),15);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1649,7 +4129,35 @@ CREATE FUNCTION data.player_day_vibe(in_player_id character varying, in_gameday 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1663,7 +4171,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (2 / (6 + round(10 * p.buoyancy)) * in_gameday + .5)) - .5 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1677,7 +4213,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 FROM data.players_from_timestamp(in_timestamp) p
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1691,7 +4255,35 @@ WHERE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 p.player_id = in_player_id;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1714,7 +4306,35 @@ CREATE FUNCTION data.player_mods_from_timestamp(in_timestamp timestamp without t
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 begin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1728,7 +4348,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	select *
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1742,7 +4390,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	where m.valid_from <= in_timestamp 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1756,7 +4432,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1779,7 +4483,49 @@ CREATE FUNCTION data.player_slug_creation() RETURNS trigger
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 BEGIN
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1807,6 +4553,34 @@ BEGIN
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	RETURN new;
 
 
@@ -1814,7 +4588,35 @@ BEGIN
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 END;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1837,7 +4639,35 @@ CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 begin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1851,7 +4681,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	select *
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1865,7 +4723,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	where p.valid_from <= in_timestamp + (INTERVAL '1 millisecond')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1879,7 +4765,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1896,6 +4810,48 @@ $$;
 CREATE FUNCTION data.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
     AS $$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1937,7 +4893,63 @@ SELECT 0.5 * data.round_half_even((
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (in_rating)* 10),0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1960,7 +4972,35 @@ CREATE FUNCTION data.reblase_gameid(in_game_id character varying) RETURNS charac
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 select 'https://reblase.sibr.dev/game/' || in_game_id;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1982,7 +5022,31 @@ CREATE FUNCTION data.ref_leaderboard_season_batting(in_season integer) RETURNS T
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 begin
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1994,7 +5058,31 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2006,7 +5094,31 @@ a.player_id,
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 p.player_name, 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2018,7 +5130,31 @@ p.url_slug,
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 p.team_id,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2030,7 +5166,31 @@ p.team,
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 c.*
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2042,7 +5202,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 (
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2054,7 +5238,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	ba.on_base_percentage, 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2066,7 +5274,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	ba.batting_average, 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2078,7 +5310,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	ba.obp_rank, 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2090,7 +5346,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	ba.ba_rank, 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2102,7 +5382,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	r.runs,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2114,7 +5418,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	r.caught_stealing,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2126,7 +5454,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	r.sb_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2138,13 +5490,49 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	from
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2156,7 +5544,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		season,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2168,7 +5580,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		walks,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2180,7 +5616,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		triples,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2192,7 +5652,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		home_runs,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2204,7 +5688,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		hits,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2216,7 +5724,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		sacrifices,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2228,7 +5760,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		hbps,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2240,7 +5796,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY hits_risps DESC) AS hits_risp_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2252,7 +5832,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY doubles DESC) AS dbl_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2264,7 +5868,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY home_runs DESC) AS hr_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2276,7 +5904,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY quadruples DESC) AS qd_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2288,7 +5940,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY runs_batted_in DESC) AS rbi_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2300,7 +5976,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2312,7 +6012,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY gidps DESC) AS gidp_rank
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2324,7 +6048,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		WHERE season = in_season
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2336,13 +6084,49 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	LEFT JOIN
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2354,7 +6138,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		on_base_percentage,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2366,7 +6174,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		batting_average,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2378,7 +6210,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY on_base_percentage DESC) AS obp_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2390,7 +6246,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY batting_average DESC) AS ba_rank,           
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2402,13 +6282,49 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		FROM DATA.batting_stats_player_season y
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		WHERE season = in_season
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2420,7 +6336,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		AND NOT is_postseason)*2
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2432,7 +6372,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	ON (b.player_id = ba.player_id)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2444,7 +6408,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2456,7 +6444,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		season,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2468,7 +6480,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		stolen_bases,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2480,7 +6516,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY runs DESC) AS runs_rank,
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2492,7 +6552,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		rank() OVER (ORDER BY caught_stealing DESC) AS cs_rank
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2504,7 +6588,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 		WHERE season = in_season
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2516,7 +6624,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	ON (b.player_id = r.player_id)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2528,7 +6660,31 @@ FROM
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 CROSS JOIN LATERAL 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2540,7 +6696,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	VALUES 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2552,7 +6732,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.slugging, a.slugging_rank, 'slugging'),
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2564,7 +6768,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.on_base_slugging,a.ops_rank,'on_base_slugging'),
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2576,7 +6804,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.walks,a.bb_rank,'walks'), 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2588,7 +6840,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.triples,a.trp_rank,'triples'), 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2600,7 +6876,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.home_runs,a.hr_rank,'home_runs'), 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2612,7 +6912,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.hits,a.hits_rank,'hits'), 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2624,7 +6948,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.sacrifices,a.sac_rank,'sacrifices'), 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2636,7 +6984,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.hbps,a.hbp_rank,'hit_by_pitches'),
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2648,7 +7020,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.runs,a.runs_rank,'runs_scored'),
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2660,7 +7056,31 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 	(a.caught_stealing,a.cs_rank,'caught_stealing')
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2672,13 +7092,49 @@ CROSS JOIN LATERAL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 JOIN data.players_info_expanded_all p ON (a.player_id = p.player_id 
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2690,7 +7146,31 @@ AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2702,7 +7182,31 @@ AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 WHERE c.rank <= 10 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2720,7 +7224,43 @@ ORDER BY c.stat, c.rank, p.player_name;
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	end;
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2737,7 +7277,19 @@ CREATE FUNCTION data.ref_leaderboard_season_pitching(in_season integer) RETURNS 
     LANGUAGE plpgsql
     AS $$
 
+
+
+
+
 begin
+
+
+
+
+
+
+
+
 
 
 
@@ -2745,237 +7297,709 @@ begin
 
 
 
+
+
+
+
+
+
+
+
 SELECT 
+
+
+
+
 
 a.player_id, 
 
+
+
+
+
 p.player_name, 
+
+
+
+
 
 p.url_slug,
 
+
+
+
+
 p.team_id,
+
+
+
+
 
 p.team,
 
+
+
+
+
 c.*
+
+
+
+
 
 FROM 
 
+
+
+
+
 (
+
+
+
+
 
 	SELECT p.*,
 
+
+
+
+
 	pa.era,
+
+
+
+
 
 	pa.bb_per_9,
 
+
+
+
+
 	pa.hits_per_9,
+
+
+
+
 
 	pa.hr_per_9,
 
+
+
+
+
 	pa.k_per_9,
+
+
+
+
 
 	pa.era_rank,
 
+
+
+
+
 	pa.bb9_rank,
+
+
+
+
 
 	pa.hits9_rank,
 
+
+
+
+
 	pa.hr9_rank,
+
+
+
+
 
 	pa.k9_rank
 
+
+
+
+
 	from
+
+
+
+
 
 	(
 
+
+
+
+
 		SELECT x.player_id,
+
+
+
+
 
 		season,
 
+
+
+
+
 		walks,
+
+
+
+
 
 		ROUND(walks/batters_faced,3) AS bb_pct,
 
+
+
+
+
 		strikeouts,
+
+
+
+
 
 		round(strikeouts/walks,2) AS k_bb,
 
+
+
+
+
 		ROUND(strikeouts/batters_faced,3) AS k_pct,
+
+
+
+
 
 		runs_allowed,
 
+
+
+
+
 		hits_allowed,
+
+
+
+
 
 		hrs_allowed,
 
+
+
+
+
 		innings,
+
+
+
+
 
 		pitch_count,
 
+
+
+
+
 		hbps,
+
+
+
+
 
 		wins,
 
+
+
+
+
 		losses,
+
+
+
+
 
 		shutouts,
 
+
+
+
+
 		quality_starts,
+
+
+
+
 
 		ROUND((walks+hits_allowed)/innings,3) AS whip,
 
+
+
+
+
 		round(wins::DECIMAL/(wins::DECIMAL+losses::DECIMAL),3) AS win_pct,
+
+
+
+
 
 		rank() OVER (ORDER BY walks DESC) AS bb_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank,		
+
+
+
+
 
 		rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY round(strikeouts/walks,2) DESC) AS kbb_rank,
+
+
+
+
 
 		rank() OVER (ORDER BY round(strikeouts/batters_faced,3) DESC) AS kpct_rank,		
 
+
+
+
+
 		rank() OVER (ORDER BY runs_allowed DESC) AS runs_rank,
+
+
+
+
 
 		rank() OVER (ORDER BY hits_allowed DESC) AS hits_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY hrs_allowed DESC) AS hrs_rank,
+
+
+
+
 
 		rank() OVER (ORDER BY innings DESC) AS inn_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY pitch_count DESC) AS ptch_rank,
+
+
+
+
 
 		rank() OVER (ORDER BY hbps DESC) AS hbp_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY wins DESC) AS win_rank,
+
+
+
+
 
 		rank() OVER (ORDER BY losses DESC) AS loss_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY shutouts DESC) AS shut_rank,
+
+
+
+
 
 		rank() OVER (ORDER BY quality_starts DESC) AS qual_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY ROUND((walks+hits_allowed)/innings,3)) AS whip_rank
+
+
+
+
 
 		FROM DATA.pitching_stats_player_season x
 
+
+
+
+
 		WHERE season = in_season
+
+
+
+
 
 	) p
 
+
+
+
+
 	LEFT JOIN
+
+
+
+
 
 	(
 
+
+
+
+
 		SELECT x.player_id,
+
+
+
+
 
 		era,
 
+
+
+
+
 		bb_per_9,
+
+
+
+
 
 		hits_per_9,
 
+
+
+
+
 		hr_per_9,
+
+
+
+
 
 		k_per_9,
 
+
+
+
+
 		rank() OVER (ORDER BY era) AS era_rank,
+
+
+
+
 
 		rank() OVER (ORDER BY bb_per_9) AS bb9_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY hits_per_9) AS hits9_rank,
+
+
+
+
 
 		rank() OVER (ORDER BY hr_per_9) AS hr9_rank,
 
+
+
+
+
 		rank() OVER (ORDER BY k_per_9 DESC) AS k9_rank
+
+
+
+
 
 		FROM DATA.pitching_stats_player_season x
 
+
+
+
+
 		WHERE season = in_season
+
+
+
+
 
 		
 
+
+
+
+
 		--at least 1 inning per team's regular season games for averaging stats
+
+
+
+
 
 		AND outs_recorded > (SELECT MAX(DAY)+1 FROM DATA.games WHERE season = in_season
 
+
+
+
+
 		AND NOT is_postseason)*3
+
+
+
+
 
 	) pa
 
+
+
+
+
 	ON (p.player_id = pa.player_id)
+
+
+
+
 
 ) a
 
+
+
+
+
 CROSS JOIN LATERAL 
+
+
+
+
 
 (
 
+
+
+
+
 	VALUES 
+
+
+
+
 
 	(a.walks, a.bb_rank, 'walks'),
 
+
+
+
+
 	(a.bb_pct, a.bbpct_rank, 'walk_percentage'),
+
+
+
+
 
 	(a.strikeouts, a.k_rank, 'strikeouts'),
 
+
+
+
+
 	(a.k_bb, a.kbb_rank, 'strikeouts_per_walk'),
+
+
+
+
 
 	(a.k_pct, a.kpct_rank, 'strikeout_percentage'),
 
+
+
+
+
 	(a.runs_allowed, a.runs_rank, 'runs_allowed'),
+
+
+
+
 
 	(a.hits_allowed, a.hits_rank, 'hits_allowed'),
 
+
+
+
+
 	(a.hrs_allowed, a.hrs_rank, 'home_runs_allowed'),
+
+
+
+
 
 	(a.innings, a.inn_rank, 'innings'),
 
+
+
+
+
 	(a.pitch_count, a.ptch_rank, 'pitches_thrown'),
+
+
+
+
 
 	(a.hbps, a.hbp_rank, 'hit_by_pitches'),
 
+
+
+
+
 	(a.wins, a.win_rank, 'wins'),
+
+
+
+
 
 	(a.losses, a.loss_rank, 'losses'),
 
+
+
+
+
 	(a.shutouts, a.shut_rank, 'shutouts'),
+
+
+
+
 
 	(a.quality_starts, a.qual_rank, 'quality_starts'),
 
+
+
+
+
 	(a.era, a.era_rank, 'earned_run_average'),
+
+
+
+
 
 	(a.bb_per_9, a.bb9_rank, 'walks_per_9'),
 
+
+
+
+
 	(a.hits_per_9, a.hits9_rank, 'hits_per_9'),
 
+
+
+
+
 	(a.hr_per_9, a.hr9_rank, 'home_runs_per_9'),
+
+
+
+
 
 	(a.k_per_9, a.k9_rank, 'strikeouts_per_9')
 
 
 
+
+
+
+
+
+
+
+
 ) AS c(value, rank, stat)
+
+
+
+
 
 JOIN data.players_info_expanded_all p ON (a.player_id = p.player_id 
 
+
+
+
+
 AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
+
+
+
+
 
 AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) >= p.valid_from
 
+
+
+
+
 AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
+
+
+
+
 
 AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) <= p.valid_until)
 
+
+
+
+
 WHERE c.rank <= 10 
+
+
+
+
 
 ORDER BY c.stat, c.rank, p.player_name;	
 
 
 
+
+
+
+
+
+
+
+
 	end;
+
+
+
+
 
 $$;
 
@@ -2993,7 +8017,49 @@ CREATE PROCEDURE data.refresh_materialized_views()
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 begin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3021,7 +8087,49 @@ perform data.refresh_matviews();
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3038,12 +8146,26 @@ $$;
 CREATE FUNCTION data.refresh_matviews() RETURNS void
     LANGUAGE sql SECURITY DEFINER
     AS $$
+
+
 REFRESH MATERIALIZED VIEW data.players_info_expanded_all;
+
+
 REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
+
+
 REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
+
+
 REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
+
+
 REFRESH MATERIALIZED VIEW data.running_stats_all_events;
+
+
 REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
+
+
 $$;
 
 
@@ -3060,7 +8182,35 @@ CREATE FUNCTION data.rosters_from_timestamp(in_timestamp timestamp without time 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 begin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3074,7 +8224,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	select *
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3088,7 +8266,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	where r.valid_from <= in_timestamp 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3102,7 +8308,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3125,7 +8359,49 @@ CREATE FUNCTION data.round_half_even(val numeric, prec integer) RETURNS numeric
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 declare
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3146,6 +8422,20 @@ declare
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     difference numeric;
 
 
@@ -3153,7 +8443,49 @@ declare
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     even boolean;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3181,6 +8513,34 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     retval := round(val,prec);
 
 
@@ -3188,7 +8548,49 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     difference := retval-val;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3216,7 +8618,63 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         even := (retval * (10::numeric^prec)) % 2::numeric = 0::numeric;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3237,7 +8695,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             retval := round(val-difference,prec);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3251,6 +8737,20 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		
 
 
@@ -3258,7 +8758,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     end if;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3279,7 +8807,49 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3302,6 +8872,20 @@ CREATE FUNCTION data.season_timespan(in_season integer) RETURNS TABLE(season_sta
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT
 
 
@@ -3309,7 +8893,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3323,7 +8935,35 @@ SELECT
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ) AS season_start,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3337,7 +8977,35 @@ COALESCE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3351,7 +9019,35 @@ COALESCE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		SELECT first_time - INTERVAL '1 SECOND' FROM data.time_map WHERE DAY = 0 AND season = 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3365,7 +9061,35 @@ COALESCE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	), 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3379,7 +9103,35 @@ COALESCE
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ) AS season_end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3402,7 +9154,35 @@ CREATE FUNCTION data.slugging(in_total_bases_from_hits bigint, in_at_bats bigint
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT (in_total_bases_from_hits::numeric/in_at_bats::numeric)::numeric(10,3)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3425,7 +9205,35 @@ CREATE FUNCTION data.team_slug_creation() RETURNS trigger
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 BEGIN
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3439,6 +9247,20 @@ BEGIN
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	RETURN new;
 
 
@@ -3446,7 +9268,35 @@ BEGIN
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 END;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3469,7 +9319,35 @@ CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zo
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 begin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3483,7 +9361,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		select *
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3497,7 +9403,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		where t.valid_from <= in_timestamp 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3511,7 +9445,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3534,7 +9496,35 @@ CREATE FUNCTION data.timestamp_from_gameday(in_season integer, in_gameday intege
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SELECT first_time FROM data.time_map where season = in_season and day = in_gameday;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3557,7 +9547,35 @@ CREATE PROCEDURE data.wipe_all()
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 begin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3571,6 +9589,20 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	call data.wipe_hourly();
 
 
@@ -3578,7 +9610,35 @@ begin
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3594,15 +9654,24 @@ $$;
 
 CREATE PROCEDURE data.wipe_events()
     LANGUAGE plpgsql
-    AS $$
-begin
-truncate data.game_events cascade;
-delete from data.imported_logs where key like 'blaseball-log%';
-update data.chronicler_meta set season=0, day=0, game_timestamp=null where id=0;
-truncate data.time_map;
-truncate data.chronicler_hash_game_event;
-truncate data.applied_patches;
-end;
+    AS $$
+
+begin
+
+truncate data.game_events cascade;
+
+delete from data.imported_logs where key like 'blaseball-log%';
+
+update data.chronicler_meta set season=0, day=0, game_timestamp=null where id=0;
+
+truncate data.time_map;
+
+truncate data.chronicler_hash_game_event;
+
+truncate data.applied_patches;
+
+end;
+
 $$;
 
 
@@ -3612,30 +9681,54 @@ $$;
 
 CREATE PROCEDURE data.wipe_hourly()
     LANGUAGE plpgsql
-    AS $$
-begin
-update data.chronicler_meta set team_timestamp=null, player_timestamp=null where id=0;
-delete from data.imported_logs where key like 'compressed-hourly%';
-truncate data.players cascade;
-truncate data.teams cascade;
-truncate data.games cascade;
-truncate data.team_roster cascade;
-truncate data.player_modifications cascade;
-truncate data.team_modifications cascade;
-truncate data.applied_patches;
-
-
-
-
-
-
-
-
-
-
-
-
-end;
+    AS $$
+
+begin
+
+update data.chronicler_meta set team_timestamp=null, player_timestamp=null where id=0;
+
+delete from data.imported_logs where key like 'compressed-hourly%';
+
+truncate data.players cascade;
+
+truncate data.teams cascade;
+
+truncate data.games cascade;
+
+truncate data.team_roster cascade;
+
+truncate data.player_modifications cascade;
+
+truncate data.team_modifications cascade;
+
+truncate data.applied_patches;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+end;
+
 $$;
 
 
@@ -3704,7 +9797,7 @@ CREATE TABLE data.game_events (
     lineup_position smallint,
     is_last_event_for_plate_appearance boolean,
     bases_hit smallint,
-    runs_batted_in smallint,
+    runs_batted_in numeric,
     is_sacrifice_hit boolean,
     is_sacrifice_fly boolean,
     outs_on_play smallint,
@@ -3797,7 +9890,7 @@ CREATE VIEW data.batting_records_combined_teams_playoffs_single_game AS
                     ge.season,
                     ge.day
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day >= 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day >= 99))
                   GROUP BY ge.game_id, 'RBIS'::text, ge.season, ge.day) x) y
   WHERE (y.this = 1)
   ORDER BY y.event, y.season, y.day;
@@ -3854,7 +9947,7 @@ CREATE VIEW data.batting_records_combined_teams_single_game AS
                     ge.season,
                     ge.day
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day < 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day < 99))
                   GROUP BY ge.game_id, 'RBIS'::text, ge.season, ge.day) x) y
   WHERE (y.this = 1)
   ORDER BY y.event, y.season, y.day;
@@ -3899,7 +9992,7 @@ CREATE VIEW data.batting_records_league_playoffs_season AS
                     'RBIS'::text AS event,
                     ge.season
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day >= 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day >= 99))
                   GROUP BY 'RBIS'::text, ge.season) x) y
   WHERE (y.this = 1)
   ORDER BY y.event, y.season;
@@ -3944,7 +10037,7 @@ CREATE VIEW data.batting_records_league_season AS
                     'RBIS'::text AS event,
                     ge.season
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day < 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day < 99))
                   GROUP BY 'RBIS'::text, ge.season) x) y
   WHERE (y.this = 1)
   ORDER BY y.event, y.season;
@@ -4387,7 +10480,7 @@ CREATE VIEW data.batting_records_player_playoffs_season AS
                     'RBIS'::text AS event,
                     ge.season
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day >= 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day >= 99))
                   GROUP BY 'RBIS'::text, ge.batter_id, ge.season) x) y
      JOIN data.players_info_expanded_all p ON ((((y.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE (y.this = 1)
@@ -4452,7 +10545,7 @@ CREATE VIEW data.batting_records_player_playoffs_single_game AS
                     ge.season,
                     ge.day
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day >= 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day >= 99))
                   GROUP BY ge.game_id, 'RBIS'::text, ge.batter_id, ge.season, ge.day) x) y
      JOIN data.players_info_expanded_all p ON ((((y.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE (y.this = 1)
@@ -4505,7 +10598,7 @@ CREATE VIEW data.batting_records_player_season AS
                     'RBIS'::text AS event,
                     ge.season
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day < 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day < 99))
                   GROUP BY 'RBIS'::text, ge.batter_id, ge.season) x) y
      JOIN data.players_info_expanded_all p ON ((((y.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE (y.this = 1)
@@ -4844,7 +10937,7 @@ CREATE VIEW data.batting_records_team_playoffs_season AS
                     'RBIS'::text AS event,
                     ge.season
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day >= 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day >= 99))
                   GROUP BY 'RBIS'::text, ge.batter_team_id, ge.season) x) y
      JOIN data.teams_current t ON (((y.team_id)::text = (t.team_id)::text)))
   WHERE (y.this = 1)
@@ -4909,7 +11002,7 @@ CREATE VIEW data.batting_records_team_playoffs_single_game AS
                     ge.season,
                     ge.day
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in >= 0) AND (ge.day < 99))
+                  WHERE ((ge.runs_batted_in >= (0)::numeric) AND (ge.day < 99))
                   GROUP BY ge.game_id, 'RBIS'::text, ge.batter_team_id, ge.season, ge.day) x) y
      JOIN data.teams_current t ON (((y.team_id)::text = (t.team_id)::text)))
   WHERE (y.this = 1)
@@ -4962,7 +11055,7 @@ CREATE VIEW data.batting_records_team_season AS
                     'RBIS'::text AS event,
                     ge.season
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day < 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day < 99))
                   GROUP BY 'RBIS'::text, ge.batter_team_id, ge.season) x) y
      JOIN data.teams_info_expanded_all t ON ((((y.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE (y.this = 1)
@@ -5027,7 +11120,7 @@ CREATE VIEW data.batting_records_team_single_game AS
                     ge.season,
                     ge.day
                    FROM data.game_events ge
-                  WHERE ((ge.runs_batted_in > 0) AND (ge.day < 99))
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day < 99))
                   GROUP BY ge.game_id, 'RBIS'::text, ge.batter_team_id, ge.season, ge.day) x) y
      JOIN data.teams_current t ON (((y.team_id)::text = (t.team_id)::text)))
   WHERE (y.this = 1)
@@ -5551,7 +11644,7 @@ CREATE VIEW data.pitching_records_player_single_game AS
             pitching_stats_all_appearances.season,
             pitching_stats_all_appearances.day
            FROM data.pitching_stats_all_appearances
-          WHERE (COALESCE(pitching_stats_all_appearances.runs_allowed, (0)::bigint) > 0)
+          WHERE (COALESCE(pitching_stats_all_appearances.runs_allowed, ((0)::bigint)::numeric) > (0)::numeric)
         UNION
          SELECT rank() OVER (ORDER BY pitching_stats_all_appearances.walks DESC) AS rank,
             'walks'::text AS event,
@@ -5581,7 +11674,7 @@ CREATE VIEW data.pitching_records_player_single_game AS
             pitching_stats_all_appearances.season,
             pitching_stats_all_appearances.day
            FROM data.pitching_stats_all_appearances
-          WHERE (COALESCE(pitching_stats_all_appearances.runs_allowed, (0)::bigint) > 0)
+          WHERE (COALESCE(pitching_stats_all_appearances.runs_allowed, ((0)::bigint)::numeric) > (0)::numeric)
         UNION
          SELECT rank() OVER (ORDER BY pitching_stats_all_appearances.hits_allowed DESC) AS rank,
             'hits_allowed'::text AS event,
@@ -5614,12 +11707,12 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
     sum(p.runs_allowed) AS runs_allowed,
     sum(
         CASE
-            WHEN (p.runs_allowed = 0) THEN 1
+            WHEN (p.runs_allowed = (0)::numeric) THEN 1
             ELSE 0
         END) AS shutouts,
     sum(
         CASE
-            WHEN ((p.runs_allowed < 4) AND (p.outs_recorded > 18)) THEN 1
+            WHEN ((p.runs_allowed < (4)::numeric) AND (p.outs_recorded > 18)) THEN 1
             ELSE 0
         END) AS quality_starts,
     sum(p.strikeouts) AS strikeouts,
@@ -5657,12 +11750,12 @@ CREATE VIEW data.pitching_stats_player_season AS
     sum(p.runs_allowed) AS runs_allowed,
     sum(
         CASE
-            WHEN (p.runs_allowed = 0) THEN 1
+            WHEN (p.runs_allowed = (0)::numeric) THEN 1
             ELSE 0
         END) AS shutouts,
     sum(
         CASE
-            WHEN ((p.runs_allowed < 4) AND (p.outs_recorded > 18)) THEN 1
+            WHEN ((p.runs_allowed < (4)::numeric) AND (p.outs_recorded > 18)) THEN 1
             ELSE 0
         END) AS quality_starts,
     sum(p.strikeouts) AS strikeouts,
@@ -7833,21 +13926,21 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 -- Name: applied_patches_patch_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.applied_patches_patch_id_seq', 10, true);
+SELECT pg_catalog.setval('data.applied_patches_patch_id_seq', 14, true);
 
 
 --
 -- Name: chronicler_hash_game_event_chronicler_hash_game_event_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.chronicler_hash_game_event_chronicler_hash_game_event_id_seq', 16653228, true);
+SELECT pg_catalog.setval('data.chronicler_hash_game_event_chronicler_hash_game_event_id_seq', 19433397, true);
 
 
 --
 -- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 12086046, true);
+SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 12685323, true);
 
 
 --
@@ -7868,49 +13961,49 @@ SELECT pg_catalog.setval('data.imported_logs_id_seq', 34207, true);
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_events_id_seq', 74558, true);
+SELECT pg_catalog.setval('data.player_events_id_seq', 77002, true);
 
 
 --
 -- Name: player_modifications_player_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 8035, true);
+SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 8865, true);
 
 
 --
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.players_id_seq', 119998, true);
+SELECT pg_catalog.setval('data.players_id_seq', 125480, true);
 
 
 --
 -- Name: team_modifications_team_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 1823, true);
+SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 2079, true);
 
 
 --
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 27066, true);
+SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 28510, true);
 
 
 --
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.teams_id_seq', 1014, true);
+SELECT pg_catalog.setval('data.teams_id_seq', 1090, true);
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 13886281, true);
+SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 13896694, true);
 
 
 --

@@ -716,7 +716,7 @@ namespace SIBR
 					writer.Write(ge.lineupPosition, NpgsqlTypes.NpgsqlDbType.Smallint);
 					writer.Write(ge.isLastEventForPlateAppearance);
 					writer.Write(ge.basesHit, NpgsqlTypes.NpgsqlDbType.Smallint);
-					writer.Write(ge.runsBattedIn, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.runsBattedIn, NpgsqlTypes.NpgsqlDbType.Numeric);
 					writer.Write(ge.isSacrificeHit);
 					writer.Write(ge.isSacrificeFly);
 					writer.Write(ge.outsOnPlay, NpgsqlTypes.NpgsqlDbType.Smallint);
