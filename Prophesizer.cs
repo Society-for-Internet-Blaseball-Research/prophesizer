@@ -49,6 +49,7 @@ namespace SIBR
 		private const bool TIMING_FILE = true;
 		private const bool DO_HOURLY = true;
 		private const bool DO_EVENTS = true;
+		private const bool DO_REFRESH_MATVIEWS = true;
 
 		private HttpClient m_chroniclerClient;
 		private HttpClient m_blaseballClient;
@@ -247,7 +248,11 @@ namespace SIBR
 			ApplyDbPatches(psqlConnection);
 
 			m_dbSeasonDay = result.Latest;
-			await RefreshMaterializedViews(psqlConnection);
+
+			if (DO_REFRESH_MATVIEWS)
+			{
+				await RefreshMaterializedViews(psqlConnection);
+			}
 
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
@@ -316,6 +321,8 @@ namespace SIBR
 
 		private async Task RefreshMaterializedViews(NpgsqlConnection psqlConnection)
 		{
+			Stopwatch matviewTimer = new Stopwatch();
+			matviewTimer.Start();
 			// If it's been at least one day since the last refresh
 			if (m_dbSeasonDay > m_lastMaterializedRefresh)
 			{
@@ -351,6 +358,9 @@ namespace SIBR
 					}
 				}
 			}
+			matviewTimer.Stop();
+			ConsoleOrWebhook($"Matview refresh took {matviewTimer.Elapsed}.");
+
 		}
 
 		private int GetMaxGameEventId(NpgsqlConnection psqlConnection)
