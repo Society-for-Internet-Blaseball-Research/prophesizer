@@ -21,6 +21,7 @@ namespace SIBR
 					Prophesizer.ConsoleOrWebhook($"Processed {numUpdates} updates in the past hour. Last recorded game is Season {result.Latest.Season+1}, Day {result.Latest.Day+1}.");
 					//Prophesizer.ConsoleOrWebhook($"    {prophesizer.NumNetworkOutcomes} games used the network outcomes.json file, {prophesizer.NumLocalOutcomes} did not.");
 					lastHour = hour;
+					numUpdates = 0;
 				}
 				await Task.Delay(1 * 60 * 1000);
 

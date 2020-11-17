@@ -321,6 +321,7 @@ namespace SIBR
 
 		private async Task RefreshMaterializedViews(NpgsqlConnection psqlConnection)
 		{
+			bool printMatviewTime = false;
 			Stopwatch matviewTimer = new Stopwatch();
 			matviewTimer.Start();
 			// If it's been at least one day since the last refresh
@@ -346,10 +347,11 @@ namespace SIBR
 				{
 					Int64 numGames = (Int64)gameCountResponse;
 					Int64 numFinishedGames = (Int64)response;
-					Console.WriteLine($"{numFinishedGames} of {numGames} games complete for Season {m_dbSeasonDay.Season+1}, Day {m_dbSeasonDay.Day+1}...");
+					ConsoleOrWebhook($"{numFinishedGames} of {numGames} games complete for Season {m_dbSeasonDay.Season+1}, Day {m_dbSeasonDay.Day+1}...");
 					// If all games are done, refresh our materialized views
 					if (numGames > 0 && numFinishedGames >= numGames)
 					{
+						printMatviewTime = true;
 						ConsoleOrWebhook($"All games complete for Season {m_dbSeasonDay.Season + 1}, Day {m_dbSeasonDay.Day + 1}, refreshing materialized views!");
 						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
 						await refreshCmd.ExecuteNonQueryAsync();
@@ -359,7 +361,10 @@ namespace SIBR
 				}
 			}
 			matviewTimer.Stop();
-			ConsoleOrWebhook($"Matview refresh took {matviewTimer.Elapsed}.");
+			if (printMatviewTime)
+			{
+				ConsoleOrWebhook($"Matview refresh took {matviewTimer.Elapsed}. Last day refreshed is now Season {m_lastMaterializedRefresh.Season + 1}, Day {m_lastMaterializedRefresh.Day + 1}");
+			}
 
 		}
 
@@ -550,7 +555,7 @@ namespace SIBR
 		// Store time_map data about a sim phase
 		private void StoreSimDataPhase(NpgsqlConnection psqlConnection, int season, int day, DateTime firstTime, int phaseId)
 		{
-			Console.WriteLine($"Storing phase {phaseId} for season {season}, day {day} starting at {firstTime}.");
+			//Console.WriteLine($"Storing phase {phaseId} for season {season}, day {day} starting at {firstTime}.");
 			NpgsqlCommand insertCmd = new NpgsqlCommand(@"
 								INSERT INTO data.time_map(season, day, first_time, phase_id) values(@season, @day, @first_time, @phaseId)
 								ON CONFLICT ON CONSTRAINT season_day_unique DO UPDATE SET first_time=EXCLUDED.first_time
