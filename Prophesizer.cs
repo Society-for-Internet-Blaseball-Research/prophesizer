@@ -23,6 +23,9 @@ namespace SIBR
 	{
 		public int Season { get; set; }
 		public int Day { get; set; }
+		public int Tournament { get; set; }
+		public int TournamentRound { get; set; }
+		public int Phase { get; set; }
 	}
 
 	struct PollResult
@@ -43,7 +46,10 @@ namespace SIBR
 		private const int MAX_SEASON = 8;
 		private const int MAX_DAY = 135;
 
-		private SeasonDay m_lastKnownSeasonDay;
+		// Most positive SeasonDay known
+		private SeasonDay m_positiveSeasonDay;
+		// Most negative SeasonDay known
+		private SeasonDay m_negativeSeasonDay;
 
 		private const bool TIMING = false;
 		private const bool TIMING_FILE = true;
@@ -200,7 +206,7 @@ namespace SIBR
 
 		public async Task<PollResult> Poll()
 		{
-			PollResult result = new PollResult();
+			PollResult result = new PollResult(); 
 
 			Console.WriteLine($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
 
@@ -466,7 +472,7 @@ namespace SIBR
 						{
 							await PersistGame(psqlConnection, ev, m_gameEventId);
 						}
-						catch(Exception ex)
+						catch (Exception ex)
 						{
 							Console.WriteLine(ex);
 						}
@@ -1470,63 +1476,75 @@ namespace SIBR
 			}
 		}
 
+		private async Task<IEnumerable<Game>> GetGames(int season, int day)
+		{
+			JsonSerializerOptions options = new JsonSerializerOptions();
+			options.IgnoreNullValues = true;
+
+			// Get games for this season & day
+			HttpResponseMessage response = await m_blaseballClient.GetAsync($"games?day={day}&season={season}");
+
+			if (response.IsSuccessStatusCode)
+			{
+
+				string strResponse = await response.Content.ReadAsStringAsync();
+				return JsonSerializer.Deserialize<IEnumerable<Game>>(strResponse, options);
+			}
+			else
+			{
+				Console.WriteLine($"Got response {response.StatusCode} from {response.RequestMessage.RequestUri}!");
+			}
+
+			return null;
+		}
+
 		/// <summary>
 		/// Get any completed games from the Blaseball API and insert them in the `game` table
 		/// </summary>
 		private async Task PopulateGameTable(NpgsqlConnection psqlConnection)
 		{
 
-			// Find the latest day already stored in the DB
-			int season = 0;
-			int day = -1;
-			using (var gamesCommand = new NpgsqlCommand(@"
+			{
+				// Find the latest day already stored in the DB
+				int season = 0;
+				int day = -1;
+				using (var gamesCommand = new NpgsqlCommand(@"
                 SELECT MAX(season), MAX(day) from data.games
                 INNER JOIN (SELECT MAX(season) AS max_season FROM data.games) b ON b.max_season = games.season",
-				psqlConnection))
-			using (var reader = await gamesCommand.ExecuteReaderAsync())
-			{
-
-				while (await reader.ReadAsync())
+					psqlConnection))
+				using (var reader = await gamesCommand.ExecuteReaderAsync())
 				{
-					if (!reader.IsDBNull(0))
-						season = reader.GetInt32(0);
-					if (!reader.IsDBNull(1))
-						day = reader.GetInt32(1);
+
+					while (await reader.ReadAsync())
+					{
+						if (!reader.IsDBNull(0))
+							season = reader.GetInt32(0);
+						if (!reader.IsDBNull(1))
+							day = reader.GetInt32(1);
+					}
 				}
-			}
 
-			m_lastKnownSeasonDay = new SeasonDay(season, day);
-			SeasonDay currSeasonDay = new SeasonDay(season, day);
+				m_positiveSeasonDay = new SeasonDay(season, day);
+				SeasonDay currSeasonDay = new SeasonDay(season, day);
 
-			Console.WriteLine($"Found games through season {season}, day {day}.");
-			// Start on the next day
-			day++;
+				Console.WriteLine($"Found games through season {season}, day {day}.");
+				// Start on the next day
+				day++;
 
-			// Talk to the blaseball API
+				// Talk to the blaseball API
 
-			JsonSerializerOptions options = new JsonSerializerOptions();
-			options.IgnoreNullValues = true;
-
-			Console.WriteLine($"Adding game records...");
-			// Loop until we break out
-			while (true)
-			{
-				// Get games for this season & day
-				HttpResponseMessage response = await m_blaseballClient.GetAsync($"games?day={day}&season={season}");
-
-				if (response.IsSuccessStatusCode)
+				Console.WriteLine($"Adding positive season game records...");
+				// Loop until we break out
+				while (true)
 				{
-
-					string strResponse = await response.Content.ReadAsStringAsync();
-					var gameList = JsonSerializer.Deserialize<IEnumerable<Game>>(strResponse, options);
-
+					var gameList = await GetGames(season, day);
 					// If we got no response 
 					if (gameList == null || gameList.Count() == 0)
 					{
 						if (day > 0)
 						{
 							// Ran out of finished games this season, try the next
-							m_lastKnownSeasonDay.Season = season;
+							m_positiveSeasonDay.Season = season;
 							season++;
 							day = 0;
 							continue;
@@ -1538,25 +1556,78 @@ namespace SIBR
 						}
 					}
 
-					//Console.WriteLine($"Storing blaseball.com game results from season {season}, day {day}...");
 					foreach (var game in gameList)
 					{
 						var cmd = InsertGameCommand(psqlConnection, game);
 						await cmd.ExecuteNonQueryAsync();
 					}
 
-					m_lastKnownSeasonDay.Day = day;
+					m_positiveSeasonDay.Day = day;
 					day++;
 				}
-				else
+			}
+
+			{
+				int negSeason = 0;
+				int negDay = 0;
+
+				using (var gamesCommand = new NpgsqlCommand(@"
+                SELECT MIN(season), MAX(day) from data.games
+                INNER JOIN (SELECT MIN(season) AS min_season FROM data.games) b ON b.min_season = games.season",
+					psqlConnection))
+				using (var reader = await gamesCommand.ExecuteReaderAsync())
 				{
-					Console.WriteLine($"Got response {response.StatusCode} from {response.RequestMessage.RequestUri}!");
-					return;
+
+					while (await reader.ReadAsync())
+					{
+						if (!reader.IsDBNull(0))
+							negSeason = reader.GetInt32(0);
+						if (!reader.IsDBNull(1))
+							negDay = reader.GetInt32(1);
+					}
+				}
+
+				m_negativeSeasonDay = new SeasonDay(-negSeason, negDay);
+				// Start on the next day
+				negDay++;
+
+				Console.WriteLine($"Adding negative season game records...");
+				// Loop until we break out
+				while (true)
+				{
+					var gameList = await GetGames(negSeason, negDay);
+					// If we got no response 
+					if (gameList == null || gameList.Count() == 0)
+					{
+						if (negDay > 0)
+						{
+							// Ran out of finished games this season, try the next
+							m_negativeSeasonDay.Season = -negSeason;
+							negSeason--;
+							negDay = 0;
+							continue;
+						}
+						else
+						{
+							// season X day 0 had no complete games, stop looping
+							break;
+						}
+					}
+
+					foreach (var game in gameList)
+					{
+						var cmd = InsertGameCommand(psqlConnection, game);
+						await cmd.ExecuteNonQueryAsync();
+					}
+
+					m_negativeSeasonDay.Day = negDay;
+					negDay++;
 				}
 			}
+
+			Console.WriteLine($"Stored positive games through Season {m_positiveSeasonDay.Season}, Day {m_positiveSeasonDay.Day}");
+			Console.WriteLine($"Stored negative games through Season {-m_negativeSeasonDay.Season}, Day {m_negativeSeasonDay.Day}");
 			Console.WriteLine($"Done!");
-
-
 		}
 
 		public static void ConsoleOrWebhook(string msg)

@@ -47,7 +47,8 @@ namespace prophesizer
 		public int Phase { get; set; }
 		public int Season { get; set; }
 		public int Day { get; set; }
-
+		public int Tournament { get; set; }
+		public int TournamentRound { get; set; }
 	}
 
 	class ChroniclerSimData
