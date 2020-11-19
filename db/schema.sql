@@ -9820,7 +9820,8 @@ CREATE TABLE data.game_events (
     home_ball_count integer DEFAULT 4,
     away_ball_count integer DEFAULT 4,
     away_base_count integer DEFAULT 4,
-    home_base_count integer DEFAULT 4
+    home_base_count integer DEFAULT 4,
+    tournament integer
 );
 
 
@@ -10650,7 +10651,8 @@ CREATE TABLE data.games (
     rules_id character varying(36),
     statsheet_id character varying(36),
     winning_pitcher_id character varying,
-    losing_pitcher_id character varying
+    losing_pitcher_id character varying,
+    tournament integer
 );
 
 
@@ -12705,7 +12707,7 @@ COPY data.game_event_base_runners (id, game_event_id, runner_id, responsible_pit
 -- Data for Name: game_events; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY data.game_events (id, perceived_at, game_id, event_type, event_index, inning, top_of_inning, outs_before_play, batter_id, batter_team_id, pitcher_id, pitcher_team_id, home_score, away_score, home_strike_count, away_strike_count, batter_count, pitches, total_strikes, total_balls, total_fouls, is_leadoff, is_pinch_hit, lineup_position, is_last_event_for_plate_appearance, bases_hit, runs_batted_in, is_sacrifice_hit, is_sacrifice_fly, outs_on_play, is_double_play, is_triple_play, is_wild_pitch, batted_ball_type, is_bunt, errors_on_play, batter_base_after_play, is_last_game_event, event_text, additional_context, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list, home_ball_count, away_ball_count, away_base_count, home_base_count) FROM stdin;
+COPY data.game_events (id, perceived_at, game_id, event_type, event_index, inning, top_of_inning, outs_before_play, batter_id, batter_team_id, pitcher_id, pitcher_team_id, home_score, away_score, home_strike_count, away_strike_count, batter_count, pitches, total_strikes, total_balls, total_fouls, is_leadoff, is_pinch_hit, lineup_position, is_last_event_for_plate_appearance, bases_hit, runs_batted_in, is_sacrifice_hit, is_sacrifice_fly, outs_on_play, is_double_play, is_triple_play, is_wild_pitch, batted_ball_type, is_bunt, errors_on_play, batter_base_after_play, is_last_game_event, event_text, additional_context, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list, home_ball_count, away_ball_count, away_base_count, home_base_count, tournament) FROM stdin;
 \.
 
 
@@ -12713,7 +12715,7 @@ COPY data.game_events (id, perceived_at, game_id, event_type, event_index, innin
 -- Data for Name: games; Type: TABLE DATA; Schema: data; Owner: -
 --
 
-COPY data.games (game_id, day, season, last_game_event, home_odds, away_odds, weather, series_index, series_length, is_postseason, home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame, terminology_id, rules_id, statsheet_id, winning_pitcher_id, losing_pitcher_id) FROM stdin;
+COPY data.games (game_id, day, season, last_game_event, home_odds, away_odds, weather, series_index, series_length, is_postseason, home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame, terminology_id, rules_id, statsheet_id, winning_pitcher_id, losing_pitcher_id, tournament) FROM stdin;
 \.
 
 
@@ -13926,21 +13928,21 @@ COPY taxa.weather (weather_id, weather_text) FROM stdin;
 -- Name: applied_patches_patch_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.applied_patches_patch_id_seq', 14, true);
+SELECT pg_catalog.setval('data.applied_patches_patch_id_seq', 38, true);
 
 
 --
 -- Name: chronicler_hash_game_event_chronicler_hash_game_event_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.chronicler_hash_game_event_chronicler_hash_game_event_id_seq', 19433397, true);
+SELECT pg_catalog.setval('data.chronicler_hash_game_event_chronicler_hash_game_event_id_seq', 37730983, true);
 
 
 --
 -- Name: game_event_base_runners_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 12685323, true);
+SELECT pg_catalog.setval('data.game_event_base_runners_id_seq', 16617286, true);
 
 
 --
@@ -13961,49 +13963,49 @@ SELECT pg_catalog.setval('data.imported_logs_id_seq', 34207, true);
 -- Name: player_events_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_events_id_seq', 77002, true);
+SELECT pg_catalog.setval('data.player_events_id_seq', 92152, true);
 
 
 --
 -- Name: player_modifications_player_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 8865, true);
+SELECT pg_catalog.setval('data.player_modifications_player_modifications_id_seq', 14719, true);
 
 
 --
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.players_id_seq', 125480, true);
+SELECT pg_catalog.setval('data.players_id_seq', 152894, true);
 
 
 --
 -- Name: team_modifications_team_modifications_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 2079, true);
+SELECT pg_catalog.setval('data.team_modifications_team_modifications_id_seq', 3359, true);
 
 
 --
 -- Name: team_positions_team_position_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 28510, true);
+SELECT pg_catalog.setval('data.team_positions_team_position_id_seq', 36274, true);
 
 
 --
 -- Name: teams_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.teams_id_seq', 1090, true);
+SELECT pg_catalog.setval('data.teams_id_seq', 1470, true);
 
 
 --
 -- Name: time_map_time_map_id_seq; Type: SEQUENCE SET; Schema: data; Owner: -
 --
 
-SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 13896694, true);
+SELECT pg_catalog.setval('data.time_map_time_map_id_seq', 14090289, true);
 
 
 --

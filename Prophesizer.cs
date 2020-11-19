@@ -65,7 +65,7 @@ namespace SIBR
 		private object _eventLocker = new object();
 		private object _pitcherLocker = new object();
 
-		private SeasonDay m_lastMaterializedRefresh;
+		private SeasonDay m_lastMaterializedRefresh = new SeasonDay(0,0);
 		private SeasonDay m_dbSeasonDay;
 		private DateTime? m_dbGameTimestamp;
 		private DateTime? m_dbTeamTimestamp;
@@ -213,24 +213,26 @@ namespace SIBR
 			await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
 			await psqlConnection.OpenAsync();
 
+			// Talk to the /games endpoint to find all the games we can into the DB
 			await PopulateGameTable(psqlConnection);
 
 			// Last day recorded in the DB
 			(m_dbSeasonDay, m_dbGameTimestamp, m_dbTeamTimestamp, m_dbPlayerTimestamp) = await GetChroniclerMeta(psqlConnection);
+			
 			// Current day according to blaseball.com
-			SeasonDay simSeasonDay;
+			//SeasonDay simSeasonDay;
 
-			var response = await m_blaseballClient.GetAsync("simulationData");
-			if (response.IsSuccessStatusCode)
-			{
-				string strResponse = await response.Content.ReadAsStringAsync();
-				var simData = JsonSerializer.Deserialize<SimulationData>(strResponse, m_options);
-				simSeasonDay = new SeasonDay(simData.Season, simData.Day);
-			}
-			else
-			{
-				throw new InvalidDataException("Couldn't get current simulation data from blaseball!");
-			}
+			//var response = await m_blaseballClient.GetAsync("simulationData");
+			//if (response.IsSuccessStatusCode)
+			//{
+			//	string strResponse = await response.Content.ReadAsStringAsync();
+			//	var simData = JsonSerializer.Deserialize<SimulationData>(strResponse, m_options);
+			//	simSeasonDay = new SeasonDay(simData.Season, simData.Day);
+			//}
+			//else
+			//{
+			//	throw new InvalidDataException("Couldn't get current simulation data from blaseball!");
+			//}
 
 			if (DO_HOURLY)
 			{
@@ -241,11 +243,38 @@ namespace SIBR
 
 			if (DO_EVENTS)
 			{
-				// TODO store current time
+				// Grab the list of games we know from the DB's `games` table
+				var gameList = GetAllGameDays(psqlConnection);
 
-				if (m_dbSeasonDay < simSeasonDay)
+				int highestSeason = gameList.Max(sd => sd.Season);
+				int highestDay = gameList.Where(sd => sd.Season == highestSeason).Max(sd => sd.Day);
+				// Should handle tournament explicitly here but ugh it'll be -1
+				SeasonDay simSeasonDay = new SeasonDay(highestSeason, highestDay);
+
+				// Grab all the days we've stored games in the DB's `game_events` table
+				var storedGameList = GetStoredGameDays(psqlConnection);
+
+				// Find all games that we should have stored but don't
+				var missingGames = gameList.Except(storedGameList);
+
+				// Ignore all the games before the SIBR era
+				missingGames = missingGames.Where(sd => sd > new SeasonDay(1, 97));
+
+				IEnumerable<SeasonDay> bustedDays = new SeasonDay[]
+				{ 
+					new SeasonDay(3,71),
+					new SeasonDay(3,72),
+					new SeasonDay(9,101),
+					new SeasonDay(10,108) 
+				};
+
+				// Ignore the known-busted days
+				missingGames = missingGames.Except(bustedDays);
+
+				if (missingGames.Any())
 				{
-					await BatchLoadGameUpdates(psqlConnection, m_dbSeasonDay, simSeasonDay);
+					// Batch load all missing games
+					await BatchLoadGameUpdates(psqlConnection, missingGames);
 				}
 
 				result = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
@@ -390,7 +419,47 @@ namespace SIBR
 
 		private Processor m_processor = new Processor();
 
-		
+		private IEnumerable<SeasonDay> GetStoredGameDays(NpgsqlConnection psqlConnection)
+		{
+			var cmd = new NpgsqlCommand(@"SELECT DISTINCT season, day, tournament FROM data.game_events ORDER BY tournament, season, day", psqlConnection);
+
+			List<SeasonDay> days = new List<SeasonDay>();
+			using (var reader = cmd.ExecuteReader())
+			{
+				while (reader.Read())
+				{
+					int season = (int)reader[0];
+					int day = (int)reader[1];
+					int tournament = -1;
+					if(!(reader[2] is DBNull))
+						tournament = (int)reader[2];
+
+					days.Add(new SeasonDay(season, day, tournament));
+				}
+			}
+
+			return days;
+		}
+
+		private IEnumerable<SeasonDay> GetAllGameDays(NpgsqlConnection psqlConnection)
+		{
+			var cmd = new NpgsqlCommand(@"SELECT DISTINCT season, day, tournament FROM data.games ORDER BY tournament, season, day", psqlConnection);
+
+			List<SeasonDay> days = new List<SeasonDay>();
+			using (var reader = cmd.ExecuteReader())
+			{
+				while(reader.Read())
+				{
+					int season = (int)reader[0];
+					int day = (int)reader[1];
+					int tournament = (int)reader[2];
+
+					days.Add(new SeasonDay(season, day, tournament));
+				}
+			}
+
+			return days;
+		}
 
 		private async Task<PollResult> IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt, DateTime? afterTime)
 		{
@@ -575,35 +644,35 @@ namespace SIBR
 		/// <summary>
 		/// Load updates from Chronicler by going wide
 		/// </summary>
-		private async Task BatchLoadGameUpdates(NpgsqlConnection psqlConnection, SeasonDay startAfter, SeasonDay stopBefore)
+		private async Task BatchLoadGameUpdates(NpgsqlConnection psqlConnection, IEnumerable<SeasonDay> games)
 		{
 			const int NUM_TASKS = 10;
 
 			m_gameEventId = GetMaxGameEventId(psqlConnection);
-			SeasonDay currSeasonDay = startAfter+1;
 
-			while (currSeasonDay < stopBefore)
+			Queue<SeasonDay> gameQueue = new Queue<SeasonDay>(games);
+
+			while (gameQueue.Count > 0)
 			{
 				// Fetch and process 10 days at a time
 				Task<bool>[] tasks = new Task<bool>[NUM_TASKS];
 
-				int lastValidDay = currSeasonDay.Day;
+				Console.Write($"Processing: ");
 				for (int i = 0; i < NUM_TASKS; i++)
 				{
-					SeasonDay dayToFetch = new SeasonDay(currSeasonDay.Season, currSeasonDay.Day + i);
-
-					if (dayToFetch < stopBefore)
+					if(gameQueue.Count > 0)
 					{
-						lastValidDay = dayToFetch.Day;
+						SeasonDay dayToFetch = gameQueue.Dequeue();
 						tasks[i] = Task.Run(() => FetchAndProcessFullDay(dayToFetch));
+						Console.Write($"{dayToFetch} ");
 					}
 					else
 					{
 						tasks[i] = Task.Run(() => false );
 					}
 				}
+				Console.WriteLine();
 
-				Console.WriteLine($"Processing Season {currSeasonDay.Season}, Days {currSeasonDay.Day}-{lastValidDay}");
 				// Wait for all 10 tasks to complete; SQL work has to be done on a single thread
 				Task.WaitAll(tasks);
 
@@ -628,18 +697,15 @@ namespace SIBR
 					await PersistPitcherResults(psqlConnection, result.Item1, result.Item2, result.Item3, result.Item4);
 				}
 
-				NpgsqlCommand updateCmd = new NpgsqlCommand(@"
-					INSERT INTO data.chronicler_meta(id, season, day, game_timestamp) values (0, @season, @day, null)
-					ON CONFLICT(id) DO UPDATE SET season=EXCLUDED.season, day=EXCLUDED.day, game_timestamp=null", 
-					psqlConnection);
-				updateCmd.Parameters.AddWithValue("season", currSeasonDay.Season);
-				updateCmd.Parameters.AddWithValue("day", lastValidDay);
-				int updateResult = await updateCmd.ExecuteNonQueryAsync();
+				//NpgsqlCommand updateCmd = new NpgsqlCommand(@"
+				//	INSERT INTO data.chronicler_meta(id, season, day, game_timestamp) values (0, @season, @day, null)
+				//	ON CONFLICT(id) DO UPDATE SET season=EXCLUDED.season, day=EXCLUDED.day, game_timestamp=null", 
+				//	psqlConnection);
+				//updateCmd.Parameters.AddWithValue("season", currSeasonDay.Season);
+				//updateCmd.Parameters.AddWithValue("day", lastValidDay);
+				//int updateResult = await updateCmd.ExecuteNonQueryAsync();
 
 				await transaction.CommitAsync();
-
-				currSeasonDay += NUM_TASKS;
-
 			}
 		}
 
@@ -677,7 +743,7 @@ namespace SIBR
 					is_last_event_for_plate_appearance, bases_hit, runs_batted_in, is_sacrifice_hit,
 					is_sacrifice_fly, outs_on_play, is_double_play, is_triple_play, is_wild_pitch,
 					batted_ball_type, is_bunt, errors_on_play, batter_base_after_play, is_last_game_event,
-					event_text, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list
+					event_text, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list, tournament
 				)FROM STDIN (FORMAT BINARY)"))
 			{
 				foreach(var ge in gameEvents)
@@ -741,6 +807,7 @@ namespace SIBR
 					writer.Write(ge.parsingErrorList);
 					writer.Write(ge.fixedError);
 					writer.Write(ge.fixedErrorList);
+					writer.Write(ge.tournament, NpgsqlTypes.NpgsqlDbType.Integer);
 
 					m_gameEventId++;
 				}
@@ -1420,13 +1487,13 @@ namespace SIBR
             (
                 game_id, day, season, home_odds, away_odds, weather, is_postseason, series_index, series_length,
                 home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame,
-                terminology_id, rules_id, statsheet_id
+                terminology_id, rules_id, statsheet_id, tournament
             )
             VALUES
             (
                 @game_id, @day, @season, @home_odds, @away_odds, @weather, @is_postseason, @series_index, @series_length,
                 @home_team, @away_team, @home_score, @away_score, @number_of_innings, @ended_on_top_of_inning, @ended_in_shame,
-                @terminology_id, @rules_id, @statsheet_id
+                @terminology_id, @rules_id, @statsheet_id, @tournament
             );
             ", psqlConnection);
 
@@ -1449,6 +1516,7 @@ namespace SIBR
 			insertGameStatement.Parameters.AddWithValue("terminology_id", game.terminology);
 			insertGameStatement.Parameters.AddWithValue("rules_id", game.rules);
 			insertGameStatement.Parameters.AddWithValue("statsheet_id", game.statsheet);
+			insertGameStatement.Parameters.AddWithValue("tournament", game.tournament);
 			//insertGameStatement.Prepare();
 			return insertGameStatement;
 		}
