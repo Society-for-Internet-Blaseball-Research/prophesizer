@@ -2,7 +2,7 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ future-perfect ]
+    branches: [ docker ]
 
 jobs:
   push_to_registry:
