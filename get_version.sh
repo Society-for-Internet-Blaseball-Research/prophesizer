@@ -12,14 +12,12 @@ docker_version=$(curl -L --fail "https://hub.docker.com/v2/repositories/corvimae
 
 cs_version=$(cat prophesizer.csproj | grep "<Version>" | sed 's/ *<\/*Version>//g')
 
-image_name="blaseballsibr/prophesizer:$cs_version"
-
 echo "Docker is at version $docker_version. Project is at version $cs_version."
 
 if verlt $docker_version $cs_version 
 then
 	echo "Building and Updating."
-	echo "image_name=$image_name" >> $GITHUB_ENV
+	echo "image_name=$cs_version" >> $GITHUB_ENV
 else
 	echo "Not building."
 	echo "image_name=abort" >> $GITHUB_ENV
