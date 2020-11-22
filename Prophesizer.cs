@@ -630,6 +630,12 @@ namespace SIBR
 		// Store time_map data about a sim phase
 		private void StoreSimDataPhase(NpgsqlConnection psqlConnection, int season, int day, DateTime firstTime, int phaseId)
 		{
+			// HACK for Coffee Cup; set the Coffee phases to season -1
+			if(phaseId >= 13 && phaseId <= 15)
+			{
+				season = -1;
+			}
+
 			//Console.WriteLine($"Storing phase {phaseId} for season {season}, day {day} starting at {firstTime}.");
 			NpgsqlCommand insertCmd = new NpgsqlCommand(@"
 								INSERT INTO data.time_map(season, day, first_time, phase_id) values(@season, @day, @first_time, @phaseId)
