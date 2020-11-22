@@ -1,0 +1,7 @@
+﻿{
+  "Evolve.Database": "PostgreSQL",
+  "Evolve.ConnectionString": "${EVOLVE_CONNECTION_STRING}",
+  "Evolve.Locations": "migrations",
+  "Evolve.Command": "migrate",
+  "Evolve.SqlMigrationSuffix": "pgsql"
+}
