@@ -62,5 +62,5 @@ At the moment only @lilserf has the permissions to do this process, but it shoul
 
 1. Stop the Prophesizer container via Portainer (Stacks -> datablase -> datablase_prophesizer_1 -> Stop)
 2. Deploy DB if necessary (TODO: get that deploy script committed somewhere useful)
-3. Update the Datablase stack to the new Prophesizer version (Stacks -> Editor -> change the vesrion number, Update Stack)
+3. Update the Datablase stack to the new Prophesizer version (Stacks -> Editor -> change the version number, Update Stack)
 
