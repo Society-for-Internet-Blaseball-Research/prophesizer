@@ -326,20 +326,20 @@ namespace SIBR
 							Console.WriteLine(cmdText);
 							var patchCmd = new NpgsqlCommand(cmdText, psqlConnection);
 
+							var trans = psqlConnection.BeginTransaction();
 							try
 							{
-								var trans = psqlConnection.BeginTransaction();
 
 								patchCmd.ExecuteNonQuery();
 								var insertCmd = new NpgsqlCommand("INSERT INTO data.applied_patches(patch_hash) VALUES(@hash)", psqlConnection);
 								insertCmd.Parameters.AddWithValue("hash", NpgsqlTypes.NpgsqlDbType.Uuid, hash);
 								insertCmd.ExecuteNonQuery();
-
 								trans.Commit();
 							}
-							catch(NpgsqlException ex)
+							catch (NpgsqlException ex)
 							{
 								Console.WriteLine($"Exception while processing patch:\n{ex.Message}");
+								trans.Rollback();
 							}
 						}
 						else
