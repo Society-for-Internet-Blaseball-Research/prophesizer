@@ -310,8 +310,6 @@ namespace SIBR
 				}
 			}
 
-			var trans = psqlConnection.BeginTransaction();
-			HashSet<Guid> newPatches = new HashSet<Guid>();
 			foreach (var patchFilename in Directory.GetFiles(Path.Combine(GetExecutingDirectoryName(), "patch")))
 			{
 				using (var md5 = MD5.Create())
@@ -324,12 +322,25 @@ namespace SIBR
 
 						if(!existingPatches.Contains(hash))
 						{
-							newPatches.Add(hash);
-
 							Console.WriteLine($"Applying patch from {Path.GetFileName(patchFilename)} / {hash.ToString()}:");
 							Console.WriteLine(cmdText);
 							var patchCmd = new NpgsqlCommand(cmdText, psqlConnection);
-							patchCmd.ExecuteNonQuery();
+
+							try
+							{
+								var trans = psqlConnection.BeginTransaction();
+
+								patchCmd.ExecuteNonQuery();
+								var insertCmd = new NpgsqlCommand("INSERT INTO data.applied_patches(patch_hash) VALUES(@hash)", psqlConnection);
+								insertCmd.Parameters.AddWithValue("hash", NpgsqlTypes.NpgsqlDbType.Uuid, hash);
+								insertCmd.ExecuteNonQuery();
+
+								trans.Commit();
+							}
+							catch(NpgsqlException ex)
+							{
+								Console.WriteLine($"Exception while processing patch:\n{ex.Message}");
+							}
 						}
 						else
 						{
@@ -339,13 +350,7 @@ namespace SIBR
 				}
 			}
 
-			foreach(var patchHash in newPatches)
-			{
-				var insertCmd = new NpgsqlCommand("INSERT INTO data.applied_patches(patch_hash) VALUES(@hash)", psqlConnection);
-				insertCmd.Parameters.AddWithValue("hash", NpgsqlTypes.NpgsqlDbType.Uuid, patchHash);
-				insertCmd.ExecuteNonQuery();
-			}
-			trans.Commit();
+			
 		}
 
 		public static string GetExecutingDirectoryName()
