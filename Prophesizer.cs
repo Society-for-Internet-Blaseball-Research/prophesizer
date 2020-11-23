@@ -326,7 +326,7 @@ namespace SIBR
 						{
 							newPatches.Add(hash);
 
-							Console.WriteLine($"Applying patch from {Path.GetFileName(patchFilename)}:");
+							Console.WriteLine($"Applying patch from {Path.GetFileName(patchFilename)} / {hash.ToString()}:");
 							Console.WriteLine(cmdText);
 							var patchCmd = new NpgsqlCommand(cmdText, psqlConnection);
 							patchCmd.ExecuteNonQuery();
