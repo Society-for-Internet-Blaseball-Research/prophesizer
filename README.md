@@ -55,3 +55,12 @@ The following instructions are written for Windows PCs.
 7. In the directory prophesizer\\db, run `node schema.js load` to load the schema Prophesizer expects into the database.
 8. Compile and run Prophesizer from VS Code via File -> Open Folder, selecting Prophesizer's folder, going to 'Run' in the menu bar, and selecting "Run Without Debugging".
 9. If at some point you make changes to the schema you wish to commit to a repository using `git`, in the directory prophesizer\\db, run `node schema.js dump` to dump your database's schema to schema.sql.
+
+## Deploy Steps for sibr.dev
+
+At the moment only @lilserf has the permissions to do this process, but it should be documented for the future.
+
+1. Stop the Prophesizer container via Portainer (Stacks -> datablase -> datablase_prophesizer_1 -> Stop)
+2. Deploy DB if necessary (TODO: get that deploy script committed somewhere useful)
+3. Update the Datablase stack to the new Prophesizer version (Stacks -> Editor -> change the vesrion number, Update Stack)
+
