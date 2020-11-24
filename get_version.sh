@@ -14,7 +14,7 @@ cs_version=$(cat prophesizer.csproj | grep "<Version>" | sed 's/ *<\/*Version>//
 
 echo "Docker is at version $docker_version. Project is at version $cs_version."
 
-if verlt $docker_version $cs_version 
+if verlt $docker_version $cs_version || [ "$docker_version" == "" ]
 then
 	echo "Building and Updating."
 	echo "image_name=$cs_version" >> $GITHUB_ENV
