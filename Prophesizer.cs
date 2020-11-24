@@ -1549,13 +1549,23 @@ namespace SIBR
 			}
 		}
 
-		private async Task<IEnumerable<Game>> GetGames(int season, int day)
+		private async Task<IEnumerable<Game>> GetGames(int season, int day, int tournament = -1)
 		{
 			JsonSerializerOptions options = new JsonSerializerOptions();
 			options.IgnoreNullValues = true;
 
+			string query = $"games?day={day}";
+			if(season == -1 && tournament != -1)
+			{
+				query += $"&tournament={tournament}";
+			}
+			else if(season != -1 && tournament == -1)
+			{
+				query += $"&season={season}";
+			}
+
 			// Get games for this season & day
-			HttpResponseMessage response = await m_blaseballClient.GetAsync($"games?day={day}&season={season}");
+			HttpResponseMessage response = await m_blaseballClient.GetAsync(query);
 
 			if (response.IsSuccessStatusCode)
 			{
@@ -1642,11 +1652,11 @@ namespace SIBR
 
 			{
 				int tournament = 0;
-				int tournDay = 0;
+				int tournDay = -1;
 
 				using (var gamesCommand = new NpgsqlCommand(@"
                 SELECT MAX(tournament), MAX(day) from data.games
-                INNER JOIN (SELECT MAX(tournament) AS max_tourn FROM data.games) b ON b.max_tourn = games.tournament",
+                INNER JOIN (SELECT MAX(tournament) AS max_tourn FROM data.games WHERE season=-1) b ON b.max_tourn = games.tournament",
 					psqlConnection))
 				using (var reader = await gamesCommand.ExecuteReaderAsync())
 				{
@@ -1668,7 +1678,7 @@ namespace SIBR
 				// Loop until we break out
 				while (true)
 				{
-					var gameList = await GetGames(tournament, tournDay);
+					var gameList = await GetGames(-1, tournDay, tournament);
 					// If we got no response 
 					if (gameList == null || gameList.Count() == 0)
 					{
