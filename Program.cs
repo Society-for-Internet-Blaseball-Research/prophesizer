@@ -7,7 +7,7 @@ namespace SIBR
 	{
 		static async Task Main(string[] args)
 		{
-			Prophesizer prophesizer = new Prophesizer("blaseball-archive-iliana");
+			Prophesizer prophesizer = new Prophesizer();
 
 			int lastHour = -1;
 			int numUpdates = 0;

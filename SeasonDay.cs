@@ -7,6 +7,7 @@ class SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 	public int Tournament;
 	public int Season;
 	public int Day;
+	public bool IsTournament => (Season == -1 && Tournament != -1);
 
 	private const int MAX_DAY = 135;
 
@@ -19,27 +20,37 @@ class SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 
 	public override string ToString()
 	{
-		string s = Tournament != -1 ? $"T{Tournament}" : "";
+		string s = IsTournament ? $"T{Tournament}" : "";
 		return s + $"S{Season}D{Day}";
 	}
 
 	int IComparable<SeasonDay>.CompareTo(SeasonDay other)
 	{
-		int tournamentDiff = GetTournamentDiff(this, other);
-
-		int seasonDiff = Season - other.Season;
-
-		if (seasonDiff == 0 && tournamentDiff == 0)
+		if (IsTournament)
 		{
-			return Day - other.Day;
-		}
-		else if(tournamentDiff == 0)
-		{
-			return seasonDiff;
+			int tournDiff = Tournament - other.Tournament;
+
+			if (tournDiff == 0)
+			{
+				return Day - other.Day;
+			}
+			else
+			{
+				return tournDiff;
+			}
 		}
 		else
 		{
-			return tournamentDiff;
+			int seasonDiff = Season - other.Season;
+
+			if (seasonDiff == 0)
+			{
+				return Day - other.Day;
+			}
+			else
+			{
+				return seasonDiff;
+			}
 		}
 	}
 
@@ -64,35 +75,9 @@ class SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 			Day == other.Day;
 	}
 
-	// Get an IComparable style number describing the tournament value of two SeasonDays
-	private static int GetTournamentDiff(SeasonDay a, SeasonDay b)
-	{
-		return a.Tournament - b.Tournament;
-		//if (a.Tournament.HasValue && !b.Tournament.HasValue)
-		//{
-		//	// non-null come after NULL tournaments
-		//	return 1;
-		//}
-		//else if (!a.Tournament.HasValue && b.Tournament.HasValue)
-		//{
-		//	// NULL tournaments come after non-null
-		//	return -1;
-		//}
-		//else
-		//{
-		//	int tournamentDiff = 0;
-		//	if (a.Tournament.HasValue && b.Tournament.HasValue)
-		//	{
-		//		tournamentDiff = a.Tournament.Value - b.Tournament.Value;
-		//	}
-
-		//	return tournamentDiff;
-		//}
-	}
-
 	public static bool operator <=(SeasonDay a, SeasonDay b)
 	{
-		int tournDiff = GetTournamentDiff(a, b);
+		int tournDiff = a.Tournament - b.Tournament;
 
 		if (tournDiff == 0)
 		{
@@ -112,7 +97,7 @@ class SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 	}
 	public static bool operator >=(SeasonDay a, SeasonDay b)
 	{
-		int tournDiff = GetTournamentDiff(a, b);
+		int tournDiff = a.Tournament - b.Tournament;
 
 		if (tournDiff == 0)
 		{
@@ -133,7 +118,7 @@ class SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 
 	public static bool operator <(SeasonDay a, SeasonDay b)
 	{
-		int tournDiff = GetTournamentDiff(a, b);
+		int tournDiff = a.Tournament - b.Tournament;
 
 		if (tournDiff == 0)
 		{
@@ -153,7 +138,7 @@ class SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 	}
 	public static bool operator >(SeasonDay a, SeasonDay b)
 	{
-		int tournDiff = GetTournamentDiff(a, b);
+		int tournDiff = a.Tournament - b.Tournament;
 
 		if (tournDiff == 0)
 		{
@@ -179,15 +164,23 @@ class SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 
 	public static SeasonDay operator +(SeasonDay a, int offset)
 	{
+		int tournament = a.Tournament;
 		int season = a.Season;
 		int day = a.Day + offset;
 
 		if (day > MAX_DAY)
 		{
-			season++;
+			if (a.IsTournament)
+			{
+				tournament++;
+			}
+			else
+			{
+				season++;
+			}
 			day = 0;
 		}
 
-		return new SeasonDay(season, day, a.Tournament);
+		return new SeasonDay(season, day, tournament);
 	}
 }
