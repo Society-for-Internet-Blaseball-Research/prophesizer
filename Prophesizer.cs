@@ -1686,7 +1686,7 @@ namespace SIBR
 						{
 							// Ran out of finished games this season, try the next
 							m_tournamentSeasonDay.Season = -tournament;
-							tournament--;
+							tournament++;
 							tournDay = 0;
 							continue;
 						}
