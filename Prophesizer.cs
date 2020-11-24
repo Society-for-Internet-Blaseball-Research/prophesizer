@@ -477,7 +477,7 @@ namespace SIBR
 				string query;
 				if (afterTime.HasValue)
 				{
-					query = $"games/updates?after={afterTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+					query = $"games/updates?after={TimestampQueryValue(afterTime.Value)}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
 					if (nextPage != null)
 					{
 						query += $"&page={nextPage}";
@@ -974,7 +974,7 @@ namespace SIBR
 
 		static string TimestampQueryValue(DateTime dt)
 		{
-			return dt.ToString("yyyy-MM-ddTHH:mm:ssZ");
+			return dt.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ");
 		}
 
 		private async Task LoadTeamUpdates(NpgsqlConnection psqlConnection)
