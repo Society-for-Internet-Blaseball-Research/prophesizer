@@ -5,7 +5,6 @@ DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events;
 DROP VIEW IF EXISTS data.rosters_extended_current;
 DROP VIEW IF EXISTS data.rosters_current;
 DROP VIEW IF EXISTS data.players_extended_current;
-DROP VIEW IF EXISTS data.players_current;
 DROP VIEW IF EXISTS data.pitching_stats_player_season;
 DROP VIEW IF EXISTS data.pitching_stats_player_lifetime;
 DROP VIEW IF EXISTS data.pitching_records_player_single_game;
@@ -23,7 +22,6 @@ DROP VIEW IF EXISTS data.batting_records_team_single_game;
 DROP VIEW IF EXISTS data.batting_records_team_season;
 DROP VIEW IF EXISTS data.batting_records_team_playoffs_single_game;
 DROP VIEW IF EXISTS data.batting_records_team_playoffs_season;
-DROP VIEW IF EXISTS data.teams_current;
 DROP VIEW IF EXISTS data.batting_records_player_single_game;
 DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_single_game;
 DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_all_events;
@@ -39,6 +37,13 @@ DROP VIEW IF EXISTS data.batting_records_combined_teams_single_game;
 DROP VIEW IF EXISTS data.batting_records_combined_teams_playoffs_single_game;
 DROP INDEX IF EXISTS data.batting_stats_all_events_indx_season;
 DROP INDEX IF EXISTS data.batting_stats_all_events_indx_player_id;
+DROP VIEW IF EXISTS data.running_stats_player_tournament_lifetime;
+DROP VIEW IF EXISTS data.fielder_stats_tournament;
+DROP VIEW IF EXISTS data.batting_stats_player_tournament_lifetime;
+DROP VIEW IF EXISTS data.batting_stats_player_tournament;
+DROP VIEW IF EXISTS data.batting_records_team_tournmament;
+DROP VIEW IF EXISTS data.batting_records_team_tournament_single_game;
+DROP VIEW IF EXISTS data.batting_records_team_tournament;
 
 
 --
@@ -235,9 +240,10 @@ CREATE VIEW data.batting_records_league_season AS
   ORDER BY y.event, y.season;
 
 
-  --
+--
 -- Name: teams_info_expanded_all; Type: VIEW; Schema: data; Owner: -
 --
+
 CREATE VIEW data.teams_info_expanded_all AS
  SELECT ts.team_id,
     t.location,
@@ -246,6 +252,9 @@ CREATE VIEW data.teams_info_expanded_all AS
     ta.team_abbreviation,
     t.url_slug,
         CASE
+            WHEN (EXISTS ( SELECT 1
+               FROM taxa.tournament_teams xtt
+              WHERE ((xtt.team_id)::text = (ts.team_id)::text))) THEN 'tournament'::text
             WHEN (NOT (EXISTS ( SELECT 1
                FROM taxa.division_teams xdt
               WHERE ((xdt.team_id)::text = (ts.team_id)::text)))) THEN 'disbanded'::text
@@ -253,22 +262,23 @@ CREATE VIEW data.teams_info_expanded_all AS
                FROM taxa.division_teams xdt
               WHERE (((xdt.team_id)::text = (ts.team_id)::text) AND (xdt.division_id IS NOT NULL) AND (xdt.valid_until IS NULL)))) THEN 'active'::text
             ELSE 'ascended'::text
-        END AS current_status,
+        END AS current_team_status,
     ts.timestampd AS valid_from,
     lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
-    ( SELECT gameday_from_timestamp.gameday
-           FROM data.gameday_from_timestamp(ts.timestampd) gameday_from_timestamp(season, gameday)) AS gameday_from,
-    ( SELECT gameday_from_timestamp.season
-           FROM data.gameday_from_timestamp(ts.timestampd) gameday_from_timestamp(season, gameday)) AS season_from,
+    ( SELECT gt.gameday
+           FROM data.gameday_from_timestamp(ts.timestampd) gt(season, gameday)) AS gameday_from,
+    ( SELECT gt.season
+           FROM data.gameday_from_timestamp(ts.timestampd) gt(season, gameday)) AS season_from,
     d.division_text AS division,
     d.division_id,
     l.league_text AS league,
     l.league_id,
+    xt.tournament_name,
     ( SELECT array_agg(DISTINCT m.modification ORDER BY m.modification) AS array_agg
            FROM data.team_modifications m
-          WHERE (((m.team_id)::text = (ts.team_id)::text) AND (m.valid_from <= ts.timestampd) AND (ts.timestampd < COALESCE((m.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))
+          WHERE (((m.team_id)::text = (ts.team_id)::text) AND (m.valid_from <= ts.timestampd) AND (ts.timestampd < COALESCE((m.valid_until)::timestamp with time zone, ((timezone('utc'::text, now()) + '00:00:00.001'::interval))::timestamp with time zone)))
           GROUP BY m.team_id) AS modifications
-   FROM (((((( SELECT DISTINCT x.team_id,
+   FROM (((((((( SELECT DISTINCT x.team_id,
             unnest(x.a) AS timestampd
            FROM ( SELECT DISTINCT t_1.team_id,
                     ARRAY[t_1.valid_from, t_1.valid_until] AS a
@@ -282,17 +292,21 @@ CREATE VIEW data.teams_info_expanded_all AS
                     ARRAY[tm.valid_from, tm.valid_until] AS a
                    FROM data.team_modifications tm
                   WHERE (NOT ((( SELECT gameday_from_timestamp.gameday
-                           FROM data.gameday_from_timestamp(COALESCE(tm.valid_from, (now())::timestamp without time zone)) gameday_from_timestamp(season, gameday)) >= 98) AND ((tm.modification)::text = 'PARTY_TIME'::text)))) x) ts
-     JOIN data.teams t ON ((((ts.team_id)::text = (t.team_id)::text) AND (t.valid_from <= (ts.timestampd + '00:00:00.001'::interval)) AND (ts.timestampd < COALESCE((t.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))))
+                           FROM data.gameday_from_timestamp(COALESCE(tm.valid_from, timezone('utc'::text, now()))) gameday_from_timestamp(season, gameday)) >= 98) AND ((tm.modification)::text = 'PARTY_TIME'::text)))) x) ts
+     JOIN data.teams t ON ((((ts.team_id)::text = (t.team_id)::text) AND (t.valid_from <= (ts.timestampd + '00:00:00.001'::interval)) AND (ts.timestampd < COALESCE((t.valid_until)::timestamp with time zone, ((timezone('utc'::text, now()) + '00:00:00.001'::interval))::timestamp with time zone)))))
      LEFT JOIN taxa.team_abbreviations ta ON (((ts.team_id)::text = (ta.team_id)::text)))
-     LEFT JOIN taxa.division_teams dt ON ((((ts.team_id)::text = (dt.team_id)::text) AND (dt.valid_from <= (ts.timestampd + '00:00:00.001'::interval)) AND (ts.timestampd < COALESCE((dt.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))))
+     LEFT JOIN taxa.division_teams dt ON ((((ts.team_id)::text = (dt.team_id)::text) AND (dt.valid_from <= (ts.timestampd + '00:00:00.001'::interval)) AND (ts.timestampd < COALESCE((dt.valid_until)::timestamp with time zone, ((timezone('utc'::text, now()) + '00:00:00.001'::interval))::timestamp with time zone)))))
      LEFT JOIN taxa.divisions d ON (((dt.division_id)::text = (d.division_id)::text)))
      LEFT JOIN taxa.leagues l ON ((d.league_id = l.league_db_id)))
+     LEFT JOIN taxa.tournament_teams tt ON (((ts.team_id)::text = (tt.team_id)::text)))
+     LEFT JOIN taxa.tournaments xt ON ((tt.tournament_db_id = xt.tournament_db_id)))
   WHERE (ts.timestampd IS NOT NULL)
   ORDER BY t.full_name, ts.timestampd;
+
 --
 -- Name: player_status_flags; Type: VIEW; Schema: data; Owner: -
 --
+
 CREATE VIEW data.player_status_flags AS
  SELECT DISTINCT p.player_id,
         CASE
@@ -300,11 +314,11 @@ CREATE VIEW data.player_status_flags AS
             WHEN (EXISTS ( SELECT 1
                FROM (data.team_roster rc
                  JOIN data.teams_info_expanded_all t ON (((rc.team_id)::text = (t.team_id)::text)))
-              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_status = 'active'::text)))) THEN 'active'::text
+              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status = 'active'::text)))) THEN 'active'::text
             WHEN (EXISTS ( SELECT 1
                FROM (data.team_roster rc
                  JOIN data.teams_info_expanded_all t ON (((rc.team_id)::text = (t.team_id)::text)))
-              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_status = 'ascended'::text)))) THEN 'ascended'::text
+              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status = 'ascended'::text)))) THEN 'ascended'::text
             WHEN ( SELECT ip.deceased
                FROM data.players ip
               WHERE (((ip.player_id)::text = (p.player_id)::text) AND (ip.valid_until IS NULL))) THEN 'deceased'::text
@@ -319,7 +333,7 @@ CREATE VIEW data.player_status_flags AS
               WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (rc.position_type_id < (2)::numeric)))) AND (NOT (EXISTS ( SELECT 1
                FROM (data.team_roster rc
                  JOIN data.teams_info_expanded_all t ON (((rc.team_id)::text = (t.team_id)::text)))
-              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_status = 'ascended'::text))))) AND (NOT (EXISTS ( SELECT 1
+              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status = 'ascended'::text))))) AND (NOT (EXISTS ( SELECT 1
                FROM data.player_modifications pm
               WHERE (((pm.player_id)::text = (p.player_id)::text) AND (pm.valid_until IS NULL) AND ((pm.modification)::text = 'RETIRED'::text)))))) THEN 'main_roster'::text
             WHEN ((EXISTS ( SELECT 1
@@ -783,34 +797,7 @@ CREATE VIEW data.batting_records_player_single_game AS
      CROSS JOIN LATERAL ( VALUES (a.hits_risps,a.hits_risp_rank,'hits_risp'::text), (a.walks,a.bb_rank,'walks'::text), (a.singles,a.sng_rank,'singles'::text), (a.doubles,a.dbl_rank,'doubles'::text), (a.triples,a.trp_rank,'triples'::text), (a.quadruples,a.qd_rank,'quadruples'::text), (a.home_runs,a.hr_rank,'home_runs'::text), (a.total_bases,a.tb_rank,'total_bases'::text), (a.hits,a.hits_rank,'hits'::text), (a.runs_batted_in,a.rbi_rank,'runs_batted_in'::text), (a.sacrifices,a.sac_rank,'sacrifices'::text), (a.strikeouts,a.k_rank,'strikeouts'::text)) c(value, rank, stat))
   WHERE (c.rank = 1)
   ORDER BY c.stat, a.player_name;
---
--- Name: teams_current; Type: VIEW; Schema: data; Owner: -
---
-CREATE VIEW data.teams_current AS
- SELECT t.team_id,
-    t.location,
-    t.nickname,
-    t.url_slug,
-    t.full_name,
-    t.valid_from,
-    ( SELECT gameday_from_timestamp.gameday
-           FROM data.gameday_from_timestamp(t.valid_from) gameday_from_timestamp(season, gameday)) AS gameday_from,
-    ( SELECT gameday_from_timestamp.season
-           FROM data.gameday_from_timestamp(t.valid_from) gameday_from_timestamp(season, gameday)) AS season_from,
-    d.division_text AS division,
-    d.division_id,
-    l.league_text AS league,
-    l.league_id
-   FROM (((data.teams t
-     JOIN taxa.division_teams dt ON ((((t.team_id)::text = (dt.team_id)::text) AND (dt.valid_until IS NULL))))
-     JOIN taxa.divisions d ON ((((dt.division_id)::text = (d.division_id)::text) AND (d.valid_until IS NULL))))
-     JOIN taxa.leagues l ON (((d.league_id = l.league_db_id) AND (l.valid_until IS NULL))))
-  WHERE (t.valid_until IS NULL)
-  ORDER BY l.league_text, d.division_text, t.nickname;
---
--- Name: VIEW teams_current; Type: COMMENT; Schema: data; Owner: -
---
-COMMENT ON VIEW data.teams_current IS 'TO BE DEPRECATED in favor of data.teams_info_expanded_all';
+
 --
 -- Name: batting_records_team_playoffs_season; Type: VIEW; Schema: data; Owner: -
 --
@@ -858,8 +845,8 @@ CREATE VIEW data.batting_records_team_playoffs_season AS
                    FROM data.game_events ge
                   WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day >= 99))
                   GROUP BY 'RBIS'::text, ge.batter_team_id, ge.season) x) y
-     JOIN data.teams_current t ON (((y.team_id)::text = (t.team_id)::text)))
-  WHERE (y.this = 1)
+     JOIN data.teams_info_expanded_all t ON ((((y.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+  WHERE ((y.this = 1) AND (y.season > 0))
   ORDER BY y.event, y.season, t.nickname;
 --
 -- Name: batting_records_team_playoffs_single_game; Type: VIEW; Schema: data; Owner: -
@@ -920,8 +907,8 @@ CREATE VIEW data.batting_records_team_playoffs_single_game AS
                    FROM data.game_events ge
                   WHERE ((ge.runs_batted_in >= (0)::numeric) AND (ge.day < 99))
                   GROUP BY ge.game_id, 'RBIS'::text, ge.batter_team_id, ge.season, ge.day) x) y
-     JOIN data.teams_current t ON (((y.team_id)::text = (t.team_id)::text)))
-  WHERE (y.this = 1)
+     JOIN data.teams_info_expanded_all t ON ((((y.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+  WHERE ((y.this = 1) AND (y.season > 0))
   ORDER BY y.event, y.season, y.day, t.nickname;
 --
 -- Name: batting_records_team_season; Type: VIEW; Schema: data; Owner: -
@@ -971,7 +958,7 @@ CREATE VIEW data.batting_records_team_season AS
                   WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day < 99))
                   GROUP BY 'RBIS'::text, ge.batter_team_id, ge.season) x) y
      JOIN data.teams_info_expanded_all t ON ((((y.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
-  WHERE (y.this = 1)
+  WHERE ((y.this = 1) AND (y.season > 0))
   ORDER BY y.event, y.season, t.nickname;
 --
 -- Name: batting_records_team_single_game; Type: VIEW; Schema: data; Owner: -
@@ -1032,9 +1019,179 @@ CREATE VIEW data.batting_records_team_single_game AS
                    FROM data.game_events ge
                   WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day < 99))
                   GROUP BY ge.game_id, 'RBIS'::text, ge.batter_team_id, ge.season, ge.day) x) y
-     JOIN data.teams_current t ON (((y.team_id)::text = (t.team_id)::text)))
-  WHERE (y.this = 1)
+     JOIN data.teams_info_expanded_all t ON ((((y.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+  WHERE ((y.this = 1) AND (y.season > 0))
   ORDER BY y.event, y.season, y.day, t.nickname;
+
+--
+-- Name: batting_records_team_tournament; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_records_team_tournament AS
+ SELECT y.that AS record,
+    t.nickname AS team,
+    (t.team_id)::character varying(36) AS team_id,
+    y.event,
+    y.season
+   FROM (( SELECT x.that,
+            x.team_id,
+            x.event,
+            x.season,
+            rank() OVER (PARTITION BY x.event ORDER BY x.that DESC) AS this
+           FROM ( SELECT count(1) AS that,
+                    game_events.batter_team_id AS team_id,
+                    game_events.event_type AS event,
+                    game_events.season
+                   FROM data.game_events
+                  WHERE ((game_events.event_type <> ALL (ARRAY['UNKNOWN'::text, 'OUT'::text, 'GAME_OVER'::text])) AND (game_events.day < 99))
+                  GROUP BY game_events.event_type, game_events.batter_team_id, game_events.season
+                UNION
+                 SELECT sum(xe.hit) AS that,
+                    ge.batter_team_id AS team_id,
+                    'HIT'::text AS event,
+                    ge.season
+                   FROM (data.game_events ge
+                     JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+                  WHERE ((xe.hit = 1) AND (ge.day < 99))
+                  GROUP BY 'HIT'::text, ge.batter_team_id, ge.season
+                UNION
+                 SELECT sum(xe.total_bases) AS that,
+                    ge.batter_team_id AS team_id,
+                    'TOTAL_BASES'::text AS event,
+                    ge.season
+                   FROM (data.game_events ge
+                     JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+                  WHERE ((xe.hit = 1) AND (ge.day < 99))
+                  GROUP BY 'TOTAL_BASES'::text, ge.batter_team_id, ge.season
+                UNION
+                 SELECT sum(ge.runs_batted_in) AS that,
+                    ge.batter_team_id AS team_id,
+                    'RBIS'::text AS event,
+                    ge.season
+                   FROM data.game_events ge
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day < 99))
+                  GROUP BY 'RBIS'::text, ge.batter_team_id, ge.season) x) y
+     JOIN data.teams_info_expanded_all t ON ((((y.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+  WHERE ((y.this = 1) AND (y.season < 0))
+  ORDER BY y.event, y.season, t.nickname;
+
+--
+-- Name: batting_records_team_tournament_single_game; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_records_team_tournament_single_game AS
+ SELECT y.that AS record,
+    t.nickname AS team,
+    t.team_id,
+    y.game_id,
+    y.event,
+    y.season,
+    y.day
+   FROM (( SELECT x.that,
+            x.team_id,
+            x.game_id,
+            x.event,
+            x.season,
+            x.day,
+            rank() OVER (PARTITION BY x.event ORDER BY x.that DESC) AS this
+           FROM ( SELECT count(1) AS that,
+                    game_events.batter_team_id AS team_id,
+                    game_events.game_id,
+                    game_events.event_type AS event,
+                    game_events.season,
+                    game_events.day
+                   FROM data.game_events
+                  WHERE ((game_events.event_type <> ALL (ARRAY['UNKNOWN'::text, 'OUT'::text, 'GAME_OVER'::text])) AND (game_events.day >= 99))
+                  GROUP BY game_events.game_id, game_events.event_type, game_events.batter_team_id, game_events.season, game_events.day
+                UNION
+                 SELECT sum(xe.hit) AS that,
+                    ge.batter_team_id AS team_id,
+                    ge.game_id,
+                    'HIT'::text AS event,
+                    ge.season,
+                    ge.day
+                   FROM (data.game_events ge
+                     JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+                  WHERE ((xe.hit = 1) AND (ge.day >= 99))
+                  GROUP BY ge.game_id, 'HIT'::text, ge.batter_team_id, ge.season, ge.day
+                UNION
+                 SELECT sum(xe.total_bases) AS that,
+                    ge.batter_team_id AS team_id,
+                    ge.game_id,
+                    'TOTAL_BASES'::text AS event,
+                    ge.season,
+                    ge.day
+                   FROM (data.game_events ge
+                     JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+                  WHERE ((xe.hit = 1) AND (ge.day >= 99))
+                  GROUP BY ge.game_id, 'TOTAL_BASES'::text, ge.batter_team_id, ge.season, ge.day
+                UNION
+                 SELECT sum(ge.runs_batted_in) AS that,
+                    ge.batter_team_id AS team_id,
+                    ge.game_id,
+                    'RBIS'::text AS event,
+                    ge.season,
+                    ge.day
+                   FROM data.game_events ge
+                  WHERE ((ge.runs_batted_in >= (0)::numeric) AND (ge.day < 99))
+                  GROUP BY ge.game_id, 'RBIS'::text, ge.batter_team_id, ge.season, ge.day) x) y
+     JOIN data.teams_info_expanded_all t ON ((((y.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+  WHERE ((y.this = 1) AND (y.season < 0))
+  ORDER BY y.event, y.season, y.day, t.nickname;
+
+--
+-- Name: batting_records_team_tournmament; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_records_team_tournmament AS
+ SELECT y.that AS record,
+    t.nickname AS team,
+    t.team_id,
+    y.event,
+    y.season
+   FROM (( SELECT x.that,
+            x.team_id,
+            x.event,
+            x.season,
+            rank() OVER (PARTITION BY x.event ORDER BY x.that DESC) AS this
+           FROM ( SELECT count(1) AS that,
+                    game_events.batter_team_id AS team_id,
+                    game_events.event_type AS event,
+                    game_events.season
+                   FROM data.game_events
+                  WHERE ((game_events.event_type <> ALL (ARRAY['UNKNOWN'::text, 'OUT'::text, 'GAME_OVER'::text])) AND (game_events.day >= 99))
+                  GROUP BY game_events.event_type, game_events.batter_team_id, game_events.season
+                UNION
+                 SELECT sum(xe.hit) AS that,
+                    ge.batter_team_id AS team_id,
+                    'HIT'::text AS event,
+                    ge.season
+                   FROM (data.game_events ge
+                     JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+                  WHERE ((xe.hit = 1) AND (ge.day >= 99))
+                  GROUP BY 'HIT'::text, ge.batter_team_id, ge.season
+                UNION
+                 SELECT sum(xe.total_bases) AS that,
+                    ge.batter_team_id AS team_id,
+                    'TOTAL_BASES'::text AS event,
+                    ge.season
+                   FROM (data.game_events ge
+                     JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+                  WHERE ((xe.hit = 1) AND (ge.day >= 99))
+                  GROUP BY 'TOTAL_BASES'::text, ge.batter_team_id, ge.season
+                UNION
+                 SELECT sum(ge.runs_batted_in) AS that,
+                    ge.batter_team_id AS team_id,
+                    'RBIS'::text AS event,
+                    ge.season
+                   FROM data.game_events ge
+                  WHERE ((ge.runs_batted_in > (0)::numeric) AND (ge.day >= 99))
+                  GROUP BY 'RBIS'::text, ge.batter_team_id, ge.season) x) y
+     JOIN data.teams_info_expanded_all t ON ((((y.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+  WHERE ((y.this = 1) AND (y.season < 0))
+  ORDER BY y.event, y.season, t.nickname;
+
+
 --
 -- Name: batting_stats_player_lifetime; Type: VIEW; Schema: data; Owner: -
 --
@@ -1081,7 +1238,7 @@ CREATE VIEW data.batting_stats_player_lifetime AS
     sum(a.gidp) AS gidps
    FROM (data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-  WHERE (NOT a.is_postseason)
+  WHERE ((NOT a.is_postseason) AND (a.season > 0))
   GROUP BY a.player_id, p.player_name;
 --
 -- Name: batting_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
@@ -1185,8 +1342,114 @@ CREATE VIEW data.batting_stats_player_season AS
    FROM ((data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
-  WHERE (NOT a.is_postseason)
+  WHERE ((NOT a.is_postseason) AND (a.season > 0))
   GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id;
+
+--
+-- Name: batting_stats_player_tournament; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_stats_player_tournament AS
+ SELECT p.player_name,
+    a.player_id,
+    (t.team_id)::character varying(36) AS team_id,
+    t.nickname AS team,
+    a.season,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
+        END AS batting_average,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+        END AS on_base_percentage,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.slugging(sum(a.total_bases), sum(a.at_bat))
+        END AS slugging,
+    sum(a.plate_appearance) AS plate_appearances,
+    sum(a.at_bat) AS at_bats,
+    sum(a.hit) AS hits,
+    sum(a.walk) AS walks,
+    sum(a.single) AS singles,
+    sum(a.double) AS doubles,
+    sum(a.triple) AS triples,
+    sum(a.home_run) AS home_runs,
+    sum(a.runs_batted_in) AS runs_batted_in,
+    sum(a.strikeout) AS strikeouts,
+    sum(a.sacrifice) AS sacrifices,
+    sum(a.at_bat_risp) AS at_bats_risp,
+    sum(a.hits_risp) AS hits_risps,
+        CASE
+            WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
+            ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
+        END AS batting_average_risp,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+        END AS on_base_slugging,
+    sum(a.total_bases) AS total_bases,
+    sum(a.hbp) AS hbps,
+    sum(a.ground_out) AS ground_outs,
+    sum(a.flyout) AS flyouts,
+    sum(a.gidp) AS gidps
+   FROM ((data.batting_stats_all_events a
+     JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+  WHERE ((NOT a.is_postseason) AND (a.season < 0))
+  GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id;
+
+--
+-- Name: batting_stats_player_tournament_lifetime; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.batting_stats_player_tournament_lifetime AS
+ SELECT p.player_name,
+    a.player_id,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
+        END AS batting_average,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+        END AS on_base_percentage,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.slugging(sum(a.total_bases), sum(a.at_bat))
+        END AS slugging,
+    sum(a.plate_appearance) AS plate_appearances,
+    sum(a.at_bat) AS at_bats,
+    sum(a.hit) AS hits,
+    sum(a.walk) AS walks,
+    sum(a.single) AS singles,
+    sum(a.double) AS doubles,
+    sum(a.triple) AS triples,
+    sum(a.home_run) AS home_runs,
+    sum(a.runs_batted_in) AS runs_batted_in,
+    sum(a.strikeout) AS strikeouts,
+    sum(a.sacrifice) AS sacrifices,
+    sum(a.at_bat_risp) AS at_bats_risp,
+    sum(a.hits_risp) AS hits_risps,
+        CASE
+            WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
+            ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
+        END AS batting_average_risp,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+        END AS on_base_slugging,
+    sum(a.total_bases) AS total_bases,
+    sum(a.hbp) AS hbps,
+    sum(a.ground_out) AS ground_outs,
+    sum(a.flyout) AS flyouts,
+    sum(a.gidp) AS gidps
+   FROM (data.batting_stats_all_events a
+     JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+  WHERE ((NOT a.is_postseason) AND (a.season < 0))
+  GROUP BY a.player_id, p.player_name;
+
+
 --
 -- Name: charm_counts; Type: VIEW; Schema: data; Owner: -
 --
@@ -1252,7 +1515,7 @@ CREATE VIEW data.fielder_stats_lifetime AS
     f.player_id,
     count(1) AS plays
    FROM data.fielder_stats_all_events f
-  WHERE (f.day < 99)
+  WHERE ((f.day < 99) AND (f.season > 0))
   GROUP BY f.player_name, f.player_id;
 --
 -- Name: fielder_stats_playoffs_lifetime; Type: VIEW; Schema: data; Owner: -
@@ -1284,8 +1547,20 @@ CREATE VIEW data.fielder_stats_season AS
     f.season,
     count(1) AS plays
    FROM data.fielder_stats_all_events f
-  WHERE (f.day < 99)
+  WHERE ((f.day < 99) AND (f.season > 0))
   GROUP BY f.player_name, f.player_id, f.season;
+
+  --
+-- Name: fielder_stats_tournament; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.fielder_stats_tournament AS
+ SELECT f.player_name,
+    f.player_id,
+    count(1) AS plays
+   FROM data.fielder_stats_all_events f
+  WHERE (f.season < 0)
+  GROUP BY f.player_name, f.player_id;
 
 --
 -- Name: pitching_stats_all_appearances; Type: MATERIALIZED VIEW; Schema: data; Owner: -
@@ -1474,7 +1749,7 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
     round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
-  WHERE (NOT p.is_postseason)
+  WHERE ((NOT p.is_postseason) AND (p.season > 0))
   GROUP BY a.player_name, p.player_id;
 --
 -- Name: pitching_stats_player_season; Type: VIEW; Schema: data; Owner: -
@@ -1514,141 +1789,9 @@ CREATE VIEW data.pitching_stats_player_season AS
     round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
-  WHERE (NOT p.is_postseason)
+  WHERE ((NOT p.is_postseason) AND (p.season > 0))
   GROUP BY a.player_name, p.player_id, p.season;
 
---
--- Name: players_current; Type: VIEW; Schema: data; Owner: -
---
-CREATE VIEW data.players_current AS
- SELECT p.player_id,
-    p.valid_from,
-    ( SELECT gameday_from_timestamp.gameday
-           FROM data.gameday_from_timestamp(p.valid_from) gameday_from_timestamp(season, gameday)) AS gameday_from,
-    ( SELECT gameday_from_timestamp.season
-           FROM data.gameday_from_timestamp(p.valid_from) gameday_from_timestamp(season, gameday)) AS season_from,
-    p.player_name,
-    p.anticapitalism,
-    p.base_thirst,
-    p.buoyancy,
-    p.chasiness,
-    p.coldness,
-    p.continuation,
-    p.divinity,
-    p.ground_friction,
-    p.indulgence,
-    p.laserlikeness,
-    p.martyrdom,
-    p.moxie,
-    p.musclitude,
-    p.omniscience,
-    p.overpowerment,
-    p.patheticism,
-    p.ruthlessness,
-    p.shakespearianism,
-    p.suppression,
-    p.tenaciousness,
-    p.thwackability,
-    p.tragicness,
-    p.unthwackability,
-    p.watchfulness,
-    p.pressurization,
-    p.cinnamon,
-    p.total_fingers,
-    p.soul,
-    p.fate,
-    p.peanut_allergy,
-    p.armor,
-    p.bat,
-    p.ritual,
-    xc.coffee_text AS coffee,
-    xb.blood_type AS blood,
-    t.team_id,
-    t.nickname AS team,
-    tr.position_id,
-    xp.position_type,
-    p.url_slug AS player_url_slug,
-    ( SELECT array_agg(DISTINCT xs.url_slug) AS array_agg
-           FROM taxa.player_url_slugs xs
-          WHERE (((xs.player_id)::text = (p.player_id)::text) AND ((xs.url_slug)::text <> (p.url_slug)::text))) AS previous_url_slugs,
-    p.deceased
-   FROM (((((data.players p
-     LEFT JOIN taxa.blood xb ON ((p.blood = xb.blood_id)))
-     LEFT JOIN taxa.coffee xc ON ((p.coffee = xc.coffee_id)))
-     LEFT JOIN data.team_roster tr ON ((((p.player_id)::text = (tr.player_id)::text) AND (tr.valid_until IS NULL))))
-     LEFT JOIN data.teams_current t ON (((tr.team_id)::text = (t.team_id)::text)))
-     LEFT JOIN taxa.position_types xp ON ((tr.position_type_id = (xp.position_type_id)::numeric)))
-  WHERE ((p.valid_until IS NULL) AND (tr.position_type_id < (2)::numeric) AND ((p.player_id)::text <> 'bc4187fa-459a-4c06-bbf2-4e0e013d27ce'::text));
---
--- Name: VIEW players_current; Type: COMMENT; Schema: data; Owner: -
---
-COMMENT ON VIEW data.players_current IS 'TO BE DEPRECATED in favor of data.players_info_expanded_all';
---
--- Name: players_extended_current; Type: VIEW; Schema: data; Owner: -
---
-CREATE VIEW data.players_extended_current AS
- SELECT p.player_id,
-    p.valid_from,
-    ( SELECT gameday_from_timestamp.gameday
-           FROM data.gameday_from_timestamp(p.valid_from) gameday_from_timestamp(season, gameday)) AS gameday_from,
-    ( SELECT gameday_from_timestamp.season
-           FROM data.gameday_from_timestamp(p.valid_from) gameday_from_timestamp(season, gameday)) AS season_from,
-    p.player_name,
-    p.anticapitalism,
-    p.base_thirst,
-    p.buoyancy,
-    p.chasiness,
-    p.coldness,
-    p.continuation,
-    p.divinity,
-    p.ground_friction,
-    p.indulgence,
-    p.laserlikeness,
-    p.martyrdom,
-    p.moxie,
-    p.musclitude,
-    p.omniscience,
-    p.overpowerment,
-    p.patheticism,
-    p.ruthlessness,
-    p.shakespearianism,
-    p.suppression,
-    p.tenaciousness,
-    p.thwackability,
-    p.tragicness,
-    p.unthwackability,
-    p.watchfulness,
-    p.pressurization,
-    p.cinnamon,
-    p.total_fingers,
-    p.soul,
-    p.fate,
-    p.peanut_allergy,
-    p.armor,
-    p.bat,
-    p.ritual,
-    xc.coffee_text AS coffee,
-    xb.blood_type AS blood,
-    t.team_id,
-    t.nickname AS team,
-    tr.position_id,
-    xp.position_type,
-    p.url_slug AS player_url_slug,
-    ( SELECT array_agg(DISTINCT xs.url_slug) AS array_agg
-           FROM taxa.player_url_slugs xs
-          WHERE (((xs.player_id)::text = (p.player_id)::text) AND ((xs.url_slug)::text <> (p.url_slug)::text))) AS previous_url_slugs,
-    p.deceased
-   FROM (((((data.players p
-     LEFT JOIN taxa.blood xb ON ((p.blood = xb.blood_id)))
-     LEFT JOIN taxa.coffee xc ON ((p.coffee = xc.coffee_id)))
-     LEFT JOIN data.team_roster tr ON ((((p.player_id)::text = (tr.player_id)::text) AND (tr.valid_until IS NULL))))
-     LEFT JOIN data.teams_current t ON (((tr.team_id)::text = (t.team_id)::text)))
-     LEFT JOIN taxa.position_types xp ON ((tr.position_type_id = (xp.position_type_id)::numeric)))
-  WHERE (((p.valid_until IS NULL) OR (p.deceased = true)) AND ((p.player_id)::text <> 'bc4187fa-459a-4c06-bbf2-4e0e013d27ce'::text));
---
--- Name: VIEW players_extended_current; Type: COMMENT; Schema: data; Owner: -
---
-COMMENT ON VIEW data.players_extended_current IS 'TO BE DEPRECATED in favor of data.players_info_expanded_all';
 
 --
 -- Name: rosters_current; Type: VIEW; Schema: data; Owner: -
@@ -1724,7 +1867,7 @@ CREATE VIEW data.running_stats_player_lifetime AS
     sum(rs.runner_scored) AS runs
    FROM (data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-  WHERE (rs.day < 99)
+  WHERE ((rs.day < 99) AND (rs.season > 0))
   GROUP BY rs.player_id, p.player_name;
 --
 -- Name: running_stats_player_season; Type: VIEW; Schema: data; Owner: -
@@ -1738,8 +1881,24 @@ CREATE VIEW data.running_stats_player_season AS
     sum(rs.runner_scored) AS runs
    FROM (data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-  WHERE (rs.day < 99)
+  WHERE ((rs.day < 99) AND (rs.season > 0))
   GROUP BY rs.player_id, rs.season, p.player_name;
+
+--
+-- Name: running_stats_player_tournament_lifetime; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW data.running_stats_player_tournament_lifetime AS
+ SELECT rs.player_id,
+    p.player_name,
+    sum(rs.was_base_stolen) AS stolen_bases,
+    sum(rs.was_caught_stealing) AS caught_stealing,
+    sum(rs.runner_scored) AS runs
+   FROM (data.running_stats_all_events rs
+     JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+  WHERE (rs.season < 0)
+  GROUP BY rs.player_id, p.player_name;
+
 --
 -- Name: stars_team_all_current; Type: VIEW; Schema: data; Owner: -
 --

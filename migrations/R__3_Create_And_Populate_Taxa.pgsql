@@ -42,6 +42,10 @@ DROP TABLE IF EXISTS taxa.leagues;
 DROP TABLE IF EXISTS taxa.divisions;
 DROP TABLE IF EXISTS taxa.division_teams;
 DROP TABLE IF EXISTS taxa.event_types;
+DROP TABLE IF EXISTS taxa.tournaments;
+DROP TABLE IF EXISTS taxa.tournament_teams;
+DROP SEQUENCE IF EXISTS taxa.tournaments_tournament_db_id_seq;
+DROP SEQUENCE IF EXISTS taxa.tournament_teams_tournament_team_id_seq;
 
 --
 -- Name: event_types; Type: TABLE; Schema: taxa; Owner: -
@@ -345,6 +349,70 @@ CREATE TABLE taxa.weather (
     weather_id integer,
     weather_text character varying
 );
+
+--
+-- Name: tournament_teams; Type: TABLE; Schema: taxa; Owner: -
+--
+
+CREATE TABLE taxa.tournament_teams (
+    tournament_team_id integer NOT NULL,
+    tournament_db_id integer,
+    team_id character varying,
+    valid_from timestamp without time zone,
+    valid_until timestamp without time zone
+);
+
+--
+-- Name: tournaments; Type: TABLE; Schema: taxa; Owner: -
+--
+
+CREATE TABLE taxa.tournaments (
+    tournament_db_id integer NOT NULL,
+    tournament_id integer,
+    tournament_name character varying,
+    valid_from timestamp without time zone,
+    valid_until timestamp without time zone
+);
+
+
+--
+-- Name: tournament_teams_tournament_team_id_seq; Type: SEQUENCE; Schema: taxa; Owner: -
+--
+
+CREATE SEQUENCE taxa.tournament_teams_tournament_team_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: tournament_teams_tournament_team_id_seq; Type: SEQUENCE OWNED BY; Schema: taxa; Owner: -
+--
+
+ALTER SEQUENCE taxa.tournament_teams_tournament_team_id_seq OWNED BY taxa.tournament_teams.tournament_team_id;
+
+--
+-- Name: tournaments_tournament_db_id_seq; Type: SEQUENCE; Schema: taxa; Owner: -
+--
+
+CREATE SEQUENCE taxa.tournaments_tournament_db_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: tournaments_tournament_db_id_seq; Type: SEQUENCE OWNED BY; Schema: taxa; Owner: -
+--
+
+ALTER SEQUENCE taxa.tournaments_tournament_db_id_seq OWNED BY taxa.tournaments.tournament_db_id;
+
+
+
 
 --
 -- Name: attributes attribute_id; Type: DEFAULT; Schema: taxa; Owner: -
@@ -692,6 +760,11 @@ COPY taxa.phases (phase_id, phase_type, phase_type_id) FROM stdin;
 6	END_POSTSEASON	5
 8	UNKNOWN_THE_OCHO	99
 99	SIESTA	99
+12	TOURNAMENT_PRESEASON	6
+13	TOURNAMENT_GAMEDAY	7
+14	TOURNAMENT_GAMEDAY	7
+15	TOURNAMENT_POSTSEASON	8
+16	END_TOURNAMENT	9
 \.
 --
 -- Data for Name: pitch_types; Type: TABLE DATA; Schema: taxa; Owner: -
@@ -1446,6 +1519,40 @@ COPY taxa.team_divine_favor (team_divine_favor_id, team_id, valid_from, valid_un
 98	57ec08cc-0411-4643-b304-0e80dbc15ac7	2020-09-26 10:30:06.456357	\N	19
 99	9debc64f-74b7-4ae1-a4d6-fce0144b6ea5	2020-09-26 10:30:06.46395	\N	20
 \.
+
+--
+-- Data for Name: tournament_teams; Type: TABLE DATA; Schema: taxa; Owner: -
+--
+
+COPY taxa.tournament_teams (tournament_team_id, tournament_db_id, team_id, valid_from, valid_until) FROM stdin;
+1	1	4e5d0063-73b4-440a-b2d1-214a7345cf16	\N	\N
+2	1	49181b72-7f1c-4f1c-929f-928d763ad7fb	\N	\N
+3	1	f29d6e60-8fce-4ac6-8bc2-b5e3cabc5696	\N	\N
+4	1	a3ea6358-ce03-4f23-85f9-deb38cb81b20	\N	\N
+5	1	4d921519-410b-41e2-882e-9726a4e54a6a	\N	\N
+6	1	b3b9636a-f88a-47dc-a91d-86ecc79f9934	\N	\N
+7	1	e3f90fa1-0bbe-40df-88ce-578d0723a23b	\N	\N
+8	1	e8f7ffee-ec53-4fe0-8e87-ea8ff1d0b4a9	\N	\N
+9	1	d8f82163-2e74-496b-8e4b-2ab35b2d3ff1	\N	\N
+10	1	70eab4ab-6cb1-41e7-ac8b-1050ee12eecc	\N	\N
+11	1	9e42c12a-7561-42a2-b2d0-7cf81a817a5e	\N	\N
+12	1	a7592bd7-1d3c-4ffb-8b3a-0b1e4bc321fd	\N	\N
+13	1	3b0a289b-aebd-493c-bc11-96793e7216d5	\N	\N
+14	1	7fcb63bc-11f2-40b9-b465-f1d458692a63	\N	\N
+15	1	9a5ab308-41f2-4889-a3c3-733b9aab806e	\N	\N
+16	1	d2634113-b650-47b9-ad95-673f8e28e687	\N	\N
+\.
+
+--
+-- Data for Name: tournaments; Type: TABLE DATA; Schema: taxa; Owner: -
+--
+
+COPY taxa.tournaments (tournament_db_id, tournament_id, tournament_name, valid_from, valid_until) FROM stdin;
+1	0	The Coffee Cup	\N	\N
+\.
+
+
+
 --
 -- Data for Name: vibe_to_arrows; Type: TABLE DATA; Schema: taxa; Owner: -
 --

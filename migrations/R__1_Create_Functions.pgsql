@@ -402,7 +402,7 @@ CREATE FUNCTION data.player_slug_creation() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-	new.url_slug = replace(regexp_replace(lower(unaccent(new.player_name)), '[^A-Za-z'' ]', '','g'),' ','-');
+	new.url_slug = replace(regexp_replace(lower(unaccent(replace(new.player_name,',',' comma'))), '[^A-Za-z'' ]', '','g'),' ','-');
 	RETURN new;
 END;
 $$;
@@ -739,7 +739,7 @@ CREATE FUNCTION data.team_slug_creation() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-	new.url_slug = replace(regexp_replace(lower(unaccent(new.nickname)), '[^A-Za-z'' ]', '','g'),' ','-');
+	new.url_slug = replace(regexp_replace(lower(unaccent(replace(new.nickname,'&','and'))), '[^A-Za-z'' ]', '','g'),' ','-');
 	RETURN new;
 END;
 $$;
