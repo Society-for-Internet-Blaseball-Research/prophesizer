@@ -47,9 +47,9 @@ namespace SIBR
 		private const int MAX_DAY = 135;
 
 		// Most positive SeasonDay known
-		private SeasonDay m_positiveSeasonDay;
+		private SeasonDay m_regularSeasonDay;
 		// Most negative SeasonDay known
-		private SeasonDay m_negativeSeasonDay;
+		private SeasonDay m_tournamentSeasonDay;
 
 		private const bool TIMING = false;
 		private const bool TIMING_FILE = true;
@@ -74,7 +74,7 @@ namespace SIBR
 		public int NumNetworkOutcomes => m_processor.NumNetworkOutcomes;
 		public int NumLocalOutcomes => m_processor.NumLocalOutcomes;
 
-		public Prophesizer(string bucketName)
+		public Prophesizer()
 		{
 			//m_processor = new Processor();
 			m_eventsToInsert = new Queue<GameEvent>();
@@ -220,19 +220,19 @@ namespace SIBR
 			(m_dbSeasonDay, m_dbGameTimestamp, m_dbTeamTimestamp, m_dbPlayerTimestamp) = await GetChroniclerMeta(psqlConnection);
 			
 			// Current day according to blaseball.com
-			//SeasonDay simSeasonDay;
+			SeasonDay simSeasonDay;
 
-			//var response = await m_blaseballClient.GetAsync("simulationData");
-			//if (response.IsSuccessStatusCode)
-			//{
-			//	string strResponse = await response.Content.ReadAsStringAsync();
-			//	var simData = JsonSerializer.Deserialize<SimulationData>(strResponse, m_options);
-			//	simSeasonDay = new SeasonDay(simData.Season, simData.Day);
-			//}
-			//else
-			//{
-			//	throw new InvalidDataException("Couldn't get current simulation data from blaseball!");
-			//}
+			var response = await m_blaseballClient.GetAsync("simulationData");
+			if (response.IsSuccessStatusCode)
+			{
+				string strResponse = await response.Content.ReadAsStringAsync();
+				var simData = JsonSerializer.Deserialize<SimulationData>(strResponse, m_options);
+				simSeasonDay = new SeasonDay(simData.Season, simData.Day, simData.Tournament);
+			}
+			else
+			{
+				throw new InvalidDataException("Couldn't get current simulation data from blaseball!");
+			}
 
 			if (DO_HOURLY)
 			{
@@ -245,11 +245,6 @@ namespace SIBR
 			{
 				// Grab the list of games we know from the DB's `games` table
 				var gameList = GetAllGameDays(psqlConnection);
-
-				int highestSeason = gameList.Max(sd => sd.Season);
-				int highestDay = gameList.Where(sd => sd.Season == highestSeason).Max(sd => sd.Day);
-				// Should handle tournament explicitly here but ugh it'll be -1
-				SeasonDay simSeasonDay = new SeasonDay(highestSeason, highestDay);
 
 				// Grab all the days we've stored games in the DB's `game_events` table
 				var storedGameList = GetStoredGameDays(psqlConnection);
@@ -289,7 +284,6 @@ namespace SIBR
 				await RefreshMaterializedViews(psqlConnection);
 			}
 
-
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
 			Console.WriteLine(msg);
 
@@ -310,8 +304,6 @@ namespace SIBR
 				}
 			}
 
-			var trans = psqlConnection.BeginTransaction();
-			HashSet<Guid> newPatches = new HashSet<Guid>();
 			foreach (var patchFilename in Directory.GetFiles(Path.Combine(GetExecutingDirectoryName(), "patch")))
 			{
 				using (var md5 = MD5.Create())
@@ -324,12 +316,25 @@ namespace SIBR
 
 						if(!existingPatches.Contains(hash))
 						{
-							newPatches.Add(hash);
-
-							Console.WriteLine($"Applying patch from {Path.GetFileName(patchFilename)}:");
+							Console.WriteLine($"Applying patch from {Path.GetFileName(patchFilename)} / {hash.ToString()}:");
 							Console.WriteLine(cmdText);
 							var patchCmd = new NpgsqlCommand(cmdText, psqlConnection);
-							patchCmd.ExecuteNonQuery();
+
+							var trans = psqlConnection.BeginTransaction();
+							try
+							{
+
+								patchCmd.ExecuteNonQuery();
+								var insertCmd = new NpgsqlCommand("INSERT INTO data.applied_patches(patch_hash) VALUES(@hash)", psqlConnection);
+								insertCmd.Parameters.AddWithValue("hash", NpgsqlTypes.NpgsqlDbType.Uuid, hash);
+								insertCmd.ExecuteNonQuery();
+								trans.Commit();
+							}
+							catch (NpgsqlException ex)
+							{
+								Console.WriteLine($"Exception while processing patch:\n{ex.Message}");
+								trans.Rollback();
+							}
 						}
 						else
 						{
@@ -339,13 +344,7 @@ namespace SIBR
 				}
 			}
 
-			foreach(var patchHash in newPatches)
-			{
-				var insertCmd = new NpgsqlCommand("INSERT INTO data.applied_patches(patch_hash) VALUES(@hash)", psqlConnection);
-				insertCmd.Parameters.AddWithValue("hash", NpgsqlTypes.NpgsqlDbType.Uuid, patchHash);
-				insertCmd.ExecuteNonQuery();
-			}
-			trans.Commit();
+			
 		}
 
 		public static string GetExecutingDirectoryName()
@@ -478,7 +477,7 @@ namespace SIBR
 				string query;
 				if (afterTime.HasValue)
 				{
-					query = $"games/updates?after={afterTime.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
+					query = $"games/updates?after={TimestampQueryValue(afterTime.Value)}&order=asc&started=true&count={NUM_EVENTS_REQUESTED}";
 					if (nextPage != null)
 					{
 						query += $"&page={nextPage}";
@@ -975,7 +974,7 @@ namespace SIBR
 
 		static string TimestampQueryValue(DateTime dt)
 		{
-			return dt.ToString("yyyy-MM-ddTHH:mm:ssZ");
+			return dt.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ");
 		}
 
 		private async Task LoadTeamUpdates(NpgsqlConnection psqlConnection)
@@ -1550,13 +1549,23 @@ namespace SIBR
 			}
 		}
 
-		private async Task<IEnumerable<Game>> GetGames(int season, int day)
+		private async Task<IEnumerable<Game>> GetGames(int season, int day, int tournament = -1)
 		{
 			JsonSerializerOptions options = new JsonSerializerOptions();
 			options.IgnoreNullValues = true;
 
+			string query = $"games?day={day}";
+			if(season == -1 && tournament != -1)
+			{
+				query += $"&tournament={tournament}";
+			}
+			else if(season != -1 && tournament == -1)
+			{
+				query += $"&season={season}";
+			}
+
 			// Get games for this season & day
-			HttpResponseMessage response = await m_blaseballClient.GetAsync($"games?day={day}&season={season}");
+			HttpResponseMessage response = await m_blaseballClient.GetAsync(query);
 
 			if (response.IsSuccessStatusCode)
 			{
@@ -1598,7 +1607,7 @@ namespace SIBR
 					}
 				}
 
-				m_positiveSeasonDay = new SeasonDay(season, day);
+				m_regularSeasonDay = new SeasonDay(season, day);
 				SeasonDay currSeasonDay = new SeasonDay(season, day);
 
 				Console.WriteLine($"Found games through season {season}, day {day}.");
@@ -1607,7 +1616,7 @@ namespace SIBR
 
 				// Talk to the blaseball API
 
-				Console.WriteLine($"Adding positive season game records...");
+				Console.WriteLine($"Adding regular season game records...");
 				// Loop until we break out
 				while (true)
 				{
@@ -1618,7 +1627,7 @@ namespace SIBR
 						if (day > 0)
 						{
 							// Ran out of finished games this season, try the next
-							m_positiveSeasonDay.Season = season;
+							m_regularSeasonDay.Season = season;
 							season++;
 							day = 0;
 							continue;
@@ -1636,18 +1645,18 @@ namespace SIBR
 						await cmd.ExecuteNonQueryAsync();
 					}
 
-					m_positiveSeasonDay.Day = day;
+					m_regularSeasonDay.Day = day;
 					day++;
 				}
 			}
 
 			{
-				int negSeason = 0;
-				int negDay = 0;
+				int tournament = 0;
+				int tournDay = -1;
 
 				using (var gamesCommand = new NpgsqlCommand(@"
-                SELECT MIN(season), MAX(day) from data.games
-                INNER JOIN (SELECT MIN(season) AS min_season FROM data.games) b ON b.min_season = games.season",
+                SELECT MAX(tournament), MAX(day) from data.games
+                INNER JOIN (SELECT MAX(tournament) AS max_tourn FROM data.games WHERE season=-1) b ON b.max_tourn = games.tournament",
 					psqlConnection))
 				using (var reader = await gamesCommand.ExecuteReaderAsync())
 				{
@@ -1655,30 +1664,30 @@ namespace SIBR
 					while (await reader.ReadAsync())
 					{
 						if (!reader.IsDBNull(0))
-							negSeason = reader.GetInt32(0);
+							tournament = reader.GetInt32(0);
 						if (!reader.IsDBNull(1))
-							negDay = reader.GetInt32(1);
+							tournDay = reader.GetInt32(1);
 					}
 				}
 
-				m_negativeSeasonDay = new SeasonDay(-negSeason, negDay);
+				m_tournamentSeasonDay = new SeasonDay(-1, tournDay, tournament);
 				// Start on the next day
-				negDay++;
+				tournDay++;
 
-				Console.WriteLine($"Adding negative season game records...");
+				Console.WriteLine($"Adding tournament game records...");
 				// Loop until we break out
 				while (true)
 				{
-					var gameList = await GetGames(negSeason, negDay);
+					var gameList = await GetGames(-1, tournDay, tournament);
 					// If we got no response 
 					if (gameList == null || gameList.Count() == 0)
 					{
-						if (negDay > 0)
+						if (tournDay > 0)
 						{
 							// Ran out of finished games this season, try the next
-							m_negativeSeasonDay.Season = -negSeason;
-							negSeason--;
-							negDay = 0;
+							m_tournamentSeasonDay.Season = -tournament;
+							tournament++;
+							tournDay = 0;
 							continue;
 						}
 						else
@@ -1694,13 +1703,13 @@ namespace SIBR
 						await cmd.ExecuteNonQueryAsync();
 					}
 
-					m_negativeSeasonDay.Day = negDay;
-					negDay++;
+					m_tournamentSeasonDay.Day = tournDay;
+					tournDay++;
 				}
 			}
 
-			Console.WriteLine($"Stored positive games through Season {m_positiveSeasonDay.Season}, Day {m_positiveSeasonDay.Day}");
-			Console.WriteLine($"Stored negative games through Season {-m_negativeSeasonDay.Season}, Day {m_negativeSeasonDay.Day}");
+			Console.WriteLine($"Stored regular games through Season {m_regularSeasonDay.Season}, Day {m_regularSeasonDay.Day}");
+			Console.WriteLine($"Stored tournament games through Tournament {m_tournamentSeasonDay.Tournament}, Day {m_tournamentSeasonDay.Day}");
 			Console.WriteLine($"Done!");
 		}
 
