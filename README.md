@@ -65,6 +65,7 @@ These come in two varieties:
 
 - Versioned migrations start with a V, such as `V_2_8_1__Unaccent.pgsql`.
 - The filename denotes the version number (2.8.1), then (after a `__` separator) a description of the schema change.
+- Currently the DB schema version is being kept in sync with the Prophesizer version (though not every Prophesizer change involves a schema change).
 - Versioned migrations are applied in version order and must be used when *tables* change.
 - The SQL code in the file must alter the tables in such a way that data is not lost, so that DB schema migrations can happen without having to completely drop the DB.
 
