@@ -48,13 +48,40 @@ The following instructions are written for Windows PCs.
 
 1. Prophesizer depends on [git](https://git-scm.com/), [PostgreSQL](https://www.postgresql.org/), [Visual Studio Code](https://code.visualstudio.com/), and [Node.js](https://nodejs.org/en/). You can manually download and install all of these, but if you have the package manager [Chocolatey](https://chocolatey.org/) installed, you can automatically install these tools by opening a prompt (cmd/powershell) as administrator and running: `choco install git postgresql vscode nodejs`
 2. Use git to clone Prophesizer from github into your desired directory: `git clone https://github.com/Society-for-Internet-Blaseball-Research/prophesizer/`. 
-3. Set the environment PSQL_CONNECTION_STRING to "Host=localhost;username=[postgres username, default 'postgres'];password=[postgres password];database=blaseball", with `setx`, making appropriate changes if any are necessary.
-4. Make sure psql is added to PATH (you can test by typing it in as a command), and your C# connection string environment variable is correctly set.
-5. Using pgAdmin or `psql`, create a database named `blaseball`.
-6. Run the command `create extension unaccent` on the `blaseball` database.
-7. In the directory prophesizer\\db, run `node schema.js load` to load the schema Prophesizer expects into the database.
-8. Compile and run Prophesizer from VS Code via File -> Open Folder, selecting Prophesizer's folder, going to 'Run' in the menu bar, and selecting "Run Without Debugging".
-9. If at some point you make changes to the schema you wish to commit to a repository using `git`, in the directory prophesizer\\db, run `node schema.js dump` to dump your database's schema to schema.sql.
+3. Set the environment var PSQL_CONNECTION_STRING to "Host=localhost;username=[postgres username, default 'postgres'];password=[postgres password];database=blaseball", with `setx`, making appropriate changes if any are necessary.
+4. Set the environment var EVOLVE_CONNECTION_STRING to "Server=localhost;User Id=[postgres username, default 'postgres'];Password=[postgres password];Database=blaseball" with `setx`, making appropriate changes if any are necessary.
+5. Make sure psql is added to PATH (you can test by typing it in as a command), and your C# connection string environment variable is correctly set.
+6. Using pgAdmin or `psql`, create a database named `blaseball`.
+7. Compile and run Prophesizer from VS Code via File -> Open Folder, selecting Prophesizer's folder, going to 'Run' in the menu bar, and selecting "Run Without Debugging". As part of the build process, you should see Evolve perform a migration on your database.
+
+## Changing the DB Schema
+
+Prophesizer is now using the [Evolve](https://evolve-db.netlify.app/) package to manage database schema migrations.
+
+All modification of the DB schema happens via `.pgsql` files in the `migrations` folder.
+These come in two varieties:
+
+### Versioned Migration Files
+
+- Versioned migrations start with a V, such as `V_2_8_1__Unaccent.pgsql`.
+- The filename denotes the version number (2.8.1), then (after a `__` separator) a description of the schema change.
+- Versioned migrations are applied in version order and must be used when *tables* change.
+- The SQL code in the file must alter the tables in such a way that data is not lost, so that DB schema migrations can happen without having to completely drop the DB.
+
+### Repeatable Migration Files
+
+- Repeatable migrations start with an R, such as `R__4_Create_Views.pgsql`. The filename only contains a description (after the `__` separator).
+- They are applied in alphabetical order - Prophesizer numbers the descriptions to enforce the correct dependencies.
+- Repeatable migrations are useful for elements of the database that can simply be dropped and re-created, such as Functions, Procedures, and Views.
+- Prophesizer also uses a repeatable migration for the `taxa` schema which consists only of taxonomy data that always comes from these files.
+
+### Disallowed Syntax
+
+Evolve doesn't support the following PostgreSQL commands in migrations:
+- CREATE INDEX CONCURRENTLY
+- CREATE/DROP DATABASE
+- COPY FROM STDIN
+- VACUUM
 
 ## Deploy Steps for sibr.dev
 
