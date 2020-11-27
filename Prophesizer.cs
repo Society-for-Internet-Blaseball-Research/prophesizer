@@ -109,34 +109,44 @@ namespace SIBR
 		{
 			int season = 0;
 			int day = 0;
-			DateTime? game_time = null;
-			DateTime? team_time = null;
-			DateTime? player_time = null;
+			DateTime? gameTime = null;
+			DateTime? teamTime = null;
+			DateTime? playerTime = null;
 
 			NpgsqlCommand cmd = new NpgsqlCommand(@"select season, day, game_timestamp, team_timestamp, player_timestamp from data.chronicler_meta where id=0", psqlConnection);
 
+			bool foundRecord = false;
 			using (var reader = await cmd.ExecuteReaderAsync())
 			{
+				if (reader.HasRows)
+					foundRecord = true;
+
 				while (await reader.ReadAsync())
 				{
 					season = reader.GetInt32(0);
 					day = reader.GetInt32(1);
 					if (!reader.IsDBNull(2))
 					{
-						game_time = reader.GetDateTime(2);
+						gameTime = reader.GetDateTime(2);
 					}
 					if(!reader.IsDBNull(3))
 					{
-						team_time = reader.GetDateTime(3);
+						teamTime = reader.GetDateTime(3);
 					}
 					if(!reader.IsDBNull(4))
 					{
-						player_time = reader.GetDateTime(4);
+						playerTime = reader.GetDateTime(4);
 					}
 				}
 			}
 
-			return (new SeasonDay(season, day), game_time, team_time, player_time);
+			if(!foundRecord)
+			{
+				NpgsqlCommand insertCmd = new NpgsqlCommand(@"insert into data.chronicler_meta values(0,0,0,null,null,null)", psqlConnection);
+				insertCmd.ExecuteNonQuery();
+			}
+
+			return (new SeasonDay(season, day), gameTime, teamTime, playerTime);
 		}
 
 		const int NUM_EVENTS_REQUESTED = 1000;
