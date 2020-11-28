@@ -1,4 +1,4 @@
-﻿/*
+﻿
 ALTER TABLE taxa.event_types DROP CONSTRAINT IF EXISTS event_types_pkey;
 ALTER TABLE taxa.event_types DROP CONSTRAINT IF EXISTS event_types_event_type_key;
 ALTER TABLE taxa.card DROP CONSTRAINT IF EXISTS card_pkey;
@@ -13,7 +13,6 @@ ALTER TABLE taxa.event_types ALTER COLUMN event_type_id DROP DEFAULT;
 ALTER TABLE taxa.divisions ALTER COLUMN division_db_id DROP DEFAULT;
 ALTER TABLE taxa.division_teams ALTER COLUMN division_teams_id DROP DEFAULT;
 ALTER TABLE taxa.attributes ALTER COLUMN attribute_id DROP DEFAULT;
-*/
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -518,6 +517,7 @@ VALUES
 (11, 'Psychic'),
 (12, 'Grass');
 
+
 --
 -- Data for Name: card; Type: TABLE DATA; Schema: taxa; Owner: -
 --
@@ -534,8 +534,7 @@ VALUES
 (7, 'VIII Justice', NULL),
 (8, 'VIIII The Hermit', NULL),
 (9, 'X The Wheel of Fortune', NULL),
-(10, 'XI Strength', NULL),
-(11, 'XII The Hanged Man', NULL),
+(10, 'XI Strength', NULL),(11, 'XII The Hanged Man', NULL),
 (12, 'XIII', NULL),
 (13, 'XIIII Temperance', NULL),
 (14, 'XV The Devil', NULL),
@@ -544,10 +543,11 @@ VALUES
 (17, 'XVIII The Moon', NULL),
 (18, 'XVIIII The Sun', NULL),
 (19, 'XX Judgment', NULL);
+
+
 --
 -- Data for Name: coffee; Type: TABLE DATA; Schema: taxa; Owner: -
 --
-
 INSERT INTO taxa.coffee 
 VALUES 
 (0, 'Black'),
@@ -557,14 +557,13 @@ VALUES
 (4, 'Cold Brew'),
 (5, 'Flat White'),
 (6, 'Americano'),
+(7, 'Espresso'),
 (8, 'Heavy Foam'),
 (9, 'Latte'),
 (10, 'Decaf'),
 (11, 'Milk Substitute'),
 (12, 'Plenty of Sugar'),
-(13, 'Anything'),
-(7, 'Espresso');
-
+(13, 'Anything');
 
 --
 -- Data for Name: division_teams; Type: TABLE DATA; Schema: taxa; Owner: -
@@ -626,7 +625,9 @@ VALUES
 -- Data for Name: divisions; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
-INSERT INTO taxa.divisions VALUES (1, 'Lawful Good', 1, '2020-09-06 15:26:39.925823', '{0,1,2,3,4}', 'f711d960-dc28-4ae2-9249-e1f320fec7d7', '2020-07-29 08:12:22.438'),
+INSERT INTO taxa.divisions 
+VALUES 
+(1, 'Lawful Good', 1, '2020-09-06 15:26:39.925823', '{0,1,2,3,4}', 'f711d960-dc28-4ae2-9249-e1f320fec7d7', '2020-07-29 08:12:22.438'),
 (2, 'Chaotic Good', 1, '2020-09-06 15:26:39.925823', '{0,1,2,3,4}', '5eb2271a-3e49-48dc-b002-9cb615288836', '2020-07-29 08:12:22.438'),
 (3, 'Lawful Evil', 2, '2020-09-06 15:26:39.925823', '{0,1,2,3,4}', '765a1e03-4101-4e8e-b611-389e71d13619', '2020-07-29 08:12:22.438'),
 (4, 'Chaotic Evil', 2, '2020-09-06 15:26:39.925823', '{0,1,2,3,4}', '7fbad33c-59ab-4e80-ba63-347177edaa2e', '2020-07-29 08:12:22.438'),
@@ -634,7 +635,6 @@ INSERT INTO taxa.divisions VALUES (1, 'Lawful Good', 1, '2020-09-06 15:26:39.925
 (6, 'Wild Low', 3, NULL, '{5}', '98c92da4-0ea7-43be-bd75-c6150e184326', '2020-09-06 15:26:34.254566'),
 (7, 'Mild High', 4, NULL, '{5}', '456089f0-f338-4620-a014-9540868789c9', '2020-09-06 15:26:34.254566'),
 (8, 'Mild Low', 4, NULL, '{5}', 'fadc9684-45b3-47a6-b647-3be3f0735a84', '2020-09-06 15:26:34.254566');
-
 
 --
 -- Data for Name: event_types; Type: TABLE DATA; Schema: taxa; Owner: -
@@ -665,15 +665,16 @@ VALUES
 (21, 'CHARM_STRIKEOUT', 1, 1, 0, 0, 1),
 (22, 'CHARM_WALK', 1, 0, 0, 1, 0);
 
+
 --
 -- Data for Name: leagues; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
-INSERT INTO taxa.leagues
+INSERT INTO taxa.leagues 
 VALUES 
 (1, 'Good', '{0,1,2,3,4}', '2020-09-06 15:26:34.254566', '7d3a3dd6-9ea1-4535-9d91-bde875c85e80', '2020-07-29 08:12:22.438'),
 (2, 'Evil', '{0,1,2,3,4}', '2020-09-06 15:26:34.254566', '93e58443-9617-44d4-8561-e254a1dbd450', '2020-07-29 08:12:22.438'),
-(3, 'Wild', '{5}', NULL, 'aabc11a1-81af-4036-9f18-229c759ca8a9', '2020-09-06 15:26:34.254566');
+(3, 'Wild', '{5}', NULL, 'aabc11a1-81af-4036-9f18-229c759ca8a9', '2020-09-06 15:26:34.254566'),
 (4, 'Mild', '{5}', NULL, '4fe65afa-804f-4bb2-9b15-1281b2eab110', '2020-09-06 15:26:34.254566');
 
 
@@ -698,6 +699,7 @@ VALUES
 (13, 'BLOOD_FAITH', '#ff1f3c', '#ff1f3c', '#52050f', 'Blood Faith', 'In the Blood Bath, this player will receive a small boost to a random stat.', 'player'),
 (14, 'BLOOD_LAW', '#ff1f3c', '#ff1f3c', '#52050f', 'Blood Law', 'In the Blood Bath, this team will gain or lose Stars depending on how low or high they finish in their division.', 'team'),
 (15, 'BLOOD_CHAOS', '#ff1f3c', '#ff1f3c', '#52050f', 'Blood Chaos', 'In the Blood Bath, each player on this team will gain or lose a random amount of Stars.', 'team'),
+(16, 'RETURNED', '#fbff8a', '#fbff8a', '#1b1c80', 'Returned', 'This player has Returned from the void. At the end of each season, this player has a chance of being called back to the Void.', 'player'),
 (17, 'INWARD', '#d3d8de', '#d3d8de', '#38080d', 'Inward', 'This player has turned Inward.', 'player'),
 (18, 'MARKED', '#eaabff', '#eaabff', '#1b1c80', 'Unstable', 'Unstable players have a much higher chance of being incinerated in a Solar Eclipse.', 'player'),
 (19, 'PARTY_TIME', '#ff66f9', '#ff66f9', '#fff947', 'Party Time', 'This team is mathematically eliminated from the Postseason, and will occasionally receive permanent stats boost in their games.', 'team'),
@@ -735,26 +737,22 @@ VALUES
 (52, 'FIRE_EATER', '#f50a31', '#f50a31', '#e3d514', 'Fire Eater', 'Fire Eaters swallow fire instead of being incinerated.', 'player'),
 (53, 'MAGMATIC', '#e63200', '#e63200', '#6b0004', 'Magmatic', 'Magmatic players are guaranteed to hit a home run in their next At Bat.', 'player'),
 (54, 'LOYALTY', '#ff61a5', '#ff61a5', '#2c1240', 'Loyalty', 'Players leaving a team with Loyalty will gain the Saboteur modification.', 'player'),
-(16, 'RETURNED', '#fbff8a', '#fbff8a', '#1b1c80', 'Returned', 'This player has Returned from the void. At the end of each season, this player has a chance of being called back to the Void.', 'player'),
 (43, 'AFFINITY_FOR_CROWS', '#cb80d9', '#cb80d9', '#240c36', 'Affinity for Crows', 'Players with Affinity for Crows will hit and pitch 50% better during Birds weather.', 'player'),
 (55, 'SABOTEUR', '#6b6a6a', '#6b6a6a', '#240c36', 'Saboteur', 'A Saboteur has a chance of intentionally failing.', 'player'),
 (56, 'CREDIT_TO_THE_TEAM', '#fffaba', '#fffaba', '#786600', 'Credit to the Team', 'This player will earn Fans 5x the rewards from all Idol Pendants.', 'player'),
+(57, 'LOVE', '#ff2b6b', '#ff2b6b', '#732652', 'Charm', 'Players with Charm have a chance of convincing their opponents to fail.', 'team'),
+(58, 'PEANUT_RAIN', '#fff199', '#fff199', '#04144a', 'Peanut Rain', 'This Team weaponizes Peanut weather against their enemies.', 'team'),
 (59, 'FLINCH', '#219ccc', '#219ccc', '#5e5e5e', 'Flinch', 'Hitters with Flinch cannot swing until a strike has been thrown in the At Bat.', 'player'),
 (60, 'WILD', '#219ccc', '#219ccc', '#361a57', 'Mild', 'Pitchers with Mild have a chance of throwing a Mild Pitch.', 'player'),
+(61, 'DESTRUCTION', '#ff8a24', '#ff8a24', '#802d00', 'Destruction', 'Teams with Destruction will add a bunch of Curses to their Opponent when defeating them in battle.', 'team'),
 (62, 'SIPHON', '#e30000', '#e30000', '#2b0000', 'Siphon', 'Siphons will steal blood more often in Blooddrain and use it in more ways.', 'player'),
 (63, 'FLIICKERRRIIING', '#80fffb', '#80fffb', '#383838', 'Fliickerrriiing', 'Fliickerrriiing players are Flickering a lot.', 'player'),
 (64, 'FRIEND_OF_CROWS', '#ff7ae7', '#ff7ae7', '#570026', 'Friend of Crows', 'In Birds weather, pitchers with Friend of Crows will encourage the Birds to attack hitters.', 'player'),
 (65, 'BLASERUNNING', '#fffaa3', '#fffaa3', '#570026', 'Blaserunning', 'Blaserunners will score .2 Runs for their Team whenever they steal a base.', 'player'),
-(68, 'HAUNTED', '#b59c9c', '#b59c9c', '#1c1c1c', 'Haunted', 'Haunted players will occasionally be Inhabited.', 'player'),
-(69, 'TRAVELING', '#cfebff', '#cfebff', '#1c1c1c', 'Traveling', 'Traveling teams will play 5% better in Away games.', 'team'),
-(78, 'RETIRED', '#d3ede5', '#d3ede5', '#000e33', 'Released', '', 'player'),
-(79, 'RESTING', '#5988ff', '#5988ff', '#163073', 'Resting', '', 'player'),
-(80, 'INHABITING', '#b59c9c', '#b59c9c', '#1c1c1c', 'Inhabiting', 'This player is temporarily Inhabiting a Haunted player.', 'player'),
-(57, 'LOVE', '#ff2b6b', '#ff2b6b', '#732652', 'Charm', 'Players with Charm have a chance of convincing their opponents to fail.', 'team'),
-(58, 'PEANUT_RAIN', '#fff199', '#fff199', '#04144a', 'Peanut Rain', 'This Team weaponizes Peanut weather against their enemies.', 'team'),
-(61, 'DESTRUCTION', '#ff8a24', '#ff8a24', '#802d00', 'Destruction', 'Teams with Destruction will add a bunch of Curses to their Opponent when defeating them in battle.', 'team'),
 (66, 'WALK_IN_THE_PARK', '#faff9c', '#faff9c', '#275c2a', 'Walk in the Park', 'Those with Walk in the Park will walk to first base on one less Ball.', 'team'),
 (67, 'BIRD_SEED', '#1e0036', '#dca8f7', '#dca8f7', 'Bird Seed', 'Birds like to eat Bird Seed. They''ll peck those with Bird Seed out of peanut shells more often. Because they like to eat Bird Seed.', 'team'),
+(68, 'HAUNTED', '#b59c9c', '#b59c9c', '#1c1c1c', 'Haunted', 'Haunted players will occasionally be Inhabited.', 'player'),
+(69, 'TRAVELING', '#cfebff', '#cfebff', '#1c1c1c', 'Traveling', 'Traveling teams will play 5% better in Away games.', 'team'),
 (70, 'SEALANT', '#eded91', '#eded91', '#571f26', 'Sealant', 'Players with Sealant cannot have blood drained in Blooddrain.', 'team'),
 (71, 'O_NO', '#cffff0', '#cffff0', '#485099', '0 No', 'Players with 0 No cannot be struck out when there are 0 Balls in the Count.', 'team'),
 (72, 'FAIRNESS', '#12b300', '#12b300', '#ffdb0f', 'Total Fairness', 'This Season, each team will win only one Blessing, and will be Happy with what they get.', 'team'),
@@ -762,7 +760,10 @@ VALUES
 (74, 'UNFLAMED', '#eaabff', '#eaabff', '#1b1c80', 'Chaotic', 'The Unstable players on a Chaotic team will hit 100% better.', 'team'),
 (75, 'TRIBUTE', '#dbce6e', '#dbce6e', '#362803', 'Tribute', 'When Hall of Flame players join this team, they''ll add their Tribute as Team Spirit.', 'team'),
 (76, 'SQUIDDEST', '#e6eaeb', '#e6eaeb', '#163073', 'Squiddest', 'This Team is the Squiddest. When a player joins the Team, they''ll become Squiddish.', 'team'),
-(77, 'CONTAINMENT', '#91ab91', '#91ab91', '#023802', 'Containment', 'When an Unstable player on this team is incinerated, the Instability cannot chain to their opponent.', 'team');
+(77, 'CONTAINMENT', '#91ab91', '#91ab91', '#023802', 'Containment', 'When an Unstable player on this team is incinerated, the Instability cannot chain to their opponent.', 'team'),
+(78, 'RETIRED', '#d3ede5', '#d3ede5', '#000e33', 'Released', '', 'player'),
+(79, 'RESTING', '#5988ff', '#5988ff', '#163073', 'Resting', '', 'player'),
+(80, 'INHABITING', '#b59c9c', '#b59c9c', '#1c1c1c', 'Inhabiting', 'This player is temporarily Inhabiting a Haunted player.', 'player');
 
 --
 -- Data for Name: phases; Type: TABLE DATA; Schema: taxa; Owner: -
@@ -781,19 +782,21 @@ VALUES
 (0, 'ELECTION_RESULTS', 5),
 (5, 'END_POSTSEASON', 5),
 (6, 'END_POSTSEASON', 5),
+(8, 'UNKNOWN_THE_OCHO', 99),
+(99, 'SIESTA', 99),
 (12, 'TOURNAMENT_PRESEASON', 6),
 (13, 'TOURNAMENT_GAMEDAY', 7),
 (14, 'TOURNAMENT_GAMEDAY', 7),
 (15, 'TOURNAMENT_POSTSEASON', 8),
-(16, 'END_TOURNAMENT', 9),
-(8, 'UNKNOWN_THE_OCHO', 99),
-(99, 'SIESTA', 99);
+(16, 'END_TOURNAMENT', 9);
 
 --
 -- Data for Name: pitch_types; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
-INSERT INTO taxa.pitch_types VALUES ('F', 'Foul Ball', 0, 0),
+INSERT INTO taxa.pitch_types 
+VALUES 
+('F', 'Foul Ball', 0, 0),
 ('X', 'Ball in play', 0, 0),
 ('A', 'Ball - Assumed', 1, 0),
 ('B', 'Ball', 1, 0),
@@ -801,18 +804,16 @@ INSERT INTO taxa.pitch_types VALUES ('F', 'Foul Ball', 0, 0),
 ('K', 'Strike - Assumed', 0, 1),
 ('S', 'Swinging Strike', 0, 1);
 
-
 --
 -- Data for Name: position_types; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
-INSERT INTO taxa.position_types 
+INSERT INTO taxa.position_types
 VALUES 
 (0, 'BATTER'),
 (1, 'PITCHER'),
 (2, 'BULLPEN'),
 (3, 'BENCH');
-
 
 --
 -- Data for Name: team_abbreviations; Type: TABLE DATA; Schema: taxa; Owner: -
@@ -843,7 +844,6 @@ VALUES
 (21, 'YELL', '7966eb04-efcc-499b-8f03-d13916330531'),
 (22, 'PODS', '40b9ec2a-cb43-4dbb-b836-5accb62e7c20'),
 (23, 'STAR', 'c6c01051-cdd4-47d6-8a98-bb5b754f937f');
-
 
 --
 -- Data for Name: team_divine_favor; Type: TABLE DATA; Schema: taxa; Owner: -
@@ -955,7 +955,6 @@ VALUES
 (15, 1, '9a5ab308-41f2-4889-a3c3-733b9aab806e', NULL, NULL),
 (16, 1, 'd2634113-b650-47b9-ad95-673f8e28e687', NULL, NULL);
 
-
 --
 -- Data for Name: tournaments; Type: TABLE DATA; Schema: taxa; Owner: -
 --
@@ -981,7 +980,9 @@ VALUES
 -- Data for Name: weather; Type: TABLE DATA; Schema: taxa; Owner: -
 --
 
-INSERT INTO taxa.weather VALUES (0, 'Void'),
+INSERT INTO taxa.weather 
+VALUES 
+(0, 'Void'),
 (1, 'Sun 2'),
 (2, 'Overcast'),
 (3, 'Rainy'),
@@ -997,7 +998,7 @@ INSERT INTO taxa.weather VALUES (0, 'Void'),
 (13, 'Reverb'),
 (14, 'Black Hole'),
 (15, 'Coffee'),
-(16, 'Coffee');
+(16, 'Coffee 2');
 
 --
 -- Name: attributes attributes_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -
@@ -1035,8 +1036,9 @@ VALUES
 (7, '63df8701-1871-4987-87d7-b55d4f1df2e9', 'wyatt-mason-7', 'Wyatt Mason'),
 (8, '75f9d874-5e69-438d-900d-a3fcb1d429b3', 'wyatt-mason-8', 'Wyatt Mason'),
 (9, 'a1ed3396-114a-40bc-9ff0-54d7e1ad1718', 'wyatt-mason-9', 'Wyatt Mason'),
+(10, 'bf6a24d1-4e89-4790-a4ba-eeb2870cbf6f', 'wyatt-mason-10', 'Wyatt Mason'),
 (11, 'e16c3f28-eecd-4571-be1a-606bbac36b2b', 'wyatt-mason-11', 'Wyatt Mason'),
 (12, 'e4034192-4dc6-4901-bb30-07fe3cf77b5e', 'wyatt-mason-12', 'Wyatt Mason'),
 (13, 'ea44bd36-65b4-4f3b-ac71-78d87a540b48', 'wyatt-mason-13', 'Wyatt Mason'),
 (14, 'f741dc01-2bae-4459-bfc0-f97536193eea', 'wyatt-mason-14', 'Wyatt Mason'),
-(15, '80e474a3-7d2b-431d-8192-2f1e27162607', 'wyatt-mason-15', 'Wyatt Mason'),
+(15, '80e474a3-7d2b-431d-8192-2f1e27162607', 'wyatt-mason-15', 'Wyatt Mason');

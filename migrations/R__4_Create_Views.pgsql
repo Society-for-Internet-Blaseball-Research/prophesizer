@@ -1,52 +1,67 @@
-﻿DROP INDEX IF EXISTS data.batting_stats_all_events_indx_player_id;
-DROP INDEX IF EXISTS data.batting_stats_all_events_indx_season;
-DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_all_events;
-DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_single_game;
-DROP MATERIALIZED VIEW IF EXISTS data.fielder_stats_all_events;
-DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_all_appearances;
-DROP MATERIALIZED VIEW IF EXISTS data.players_info_expanded_all;
-DROP MATERIALIZED VIEW IF EXISTS data.players_ratings;
-DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events;
-DROP VIEW IF EXISTS data.batting_records_combined_teams_playoffs_single_game;
-DROP VIEW IF EXISTS data.batting_records_combined_teams_single_game;
-DROP VIEW IF EXISTS data.batting_records_league_playoffs_season;
-DROP VIEW IF EXISTS data.batting_records_league_season;
-DROP VIEW IF EXISTS data.batting_records_player_playoffs_season;
-DROP VIEW IF EXISTS data.batting_records_player_playoffs_single_game;
-DROP VIEW IF EXISTS data.batting_records_player_season;
-DROP VIEW IF EXISTS data.batting_records_player_single_game;
-DROP VIEW IF EXISTS data.batting_records_team_playoffs_season;
-DROP VIEW IF EXISTS data.batting_records_team_playoffs_single_game;
-DROP VIEW IF EXISTS data.batting_records_team_season;
-DROP VIEW IF EXISTS data.batting_records_team_single_game;
-DROP VIEW IF EXISTS data.batting_records_team_tournament_single_game;
-DROP VIEW IF EXISTS data.batting_records_team_tournament;
-DROP VIEW IF EXISTS data.batting_records_team_tournmament;
-DROP VIEW IF EXISTS data.batting_stats_player_lifetime;
-DROP VIEW IF EXISTS data.batting_stats_player_playoffs_season;
-DROP VIEW IF EXISTS data.batting_stats_player_season;
-DROP VIEW IF EXISTS data.batting_stats_player_tournament_lifetime;
-DROP VIEW IF EXISTS data.batting_stats_player_tournament;
-DROP VIEW IF EXISTS data.charm_counts;
-DROP VIEW IF EXISTS data.fielder_stats_lifetime;
-DROP VIEW IF EXISTS data.fielder_stats_playoffs_lifetime;
-DROP VIEW IF EXISTS data.fielder_stats_playoffs_season;
-DROP VIEW IF EXISTS data.fielder_stats_season;
-DROP VIEW IF EXISTS data.fielder_stats_tournament;
-DROP VIEW IF EXISTS data.pitching_records_player_single_game;
-DROP VIEW IF EXISTS data.pitching_stats_player_lifetime;
-DROP VIEW IF EXISTS data.pitching_stats_player_season;
-DROP VIEW IF EXISTS data.player_status_flags;
-DROP VIEW IF EXISTS data.players_extended_current;  -- DEPRECATED
-DROP VIEW IF EXISTS data.rosters_current;
-DROP VIEW IF EXISTS data.rosters_extended_current;
-DROP VIEW IF EXISTS data.running_stats_player_lifetime;
-DROP VIEW IF EXISTS data.running_stats_player_season;
-DROP VIEW IF EXISTS data.running_stats_player_tournament_lifetime;
-DROP VIEW IF EXISTS data.stars_team_all_current;
-DROP VIEW IF EXISTS data.teams_info_expanded_all;
+﻿DROP MATERIALIZED VIEW IF EXISTS data.players_ratings CASCADE;
+DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
+DROP VIEW IF EXISTS data.running_stats_player_season CASCADE;
+DROP VIEW IF EXISTS data.running_stats_player_lifetime CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events CASCADE;
+DROP VIEW IF EXISTS data.rosters_extended_current CASCADE;
+DROP VIEW IF EXISTS data.rosters_current CASCADE;
+DROP VIEW IF EXISTS data.players_extended_current CASCADE;
+DROP VIEW IF EXISTS data.pitching_stats_player_season CASCADE;
+DROP VIEW IF EXISTS data.pitching_stats_player_lifetime CASCADE;
+DROP VIEW IF EXISTS data.pitching_records_player_single_game CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_all_appearances CASCADE;
+DROP VIEW IF EXISTS data.fielder_stats_season CASCADE;
+DROP VIEW IF EXISTS data.fielder_stats_playoffs_season CASCADE;
+DROP VIEW IF EXISTS data.fielder_stats_playoffs_lifetime CASCADE;
+DROP VIEW IF EXISTS data.fielder_stats_lifetime CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.fielder_stats_all_events CASCADE;
+DROP VIEW IF EXISTS data.charm_counts CASCADE;
+DROP VIEW IF EXISTS data.batting_stats_player_season CASCADE;
+DROP VIEW IF EXISTS data.batting_stats_player_playoffs_season CASCADE;
+DROP VIEW IF EXISTS data.batting_stats_player_lifetime CASCADE;
+DROP VIEW IF EXISTS data.batting_records_team_single_game CASCADE;
+DROP VIEW IF EXISTS data.batting_records_team_season CASCADE;
+DROP VIEW IF EXISTS data.batting_records_team_playoffs_single_game CASCADE;
+DROP VIEW IF EXISTS data.batting_records_team_playoffs_season CASCADE;
+DROP VIEW IF EXISTS data.batting_records_player_single_game CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_single_game CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_all_events CASCADE;
+DROP VIEW IF EXISTS data.batting_records_player_season CASCADE;
+DROP VIEW IF EXISTS data.batting_records_player_playoffs_single_game CASCADE;
+DROP VIEW IF EXISTS data.batting_records_player_playoffs_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.players_info_expanded_all CASCADE;
+DROP VIEW IF EXISTS data.player_status_flags CASCADE;
+DROP VIEW IF EXISTS data.teams_info_expanded_all CASCADE;
+DROP VIEW IF EXISTS data.batting_records_league_season CASCADE;
+DROP VIEW IF EXISTS data.batting_records_league_playoffs_season CASCADE;
+DROP VIEW IF EXISTS data.batting_records_combined_teams_single_game CASCADE;
+DROP VIEW IF EXISTS data.batting_records_combined_teams_playoffs_single_game CASCADE;
+DROP INDEX IF EXISTS data.batting_stats_all_events_indx_season CASCADE;
+DROP INDEX IF EXISTS data.batting_stats_all_events_indx_player_id CASCADE;
+DROP VIEW IF EXISTS data.running_stats_player_tournament_lifetime CASCADE;
+DROP VIEW IF EXISTS data.fielder_stats_tournament CASCADE;
+DROP VIEW IF EXISTS data.batting_stats_player_tournament_lifetime CASCADE;
+DROP VIEW IF EXISTS data.batting_stats_player_tournament CASCADE;
+DROP VIEW IF EXISTS data.batting_records_team_tournmament CASCADE;
+DROP VIEW IF EXISTS data.batting_records_team_tournament_single_game CASCADE;
+DROP VIEW IF EXISTS data.batting_records_team_tournament CASCADE;
 
-
+--
+-- Name: players_ratings; Type: VIEW; Schema: data; Owner: -
+--
+CREATE MATERIALIZED VIEW data.players_ratings AS
+ SELECT p.player_id,
+    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
+    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
+    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
+    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
+    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
+    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
+    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
+    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
+   FROM data.players p
+  WHERE (p.valid_until IS NULL)
+  WITH NO DATA;
 --
 -- Name: batting_records_combined_teams_playoffs_single_game; Type: VIEW; Schema: data; Owner: -
 --
@@ -350,27 +365,11 @@ CREATE VIEW data.player_status_flags AS
             ELSE 'other'::text
         END AS current_location
    FROM data.players p;
---
--- Name: players_ratings; Type: MATERIALIZED VIEW; Schema: data; Owner: -
---
 
-CREATE MATERIALIZED VIEW data.players_ratings AS
- SELECT p.player_id,
-    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
-    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
-    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
-    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
-    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
-    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
-    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
-    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
-   FROM data.players p
-  WHERE (p.valid_until IS NULL)
-  WITH NO DATA;
-  
 --
 -- Name: players_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
+
 CREATE MATERIALIZED VIEW data.players_info_expanded_all AS
  SELECT p.player_id,
     p.player_name,
