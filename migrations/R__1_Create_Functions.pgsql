@@ -1,41 +1,75 @@
 ﻿
-/*
-DROP FUNCTION IF EXISTS data.timestamp_from_gameday(in_season integer, in_gameday integer);
-DROP FUNCTION IF EXISTS data.teams_from_timestamp(in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.team_slug_creation();
-DROP FUNCTION IF EXISTS data.slugging(in_total_bases_from_hits bigint, in_at_bats bigint);
-DROP FUNCTION IF EXISTS data.season_timespan(in_season integer);
-DROP FUNCTION IF EXISTS data.round_half_even(val numeric, prec integer);
-DROP FUNCTION IF EXISTS data.rosters_from_timestamp(in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.refresh_matviews();
-DROP FUNCTION IF EXISTS data.ref_leaderboard_season_pitching(in_season integer);
-DROP FUNCTION IF EXISTS data.ref_leaderboard_season_batting(in_season integer);
-DROP FUNCTION IF EXISTS data.reblase_gameid(in_game_id character varying);
-DROP FUNCTION IF EXISTS data.rating_to_star(in_rating numeric);
-DROP FUNCTION IF EXISTS data.players_from_timestamp(in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.player_slug_creation();
-DROP FUNCTION IF EXISTS data.player_mods_from_timestamp(in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.player_day_vibe(in_player_id character varying, in_gameday integer, in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.pitching_rating_raw(in_unthwackability numeric, in_ruthlessness numeric, in_overpowerment numeric, in_shakespearianism numeric, in_coldness numeric);
-DROP FUNCTION IF EXISTS data.pitching_rating(in_player_id character varying, in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.pitcher_idol_coins(in_player_id character varying, in_season integer);
-DROP FUNCTION IF EXISTS data.on_base_percentage(in_hits bigint, in_raw_at_bats bigint, in_walks bigint, in_sacs bigint);
-DROP FUNCTION IF EXISTS data.last_position_in_string(in_string text, in_search text);
-DROP FUNCTION IF EXISTS data.innings_from_outs(in_outs numeric);
-DROP FUNCTION IF EXISTS data.gameday_from_timestamp(in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.earned_run_average(in_runs numeric, in_outs numeric);
-DROP FUNCTION IF EXISTS data.defense_rating_raw(in_omniscience numeric, in_tenaciousness numeric, in_watchfulness numeric, in_anticapitalism numeric, in_chasiness numeric);
-DROP FUNCTION IF EXISTS data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.current_season();
-DROP FUNCTION IF EXISTS data.current_gameday();
-DROP FUNCTION IF EXISTS data.batting_rating_raw(in_tragicness numeric, in_patheticism numeric, in_thwackability numeric, in_divinity numeric, in_moxie numeric, in_musclitude numeric, in_martyrdom numeric);
-DROP FUNCTION IF EXISTS data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.batting_average(in_hits bigint, in_raw_at_bats bigint);
-DROP FUNCTION IF EXISTS data.batter_idol_coins(in_player_id character varying, in_season integer);
+DROP FUNCTION IF EXISTS data.bankers_round(in_val numeric, in_prec integer);
 DROP FUNCTION IF EXISTS data.baserunning_rating_raw(in_laserlikeness numeric, in_continuation numeric, in_base_thirst numeric, in_indulgence numeric, in_ground_friction numeric);
 DROP FUNCTION IF EXISTS data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone);
-DROP FUNCTION IF EXISTS data.bankers_round(in_val numeric, in_prec integer);
-*/
+DROP FUNCTION IF EXISTS data.batter_idol_coins(in_player_id character varying, in_season integer);
+DROP FUNCTION IF EXISTS data.batting_average(in_hits bigint, in_raw_at_bats bigint);
+DROP FUNCTION IF EXISTS data.batting_rating_raw(in_tragicness numeric, in_patheticism numeric, in_thwackability numeric, in_divinity numeric, in_moxie numeric, in_musclitude numeric, in_martyrdom numeric);
+DROP FUNCTION IF EXISTS data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.current_gameday();
+DROP FUNCTION IF EXISTS data.current_season();
+DROP FUNCTION IF EXISTS data.defense_rating_raw(in_omniscience numeric, in_tenaciousness numeric, in_watchfulness numeric, in_anticapitalism numeric, in_chasiness numeric);
+DROP FUNCTION IF EXISTS data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.earned_run_average(in_runs numeric, in_outs numeric);
+DROP FUNCTION IF EXISTS data.gameday_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.gamestate_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.innings_from_outs(in_outs numeric);
+DROP FUNCTION IF EXISTS data.last_position_in_string(in_string text, in_search text);
+DROP FUNCTION IF EXISTS data.on_base_percentage(in_hits bigint, in_raw_at_bats bigint, in_walks bigint, in_sacs bigint);
+DROP FUNCTION IF EXISTS data.pitcher_idol_coins(in_player_id character varying, in_season integer);
+DROP FUNCTION IF EXISTS data.pitching_rating_raw(in_unthwackability numeric, in_ruthlessness numeric, in_overpowerment numeric, in_shakespearianism numeric, in_coldness numeric);
+DROP FUNCTION IF EXISTS data.pitching_rating(in_player_id character varying, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.player_day_vibe(in_player_id character varying, in_gameday integer, in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.player_mods_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.player_slug_creation();
+DROP FUNCTION IF EXISTS data.players_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.rating_to_star(in_rating numeric);
+DROP FUNCTION IF EXISTS data.reblase_gameid(in_game_id character varying);
+DROP FUNCTION IF EXISTS data.ref_leaderboard_season_batting(in_season integer);
+DROP FUNCTION IF EXISTS data.ref_leaderboard_season_pitching(in_season integer);
+DROP FUNCTION IF EXISTS data.refresh_matviews();
+DROP FUNCTION IF EXISTS data.rosters_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.round_half_even(val numeric, prec integer);
+DROP FUNCTION IF EXISTS data.season_timespan(in_season integer);
+DROP FUNCTION IF EXISTS data.slugging(in_total_bases_from_hits bigint, in_at_bats bigint);
+DROP FUNCTION IF EXISTS data.team_slug_creation();
+DROP FUNCTION IF EXISTS data.teams_from_timestamp(in_timestamp timestamp without time zone);
+DROP FUNCTION IF EXISTS data.timestamp_from_gameday(in_season integer, in_gameday integer);
+
+--
+-- Name: gamestate_from_timestamp(in_timestamp timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
+--
+CREATE OR REPLACE FUNCTION data.gamestate_from_timestamp(
+	in_timestamp timestamp without time zone)
+    RETURNS character varying
+    LANGUAGE 'sql'
+
+    COST 100
+    VOLATILE 
+    
+AS $BODY$
+SELECT 
+CASE
+	WHEN phase_type IN ('END_REGULAR_SEASON','END_POSTSEASON','ELECTION_RESULTS','PRESEASON','BOSS_FIGHT')
+	THEN 'Season: ' || season || ', ' || phase_type
+	WHEN phase_type IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT') 
+	THEN 'Tournament: Coffee Cup, ' || phase_type
+	WHEN phase_type IN ('TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON')
+	THEN 'Tournament: Coffee Cup, Game: ' || day
+	ELSE 'Season: ' || season || ', Game: ' || day
+END AS gamestate
+FROM DATA.time_map tm
+JOIN taxa.phases xp
+ON (tm.phase_id = xp.phase_id)
+LEFT JOIN taxa.tournaments xt
+ON (tm.season = xt.tournament_id)
+WHERE first_time = 
+(
+	SELECT max(first_time)
+	FROM data.time_map 
+	WHERE first_time < timezone('utc'::text, in_timestamp)
+)
+$BODY$;
 
 --
 -- Name: round_half_even(numeric, integer); Type: FUNCTION; Schema: data; Owner: -
@@ -72,7 +106,7 @@ $$;
 --
 -- Name: players_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric, pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint, url_slug character varying)
+CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone DEFAULT (timezone('utc'::text, now()))) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric, pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint, url_slug character varying)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -80,7 +114,7 @@ begin
 	select *
 	from data.players p
 	where p.valid_from <= in_timestamp + (INTERVAL '1 millisecond')
-	and in_timestamp < coalesce(p.valid_until,NOW() + (INTERVAL '1 millisecond'));
+	and in_timestamp < coalesce(p.valid_until,timezone('utc'::text, now()) + (INTERVAL '1 millisecond'));
 end;
 $$;
 
@@ -109,7 +143,7 @@ $$;
 --
 -- Name: baserunning_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (timezone('utc'::text, now()))) RETURNS numeric
     LANGUAGE sql
     AS $$
 SELECT 
@@ -162,7 +196,7 @@ $$;
 --
 -- Name: batting_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (timezone('utc'::text, now()))) RETURNS numeric
     LANGUAGE sql
     AS $$
 SELECT 
@@ -199,7 +233,7 @@ $$;
 --
 -- Name: defense_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (timezone('utc'::text, now()))) RETURNS numeric
     LANGUAGE sql
     AS $$
 SELECT 
@@ -339,7 +373,7 @@ $$;
 --
 -- Name: pitching_rating(character varying, timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.pitching_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (now())::timestamp without time zone) RETURNS numeric
+CREATE FUNCTION data.pitching_rating(in_player_id character varying, in_timestamp timestamp without time zone DEFAULT (timezone('utc'::text, now()))) RETURNS numeric
     LANGUAGE sql
     AS $$
 SELECT 
@@ -392,7 +426,7 @@ begin
 	select *
 	from data.player_modifications m
 	where m.valid_from <= in_timestamp 
-	and in_timestamp < coalesce(m.valid_until,NOW()+ (INTERVAL '1 millisecond'));
+	and in_timestamp < coalesce(m.valid_until,timezone('utc'::text, now())+ (INTERVAL '1 millisecond'));
 end;
 $$;
 --
@@ -683,6 +717,8 @@ $$;
 CREATE FUNCTION data.refresh_matviews() RETURNS void
     LANGUAGE sql SECURITY DEFINER
     AS $$
+	
+REFRESH MATERIALIZED VIEW data.players_ratings;
 REFRESH MATERIALIZED VIEW data.players_info_expanded_all;
 REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
@@ -701,7 +737,7 @@ begin
 	select *
 	from data.team_roster r
 	where r.valid_from <= in_timestamp 
-	and in_timestamp < coalesce(r.valid_until,NOW()+ (INTERVAL '1 millisecond'));
+	and in_timestamp < coalesce(r.valid_until,timezone('utc'::text, now())+ (INTERVAL '1 millisecond'));
 end;
 $$;
 
@@ -721,7 +757,7 @@ COALESCE
 		SELECT first_time - INTERVAL '1 SECOND' FROM data.time_map WHERE DAY = 0 AND season = 
 		(in_season + 1)
 	), 
-	NOW()::timestamp
+	timezone('utc'::text, now())
 ) AS season_end
 $$;
 --
@@ -754,7 +790,7 @@ begin
 		select *
 		from data.teams t
 		where t.valid_from <= in_timestamp 
-		and in_timestamp < coalesce(t.valid_until,NOW()+ (INTERVAL '1 millisecond'));
+		and in_timestamp < coalesce(t.valid_until,timezone('utc'::text, now())+ (INTERVAL '1 millisecond'));
 end;
 $$;
 --

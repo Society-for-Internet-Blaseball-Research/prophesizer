@@ -1,49 +1,50 @@
-﻿DROP VIEW IF EXISTS data.stars_team_all_current;
-DROP VIEW IF EXISTS data.running_stats_player_season;
-DROP VIEW IF EXISTS data.running_stats_player_lifetime;
-DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events;
-DROP VIEW IF EXISTS data.rosters_extended_current;
-DROP VIEW IF EXISTS data.rosters_current;
-DROP VIEW IF EXISTS data.players_extended_current;
-DROP VIEW IF EXISTS data.pitching_stats_player_season;
-DROP VIEW IF EXISTS data.pitching_stats_player_lifetime;
-DROP VIEW IF EXISTS data.pitching_records_player_single_game;
-DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_all_appearances;
-DROP VIEW IF EXISTS data.fielder_stats_season;
-DROP VIEW IF EXISTS data.fielder_stats_playoffs_season;
-DROP VIEW IF EXISTS data.fielder_stats_playoffs_lifetime;
-DROP VIEW IF EXISTS data.fielder_stats_lifetime;
-DROP MATERIALIZED VIEW IF EXISTS data.fielder_stats_all_events;
-DROP VIEW IF EXISTS data.charm_counts;
-DROP VIEW IF EXISTS data.batting_stats_player_season;
-DROP VIEW IF EXISTS data.batting_stats_player_playoffs_season;
-DROP VIEW IF EXISTS data.batting_stats_player_lifetime;
-DROP VIEW IF EXISTS data.batting_records_team_single_game;
-DROP VIEW IF EXISTS data.batting_records_team_season;
-DROP VIEW IF EXISTS data.batting_records_team_playoffs_single_game;
-DROP VIEW IF EXISTS data.batting_records_team_playoffs_season;
-DROP VIEW IF EXISTS data.batting_records_player_single_game;
-DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_single_game;
-DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_all_events;
-DROP VIEW IF EXISTS data.batting_records_player_season;
-DROP VIEW IF EXISTS data.batting_records_player_playoffs_single_game;
-DROP VIEW IF EXISTS data.batting_records_player_playoffs_season;
-DROP MATERIALIZED VIEW IF EXISTS data.players_info_expanded_all;
-DROP VIEW IF EXISTS data.player_status_flags;
-DROP VIEW IF EXISTS data.teams_info_expanded_all;
-DROP VIEW IF EXISTS data.batting_records_league_season;
-DROP VIEW IF EXISTS data.batting_records_league_playoffs_season;
-DROP VIEW IF EXISTS data.batting_records_combined_teams_single_game;
-DROP VIEW IF EXISTS data.batting_records_combined_teams_playoffs_single_game;
+﻿DROP INDEX IF EXISTS data.batting_stats_all_events_indx_player_id;
 DROP INDEX IF EXISTS data.batting_stats_all_events_indx_season;
-DROP INDEX IF EXISTS data.batting_stats_all_events_indx_player_id;
-DROP VIEW IF EXISTS data.running_stats_player_tournament_lifetime;
-DROP VIEW IF EXISTS data.fielder_stats_tournament;
-DROP VIEW IF EXISTS data.batting_stats_player_tournament_lifetime;
-DROP VIEW IF EXISTS data.batting_stats_player_tournament;
-DROP VIEW IF EXISTS data.batting_records_team_tournmament;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_all_events;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_single_game;
+DROP MATERIALIZED VIEW IF EXISTS data.fielder_stats_all_events;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_all_appearances;
+DROP MATERIALIZED VIEW IF EXISTS data.players_info_expanded_all;
+DROP MATERIALIZED VIEW IF EXISTS data.players_ratings;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events;
+DROP VIEW IF EXISTS data.batting_records_combined_teams_playoffs_single_game;
+DROP VIEW IF EXISTS data.batting_records_combined_teams_single_game;
+DROP VIEW IF EXISTS data.batting_records_league_playoffs_season;
+DROP VIEW IF EXISTS data.batting_records_league_season;
+DROP VIEW IF EXISTS data.batting_records_player_playoffs_season;
+DROP VIEW IF EXISTS data.batting_records_player_playoffs_single_game;
+DROP VIEW IF EXISTS data.batting_records_player_season;
+DROP VIEW IF EXISTS data.batting_records_player_single_game;
+DROP VIEW IF EXISTS data.batting_records_team_playoffs_season;
+DROP VIEW IF EXISTS data.batting_records_team_playoffs_single_game;
+DROP VIEW IF EXISTS data.batting_records_team_season;
+DROP VIEW IF EXISTS data.batting_records_team_single_game;
 DROP VIEW IF EXISTS data.batting_records_team_tournament_single_game;
 DROP VIEW IF EXISTS data.batting_records_team_tournament;
+DROP VIEW IF EXISTS data.batting_records_team_tournmament;
+DROP VIEW IF EXISTS data.batting_stats_player_lifetime;
+DROP VIEW IF EXISTS data.batting_stats_player_playoffs_season;
+DROP VIEW IF EXISTS data.batting_stats_player_season;
+DROP VIEW IF EXISTS data.batting_stats_player_tournament_lifetime;
+DROP VIEW IF EXISTS data.batting_stats_player_tournament;
+DROP VIEW IF EXISTS data.charm_counts;
+DROP VIEW IF EXISTS data.fielder_stats_lifetime;
+DROP VIEW IF EXISTS data.fielder_stats_playoffs_lifetime;
+DROP VIEW IF EXISTS data.fielder_stats_playoffs_season;
+DROP VIEW IF EXISTS data.fielder_stats_season;
+DROP VIEW IF EXISTS data.fielder_stats_tournament;
+DROP VIEW IF EXISTS data.pitching_records_player_single_game;
+DROP VIEW IF EXISTS data.pitching_stats_player_lifetime;
+DROP VIEW IF EXISTS data.pitching_stats_player_season;
+DROP VIEW IF EXISTS data.player_status_flags;
+DROP VIEW IF EXISTS data.players_extended_current;  -- DEPRECATED
+DROP VIEW IF EXISTS data.rosters_current;
+DROP VIEW IF EXISTS data.rosters_extended_current;
+DROP VIEW IF EXISTS data.running_stats_player_lifetime;
+DROP VIEW IF EXISTS data.running_stats_player_season;
+DROP VIEW IF EXISTS data.running_stats_player_tournament_lifetime;
+DROP VIEW IF EXISTS data.stars_team_all_current;
+DROP VIEW IF EXISTS data.teams_info_expanded_all;
 
 
 --
@@ -349,7 +350,24 @@ CREATE VIEW data.player_status_flags AS
             ELSE 'other'::text
         END AS current_location
    FROM data.players p;
+--
+-- Name: players_ratings; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
 
+CREATE MATERIALIZED VIEW data.players_ratings AS
+ SELECT p.player_id,
+    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
+    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
+    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
+    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
+    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
+    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
+    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
+    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
+   FROM data.players p
+  WHERE (p.valid_until IS NULL)
+  WITH NO DATA;
+  
 --
 -- Name: players_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
@@ -365,10 +383,10 @@ CREATE MATERIALIZED VIEW data.players_info_expanded_all AS
     xp.position_type,
     ts.timestampd AS valid_from,
     lead(ts.timestampd) OVER (PARTITION BY ts.player_id ORDER BY ts.timestampd) AS valid_until,
-    ( SELECT gameday_from_timestamp.gameday
-           FROM data.gameday_from_timestamp(ts.timestampd) gameday_from_timestamp(season, gameday)) AS gameday_from,
-    ( SELECT gameday_from_timestamp.season
-           FROM data.gameday_from_timestamp(ts.timestampd) gameday_from_timestamp(season, gameday)) AS season_from,
+    ( SELECT gd1.gameday
+           FROM data.gameday_from_timestamp(ts.timestampd) gd1(season, gameday)) AS gameday_from,
+    ( SELECT gd2.season
+           FROM data.gameday_from_timestamp(ts.timestampd) gd2(season, gameday)) AS season_from,
     p.deceased,
     p.anticapitalism,
     p.base_thirst,
@@ -406,34 +424,38 @@ CREATE MATERIALIZED VIEW data.players_info_expanded_all AS
     xc.coffee_text AS coffee,
     xb.blood_type AS blood,
     p.url_slug,
-    ( SELECT array_agg(DISTINCT m.modification ORDER BY m.modification) AS array_agg
+    ( SELECT array_agg(DISTINCT m.modification ORDER BY m.modification) AS modifications
            FROM data.player_modifications m
-          WHERE (((m.player_id)::text = (ts.player_id)::text) AND (m.valid_from <= ts.timestampd) AND (ts.timestampd < COALESCE((m.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))
+          WHERE (((m.player_id)::text = (ts.player_id)::text) AND (m.valid_from <= ts.timestampd) AND (ts.timestampd < COALESCE(m.valid_until, (timezone('utc'::text, now()) + '00:00:00.001'::interval))))
           GROUP BY m.player_id) AS modifications,
-    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
-    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
-    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
-    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
-    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
-    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
-    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
-    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
-   FROM (((((((( SELECT DISTINCT x.player_id,
-            (unnest(x.a))::timestamp without time zone AS timestampd
+    pr.batting_rating,
+    pr.baserunning_rating,
+    pr.defense_rating,
+    pr.pitching_rating,
+    pr.batting_stars,
+    pr.baserunning_stars,
+    pr.defense_stars,
+    pr.pitching_stars
+   FROM ((((((((( SELECT DISTINCT x.player_id,
+            unnest(x.a) AS timestampd
            FROM ( SELECT DISTINCT players.player_id,
-                    ARRAY[(players.valid_from)::timestamp with time zone, COALESCE((players.valid_until)::timestamp with time zone, now())] AS a
+                    ARRAY[players.valid_from, COALESCE(players.valid_until, timezone('utc'::text, now()))] AS a
                    FROM data.players
                 UNION
                  SELECT DISTINCT player_modifications.player_id,
-                    ARRAY[(player_modifications.valid_from)::timestamp with time zone, COALESCE((player_modifications.valid_until)::timestamp with time zone, now())] AS a
+                    ARRAY[player_modifications.valid_from, COALESCE(player_modifications.valid_until, timezone('utc'::text, now()))] AS a
                    FROM data.player_modifications
                 UNION
                  SELECT DISTINCT team_roster.player_id,
-                    ARRAY[(team_roster.valid_from)::timestamp with time zone, COALESCE((team_roster.valid_until)::timestamp with time zone, now())] AS a
-                   FROM data.team_roster) x) ts
-     JOIN data.players p ON ((((p.player_id)::text = (ts.player_id)::text) AND (p.valid_from <= (ts.timestampd + '00:00:00.001'::interval)) AND (ts.timestampd < COALESCE((p.valid_until)::timestamp with time zone, (now() + '00:00:00.001'::interval))))))
+                    ARRAY[team_roster.valid_from, COALESCE(team_roster.valid_until, timezone('utc'::text, now()))] AS a
+                   FROM data.team_roster
+                  WHERE (NOT ((team_roster.team_id)::text IN ( SELECT tournament_teams.team_id
+                           FROM taxa.tournament_teams)))) x) ts
+     JOIN data.players p ON ((((p.player_id)::text = (ts.player_id)::text) AND (p.valid_from <= (ts.timestampd + '00:00:00.001'::interval)) AND (ts.timestampd < COALESCE(p.valid_until, (timezone('utc'::text, now()) + '00:00:00.001'::interval))))))
      JOIN data.player_status_flags ps ON (((ts.player_id)::text = (ps.player_id)::text)))
-     LEFT JOIN LATERAL data.rosters_from_timestamp(COALESCE(ts.timestampd, (now())::timestamp without time zone)) r(team_roster_id, team_id, position_id, valid_from, valid_until, player_id, position_type_id) ON (((ts.player_id)::text = (r.player_id)::text)))
+     JOIN data.players_ratings pr ON (((ts.player_id)::text = (pr.player_id)::text)))
+     LEFT JOIN data.team_roster r ON ((((ts.player_id)::text = (r.player_id)::text) AND (r.valid_from <= COALESCE(ts.timestampd, timezone('utc'::text, now()))) AND (COALESCE(ts.timestampd, timezone('utc'::text, now())) < COALESCE(r.valid_until, (timezone('utc'::text, now()) + '00:00:00.001'::interval))) AND (NOT ((r.team_id)::text IN ( SELECT tournament_teams.team_id
+           FROM taxa.tournament_teams))))))
      LEFT JOIN data.teams_info_expanded_all t ON ((((r.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
      LEFT JOIN taxa.blood xb ON ((p.blood = xb.blood_id)))
      LEFT JOIN taxa.coffee xc ON ((p.coffee = xc.coffee_id)))
