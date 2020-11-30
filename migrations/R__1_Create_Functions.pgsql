@@ -303,7 +303,7 @@ SELECT
 		)
 	,0)
 );
-$$;
+$$ ROWS 1;
 --
 -- Name: innings_from_outs(numeric); Type: FUNCTION; Schema: data; Owner: -
 --
