@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Npgsql;
+using System;
 using System.Threading.Tasks;
 
 namespace SIBR
@@ -7,6 +8,27 @@ namespace SIBR
 	{
 		static async Task Main(string[] args)
 		{
+			try
+			{
+				// Try to migrate the DB to the latest schema
+				var connection  = new NpgsqlConnection (Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
+				var evolve = new Evolve.Evolve(connection, msg => Console.WriteLine(msg))
+				{
+					Locations = new[] { "migrations" },
+					SqlMigrationSuffix = ".pgsql",
+					//IsEraseDisabled = true, //< Recommended in production
+				};
+
+				evolve.Migrate();
+			}
+			catch (Exception ex)
+			{
+				// Oh noes
+				Console.WriteLine("Database migration failed.", ex);
+				throw;
+			}
+
+
 			Prophesizer prophesizer = new Prophesizer();
 
 			int lastHour = -1;
