@@ -28,6 +28,7 @@ DROP FUNCTION IF EXISTS data.defense_rating_raw(in_omniscience numeric, in_tenac
 DROP FUNCTION IF EXISTS data.defense_rating(in_player_id character varying, in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.current_season() CASCADE;
 DROP FUNCTION IF EXISTS data.current_gameday() CASCADE;
+DROP FUNCTION IF EXISTS data.current_tournament() CASCADE;
 DROP FUNCTION IF EXISTS data.batting_rating_raw(in_tragicness numeric, in_patheticism numeric, in_thwackability numeric, in_divinity numeric, in_moxie numeric, in_musclitude numeric, in_martyrdom numeric) CASCADE;
 DROP FUNCTION IF EXISTS data.batting_rating(in_player_id character varying, in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.batting_average(in_hits bigint, in_raw_at_bats bigint) CASCADE;
@@ -61,7 +62,7 @@ WHERE first_time =
 (
 	SELECT max(first_time)
 	FROM data.time_map 
-	WHERE first_time < timezone('utc'::text, in_timestamp)
+	WHERE first_time < in_timestamp
 );
 $$;
 --
@@ -94,6 +95,24 @@ CREATE FUNCTION data.current_season() RETURNS integer
     LANGUAGE sql
     AS $$
 SELECT max(season) from data.games;
+$$;
+--
+-- Name: current_tournament(); Type: FUNCTION; Schema: data; Owner: -
+--
+CREATE FUNCTION data.current_tournament() RETURNS integer
+    LANGUAGE sql
+    AS $$
+SELECT 
+CASE
+	WHEN phase_id BETWEEN 12 AND 16 THEN 0
+	ELSE NULL
+END AS tournament_current	
+FROM DATA.time_map
+WHERE first_time = 
+(
+	SELECT MAX(first_time)
+	FROM DATA.time_map
+)
 $$;
 --
 -- Name: players_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
@@ -614,7 +633,9 @@ FROM
 		walks,
 		ROUND(walks/batters_faced,3) AS bb_pct,
 		strikeouts,
-		round(strikeouts/walks,2) AS k_bb,
+		case
+			WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
+		end AS k_bb,
 		ROUND(strikeouts/batters_faced,3) AS k_pct,
 		runs_allowed,
 		hits_allowed,
@@ -631,7 +652,7 @@ FROM
 		rank() OVER (ORDER BY walks DESC) AS bb_rank,
 		rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank,		
 		rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
-		rank() OVER (ORDER BY round(strikeouts/walks,2) DESC) AS kbb_rank,
+		rank() OVER (ORDER BY CASE WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2) END DESC) AS kbb_rank,
 		rank() OVER (ORDER BY round(strikeouts/batters_faced,3) DESC) AS kpct_rank,		
 		rank() OVER (ORDER BY runs_allowed DESC) AS runs_rank,
 		rank() OVER (ORDER BY hits_allowed DESC) AS hits_rank,
@@ -709,7 +730,6 @@ $$;
 CREATE FUNCTION data.refresh_matviews() RETURNS void
     LANGUAGE sql SECURITY DEFINER
     AS $$
-REFRESH MATERIALIZED VIEW data.players_ratings;
 REFRESH MATERIALIZED VIEW data.players_info_expanded_all;
 REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;

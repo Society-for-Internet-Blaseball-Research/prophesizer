@@ -1,4 +1,4 @@
-﻿DROP MATERIALIZED VIEW IF EXISTS data.players_ratings CASCADE;
+﻿DROP MATERIALIZED VIEW IF EXISTS data.players_ratings CASCADE; --to be DEPRECATED
 DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_season CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_lifetime CASCADE;
@@ -45,23 +45,8 @@ DROP VIEW IF EXISTS data.batting_stats_player_tournament CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_tournmament CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_tournament_single_game CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_tournament CASCADE;
+DROP VIEW IF EXISTS data.pitching_stats_player_tournament CASCADE;
 
---
--- Name: players_ratings; Type: VIEW; Schema: data; Owner: -
---
-CREATE MATERIALIZED VIEW data.players_ratings AS
- SELECT p.player_id,
-    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
-    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
-    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
-    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
-    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
-    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
-    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
-    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
-   FROM data.players p
-  WHERE (p.valid_until IS NULL)
-  WITH NO DATA;
 --
 -- Name: batting_records_combined_teams_playoffs_single_game; Type: VIEW; Schema: data; Owner: -
 --
@@ -330,7 +315,7 @@ CREATE VIEW data.player_status_flags AS
             WHEN (EXISTS ( SELECT 1
                FROM (data.team_roster rc
                  JOIN data.teams_info_expanded_all t ON (((rc.team_id)::text = (t.team_id)::text)))
-              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status = 'active'::text)))) THEN 'active'::text
+              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status IN  ('active','tournament')))) THEN 'active'::text
             WHEN (EXISTS ( SELECT 1
                FROM (data.team_roster rc
                  JOIN data.teams_info_expanded_all t ON (((rc.team_id)::text = (t.team_id)::text)))
@@ -340,7 +325,7 @@ CREATE VIEW data.player_status_flags AS
               WHERE (((ip.player_id)::text = (p.player_id)::text) AND (ip.valid_until IS NULL))) THEN 'deceased'::text
             WHEN (EXISTS ( SELECT 1
                FROM data.player_modifications pm
-              WHERE (((pm.player_id)::text = (p.player_id)::text) AND (pm.valid_until IS NULL) AND ((pm.modification)::text = 'RETIRED'::text)))) THEN 'retired'::text
+              WHERE (((pm.player_id)::text = (p.player_id)::text) AND (pm.valid_until IS NULL) AND ((pm.modification)::text in ('COFFEE_EXIT','RETIRED'))))) THEN 'retired'::text
             ELSE NULL::text
         END AS current_state,
         CASE
@@ -381,11 +366,16 @@ CREATE MATERIALIZED VIEW data.players_info_expanded_all AS
     r.position_id,
     xp.position_type,
     ts.timestampd AS valid_from,
-    lead(ts.timestampd) OVER (PARTITION BY ts.player_id ORDER BY ts.timestampd) AS valid_until,
+    CASE
+    	WHEN lead(ts.timestampd) OVER (PARTITION BY ts.player_id ORDER BY ts.timestampd) = NOW()::TIMESTAMP WITHOUT TIME zone
+    		THEN NULL
+    	ELSE lead(ts.timestampd) OVER (PARTITION BY ts.player_id ORDER BY ts.timestampd) 
+	 END AS valid_until,
     ( SELECT gd1.gameday
            FROM data.gameday_from_timestamp(ts.timestampd) gd1(season, gameday)) AS gameday_from,
     ( SELECT gd2.season
            FROM data.gameday_from_timestamp(ts.timestampd) gd2(season, gameday)) AS season_from,
+    DATA.gamestate_from_timestamp(ts.timestampd) AS gamestate_from,
     p.deceased,
     p.anticapitalism,
     p.base_thirst,
@@ -427,38 +417,48 @@ CREATE MATERIALIZED VIEW data.players_info_expanded_all AS
            FROM data.player_modifications m
           WHERE (((m.player_id)::text = (ts.player_id)::text) AND (m.valid_from <= ts.timestampd) AND (ts.timestampd < COALESCE(m.valid_until, (timezone('utc'::text, now()) + '00:00:00.001'::interval))))
           GROUP BY m.player_id) AS modifications,
-    pr.batting_rating,
-    pr.baserunning_rating,
-    pr.defense_rating,
-    pr.pitching_rating,
-    pr.batting_stars,
-    pr.baserunning_stars,
-    pr.defense_stars,
-    pr.pitching_stars
-   FROM ((((((((( SELECT DISTINCT x.player_id,
+    data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
+    data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
+    data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
+    data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
+    data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
+    data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
+    data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
+    data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
+   FROM (((((((( SELECT DISTINCT x.player_id,
             unnest(x.a) AS timestampd
            FROM ( SELECT DISTINCT players.player_id,
-                    ARRAY[players.valid_from, COALESCE(players.valid_until, timezone('utc'::text, now()))] AS a
+                    ARRAY[players.valid_from, COALESCE(players.valid_until, NOW()::TIMESTAMP WITHOUT TIME ZONE)] AS a
                    FROM data.players
                 UNION
                  SELECT DISTINCT player_modifications.player_id,
-                    ARRAY[player_modifications.valid_from, COALESCE(player_modifications.valid_until, timezone('utc'::text, now()))] AS a
+                    ARRAY[player_modifications.valid_from, COALESCE(player_modifications.valid_until, now()::TIMESTAMP WITHOUT TIME ZONE)] AS a
                    FROM data.player_modifications
                 UNION
                  SELECT DISTINCT team_roster.player_id,
-                    ARRAY[team_roster.valid_from, COALESCE(team_roster.valid_until, timezone('utc'::text, now()))] AS a
-                   FROM data.team_roster
-                  WHERE (NOT ((team_roster.team_id)::text IN ( SELECT tournament_teams.team_id
-                           FROM taxa.tournament_teams)))) x) ts
+                    ARRAY[team_roster.valid_from, COALESCE(team_roster.valid_until, now()::TIMESTAMP WITHOUT TIME ZONE)] AS a
+                   FROM data.team_roster) x) ts
      JOIN data.players p ON ((((p.player_id)::text = (ts.player_id)::text) AND (p.valid_from <= (ts.timestampd + '00:00:00.001'::interval)) AND (ts.timestampd < COALESCE(p.valid_until, (timezone('utc'::text, now()) + '00:00:00.001'::interval))))))
      JOIN data.player_status_flags ps ON (((ts.player_id)::text = (ps.player_id)::text)))
-     JOIN data.players_ratings pr ON (((ts.player_id)::text = (pr.player_id)::text)))
-     LEFT JOIN data.team_roster r ON ((((ts.player_id)::text = (r.player_id)::text) AND (r.valid_from <= COALESCE(ts.timestampd, timezone('utc'::text, now()))) AND (COALESCE(ts.timestampd, timezone('utc'::text, now())) < COALESCE(r.valid_until, (timezone('utc'::text, now()) + '00:00:00.001'::interval))) AND (NOT ((r.team_id)::text IN ( SELECT tournament_teams.team_id
-           FROM taxa.tournament_teams))))))
+     LEFT JOIN 	  
+	 (
+	  		SELECT t.team_id, r.player_id, r.valid_from, 
+			CASE
+				WHEN r.valid_until IS NULL AND DATA.current_tournament() IS NOT NULL AND t.current_team_status = 'active' 
+				THEN lead(r.valid_from) over (PARTITION BY r.player_id ORDER BY r.valid_from)
+				ELSE r.valid_until
+			END AS valid_until, 
+			position_type_id, position_id
+			FROM DATA.team_roster r
+			JOIN DATA.teams_info_expanded_all t
+			ON (r.team_id = t.team_id AND t.valid_until IS NULL)
+	  ) r ON ((((ts.player_id)::text = (r.player_id)::text) AND (r.valid_from <= COALESCE(ts.timestampd, timezone('utc'::text, now()))) 
+	  AND (COALESCE(ts.timestampd, timezone('utc'::text, now())) < COALESCE(r.valid_until, (timezone('utc'::text, now()) + '00:00:00.001'::interval))))))
      LEFT JOIN data.teams_info_expanded_all t ON ((((r.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
      LEFT JOIN taxa.blood xb ON ((p.blood = xb.blood_id)))
      LEFT JOIN taxa.coffee xc ON ((p.coffee = xc.coffee_id)))
-     LEFT JOIN taxa.position_types xp ON ((r.position_type_id = (xp.position_type_id)::numeric)))
+     LEFT JOIN taxa.position_types xp ON ((r.position_type_id = (xp.position_type_id))))
+	  WHERE ts.timestampd <> NOW()::TIMESTAMP WITHOUT TIME zone	 
   WITH NO DATA;
 
 --
@@ -1341,6 +1341,7 @@ CREATE VIEW data.batting_stats_player_season AS
     sum(a.single) AS singles,
     sum(a.double) AS doubles,
     sum(a.triple) AS triples,
+	sum(a.quadruple) as quadruples,
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
@@ -1417,7 +1418,7 @@ CREATE VIEW data.batting_stats_player_tournament AS
    FROM ((data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
-  WHERE ((NOT a.is_postseason) AND (a.season < 0))
+  WHERE (a.season < 0)
   GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id;
 
 --
@@ -1467,9 +1468,50 @@ CREATE VIEW data.batting_stats_player_tournament_lifetime AS
     sum(a.gidp) AS gidps
    FROM (data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-  WHERE ((NOT a.is_postseason) AND (a.season < 0))
+  WHERE (a.season < 0)
   GROUP BY a.player_id, p.player_name;
 
+--
+-- Name: pitching_stats_player_tournament; Type: VIEW; Schema: data; Owner: -
+--
+CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
+ AS
+ SELECT a.player_name,
+    p.player_id,
+    p.season,
+    array_agg(p.team_id) AS team_ids,
+    count(1) AS games,
+    sum(p.win) AS wins,
+    sum(p.loss) AS losses,
+    sum(p.pitch_count) AS pitch_count,
+    sum(p.batters_faced) AS batters_faced,
+    sum(p.outs_recorded) AS outs_recorded,
+    round(floor(sum(p.outs_recorded) / 3::numeric) + mod(sum(p.outs_recorded), 3::numeric) / 10::numeric, 1) AS innings,
+    sum(p.runs_allowed) AS runs_allowed,
+    sum(
+        CASE
+            WHEN p.runs_allowed = 0::numeric THEN 1
+            ELSE 0
+        END) AS shutouts,
+    sum(
+        CASE
+            WHEN p.runs_allowed < 4::numeric AND p.outs_recorded > 18 THEN 1
+            ELSE 0
+        END) AS quality_starts,
+    sum(p.strikeouts) AS strikeouts,
+    sum(p.walks) AS walks,
+    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.hits_allowed) AS hits_allowed,
+    sum(p.hit_by_pitches) AS hbps,
+    round(9::numeric * sum(p.runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS era,
+    round(9::numeric * sum(p.walks) / (sum(p.outs_recorded) / 3::numeric), 2) AS bb_per_9,
+    round(9::numeric * sum(p.hits_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hits_per_9,
+    round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS k_per_9,
+    round(9::numeric * sum(p.hrs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9
+   FROM data.pitching_stats_all_appearances p
+     JOIN data.players_info_expanded_all a ON a.player_id::text = p.player_id::text AND a.valid_until IS NULL
+  WHERE p.season < 0
+  GROUP BY a.player_name, p.player_id, p.season;
 
 --
 -- Name: charm_counts; Type: VIEW; Schema: data; Owner: -
@@ -1632,6 +1674,7 @@ CREATE MATERIALIZED VIEW data.pitching_stats_all_appearances AS
      JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
      JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
   GROUP BY ge.season, ge.day, ge.game_id, ge.pitcher_id, ga.winning_pitcher_id, ga.losing_pitcher_id, ge.pitcher_team_id, ge.top_of_inning, ga.weather, ga.is_postseason
+  HAVING sum(xe.plate_appearance) > 0 
   WITH NO DATA;
 --
 -- Name: pitching_records_player_single_game; Type: VIEW; Schema: data; Owner: -
