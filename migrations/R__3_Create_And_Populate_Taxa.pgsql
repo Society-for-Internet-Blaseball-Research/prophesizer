@@ -1,4 +1,4 @@
-﻿
+﻿/*
 ALTER TABLE taxa.event_types DROP CONSTRAINT IF EXISTS event_types_pkey;
 ALTER TABLE taxa.event_types DROP CONSTRAINT IF EXISTS event_types_event_type_key;
 ALTER TABLE taxa.card DROP CONSTRAINT IF EXISTS card_pkey;
@@ -13,6 +13,7 @@ ALTER TABLE taxa.event_types ALTER COLUMN event_type_id DROP DEFAULT;
 ALTER TABLE taxa.divisions ALTER COLUMN division_db_id DROP DEFAULT;
 ALTER TABLE taxa.division_teams ALTER COLUMN division_teams_id DROP DEFAULT;
 ALTER TABLE taxa.attributes ALTER COLUMN attribute_id DROP DEFAULT;
+*/
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
