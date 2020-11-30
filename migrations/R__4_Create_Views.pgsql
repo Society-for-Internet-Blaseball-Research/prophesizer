@@ -315,7 +315,7 @@ CREATE VIEW data.player_status_flags AS
             WHEN (EXISTS ( SELECT 1
                FROM (data.team_roster rc
                  JOIN data.teams_info_expanded_all t ON (((rc.team_id)::text = (t.team_id)::text)))
-              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status IN  ('active','tournament')))) THEN 'active'::text
+              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status IN  ('active','tournament'))))) THEN 'active'::text
             WHEN (EXISTS ( SELECT 1
                FROM (data.team_roster rc
                  JOIN data.teams_info_expanded_all t ON (((rc.team_id)::text = (t.team_id)::text)))
@@ -1471,47 +1471,6 @@ CREATE VIEW data.batting_stats_player_tournament_lifetime AS
   WHERE (a.season < 0)
   GROUP BY a.player_id, p.player_name;
 
---
--- Name: pitching_stats_player_tournament; Type: VIEW; Schema: data; Owner: -
---
-CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
- AS
- SELECT a.player_name,
-    p.player_id,
-    p.season,
-    array_agg(p.team_id) AS team_ids,
-    count(1) AS games,
-    sum(p.win) AS wins,
-    sum(p.loss) AS losses,
-    sum(p.pitch_count) AS pitch_count,
-    sum(p.batters_faced) AS batters_faced,
-    sum(p.outs_recorded) AS outs_recorded,
-    round(floor(sum(p.outs_recorded) / 3::numeric) + mod(sum(p.outs_recorded), 3::numeric) / 10::numeric, 1) AS innings,
-    sum(p.runs_allowed) AS runs_allowed,
-    sum(
-        CASE
-            WHEN p.runs_allowed = 0::numeric THEN 1
-            ELSE 0
-        END) AS shutouts,
-    sum(
-        CASE
-            WHEN p.runs_allowed < 4::numeric AND p.outs_recorded > 18 THEN 1
-            ELSE 0
-        END) AS quality_starts,
-    sum(p.strikeouts) AS strikeouts,
-    sum(p.walks) AS walks,
-    sum(p.hrs_allowed) AS hrs_allowed,
-    sum(p.hits_allowed) AS hits_allowed,
-    sum(p.hit_by_pitches) AS hbps,
-    round(9::numeric * sum(p.runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS era,
-    round(9::numeric * sum(p.walks) / (sum(p.outs_recorded) / 3::numeric), 2) AS bb_per_9,
-    round(9::numeric * sum(p.hits_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hits_per_9,
-    round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS k_per_9,
-    round(9::numeric * sum(p.hrs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9
-   FROM data.pitching_stats_all_appearances p
-     JOIN data.players_info_expanded_all a ON a.player_id::text = p.player_id::text AND a.valid_until IS NULL
-  WHERE p.season < 0
-  GROUP BY a.player_name, p.player_id, p.season;
 
 --
 -- Name: charm_counts; Type: VIEW; Schema: data; Owner: -
@@ -1855,6 +1814,49 @@ CREATE VIEW data.pitching_stats_player_season AS
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
   GROUP BY a.player_name, p.player_id, p.season;
+
+--
+-- Name: pitching_stats_player_tournament; Type: VIEW; Schema: data; Owner: -
+--
+CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
+ AS
+ SELECT a.player_name,
+    p.player_id,
+    p.season,
+    array_agg(p.team_id) AS team_ids,
+    count(1) AS games,
+    sum(p.win) AS wins,
+    sum(p.loss) AS losses,
+    sum(p.pitch_count) AS pitch_count,
+    sum(p.batters_faced) AS batters_faced,
+    sum(p.outs_recorded) AS outs_recorded,
+    round(floor(sum(p.outs_recorded) / 3::numeric) + mod(sum(p.outs_recorded), 3::numeric) / 10::numeric, 1) AS innings,
+    sum(p.runs_allowed) AS runs_allowed,
+    sum(
+        CASE
+            WHEN p.runs_allowed = 0::numeric THEN 1
+            ELSE 0
+        END) AS shutouts,
+    sum(
+        CASE
+            WHEN p.runs_allowed < 4::numeric AND p.outs_recorded > 18 THEN 1
+            ELSE 0
+        END) AS quality_starts,
+    sum(p.strikeouts) AS strikeouts,
+    sum(p.walks) AS walks,
+    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.hits_allowed) AS hits_allowed,
+    sum(p.hit_by_pitches) AS hbps,
+    round(9::numeric * sum(p.runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS era,
+    round(9::numeric * sum(p.walks) / (sum(p.outs_recorded) / 3::numeric), 2) AS bb_per_9,
+    round(9::numeric * sum(p.hits_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hits_per_9,
+    round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS k_per_9,
+    round(9::numeric * sum(p.hrs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9
+   FROM data.pitching_stats_all_appearances p
+     JOIN data.players_info_expanded_all a ON a.player_id::text = p.player_id::text AND a.valid_until IS NULL
+  WHERE p.season < 0
+  GROUP BY a.player_name, p.player_id, p.season;
+
 
 
 --
