@@ -2003,3 +2003,14 @@ CREATE INDEX batting_stats_all_events_indx_season ON data.batting_stats_all_even
 -- Name: running_stats_all_events_indx_player_id; Type: INDEX; Schema: data; Owner: -
 --
 CREATE INDEX running_stats_all_events_indx_player_id ON data.running_stats_all_events USING btree (player_id);
+
+CREATE INDEX players_indx_player_id_timespan
+ON data.players (player_id, valid_from, valid_until DESC);
+
+CREATE INDEX team_roster_indx_player_id_timespan
+ON data.team_roster (player_id, valid_from, valid_until DESC);
+
+CREATE INDEX player_mods_indx_player_id_timespan
+ON data.player_modifications(player_id, valid_from, valid_until DESC);
+
+CLUSTER data.players USING players_indx_player_id_timespan;
