@@ -41,7 +41,7 @@ namespace SIBR
 				numUpdates += result.NumUpdatesProcessed;
 				if ((hour > lastHour) || (hour==0 && lastHour == 23))
 				{
-					Prophesizer.ConsoleOrWebhook($"Processed {numUpdates} updates in the past hour. Last recorded game is Season {result.Latest.Season+1}, Day {result.Latest.Day+1}.");
+					Prophesizer.ConsoleOrWebhook($"Processed {numUpdates} updates in the past hour. Last recorded game is {result.Latest.HumanReadable}.");
 					//Prophesizer.ConsoleOrWebhook($"    {prophesizer.NumNetworkOutcomes} games used the network outcomes.json file, {prophesizer.NumLocalOutcomes} did not.");
 					lastHour = hour;
 					numUpdates = 0;
