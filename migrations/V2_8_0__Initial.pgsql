@@ -128,6 +128,9 @@ CREATE TABLE data.game_events (
     game_id character varying(36),
     event_type text,
     event_index integer,
+    season integer,
+    day integer,
+    tournament integer,
     inning smallint,
     top_of_inning boolean,
     outs_before_play smallint,
@@ -137,9 +140,13 @@ CREATE TABLE data.game_events (
     pitcher_team_id character varying(36),
     home_score numeric,
     away_score numeric,
-    home_strike_count smallint DEFAULT '3'::smallint,
-    away_strike_count smallint DEFAULT '3'::smallint,
-    batter_count integer,
+    home_strike_count integer DEFAULT 3,
+    away_strike_count integer DEFAULT 3,
+    home_ball_count integer DEFAULT 4,
+    away_ball_count integer DEFAULT 4,
+    away_base_count integer DEFAULT 4,
+    home_base_count integer DEFAULT 4,    
+	batter_count integer,
     pitches character varying(1)[],
     total_strikes smallint,
     total_balls smallint,
@@ -163,17 +170,10 @@ CREATE TABLE data.game_events (
     is_last_game_event boolean,
     event_text text[],
     additional_context text,
-    season integer,
-    day integer,
-    parsing_error boolean,
+	parsing_error boolean,
     parsing_error_list text[],
     fixed_error boolean,
-    fixed_error_list text[],
-    home_ball_count integer DEFAULT 4,
-    away_ball_count integer DEFAULT 4,
-    away_base_count integer DEFAULT 4,
-    home_base_count integer DEFAULT 4,
-    tournament integer
+    fixed_error_list text[]
 );
 
 --
@@ -265,11 +265,11 @@ CREATE TABLE data.teams (
     location text,
     nickname text,
     full_name text,
+    url_slug character varying,
+    card integer,
     valid_from timestamp without time zone,
     valid_until timestamp without time zone,
-    hash uuid,
-    url_slug character varying,
-    card integer
+    hash uuid
 );
 
 --
@@ -295,6 +295,7 @@ CREATE TABLE data.games (
     game_id character varying(36) NOT NULL,
     day integer,
     season integer,
+	tournament integer
     last_game_event integer,
     home_odds numeric,
     away_odds numeric,
@@ -313,8 +314,7 @@ CREATE TABLE data.games (
     rules_id character varying(36),
     statsheet_id character varying(36),
     winning_pitcher_id character varying,
-    losing_pitcher_id character varying,
-    tournament integer
+    losing_pitcher_id character varying
 );
 
 --
