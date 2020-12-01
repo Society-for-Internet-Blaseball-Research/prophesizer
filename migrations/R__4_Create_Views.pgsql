@@ -349,7 +349,7 @@ CASE
 		SELECT 1
 		FROM data.team_roster rc
 		JOIN data.teams_info_expanded_all t ON (rc.team_id = t.team_id)
-              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status IN  ('active','tournament')))) THEN 'active'::text
+              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status IN  ('active','tournament')))
 	) 
 	THEN 'active'
 	WHEN EXISTS 
