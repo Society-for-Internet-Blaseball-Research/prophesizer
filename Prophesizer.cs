@@ -391,12 +391,12 @@ namespace SIBR
 				{
 					Int64 numGames = (Int64)gameCountResponse;
 					Int64 numFinishedGames = (Int64)response;
-					ConsoleOrWebhook($"{numFinishedGames} of {numGames} games complete for Season {m_dbSeasonDay.Season+1}, Day {m_dbSeasonDay.Day+1}...");
+					ConsoleOrWebhook($"{numFinishedGames} of {numGames} games complete for {m_dbSeasonDay.HumanReadable}...");
 					// If all games are done, refresh our materialized views
 					if (numGames > 0 && numFinishedGames >= numGames)
 					{
 						printMatviewTime = true;
-						ConsoleOrWebhook($"All games complete for Season {m_dbSeasonDay.Season + 1}, Day {m_dbSeasonDay.Day + 1}, refreshing materialized views!");
+						ConsoleOrWebhook($"All games complete for {m_dbSeasonDay.HumanReadable}, refreshing materialized views!");
 						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
 						await refreshCmd.ExecuteNonQueryAsync();
 
@@ -407,7 +407,7 @@ namespace SIBR
 			matviewTimer.Stop();
 			if (printMatviewTime)
 			{
-				ConsoleOrWebhook($"Matview refresh took {matviewTimer.Elapsed}. Last day refreshed is now Season {m_lastMaterializedRefresh.Season + 1}, Day {m_lastMaterializedRefresh.Day + 1}");
+				ConsoleOrWebhook($"Matview refresh took {matviewTimer.Elapsed}. Last day refreshed is now {m_lastMaterializedRefresh.HumanReadable}");
 			}
 
 		}

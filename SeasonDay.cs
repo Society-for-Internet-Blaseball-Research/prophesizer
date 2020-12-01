@@ -7,9 +7,18 @@ class SeasonDay : IEquatable<SeasonDay>, IComparable<SeasonDay>
 	public int Tournament;
 	public int Season;
 	public int Day;
-	public bool IsTournament => (Season == -1 && Tournament != -1);
+	public bool IsTournament => (Tournament != -1);
 
 	private const int MAX_DAY = 135;
+
+	public string HumanReadable
+	{
+		get
+		{
+			if (IsTournament) return $"Tournament {Tournament}, Day {Day + 1}";
+			else return $"Season {Season + 1}, Day {Day + 1}";
+		}
+	}
 
 	public SeasonDay(int season, int day, int tournament = -1)
 	{
