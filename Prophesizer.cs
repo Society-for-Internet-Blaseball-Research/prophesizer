@@ -791,8 +791,8 @@ namespace SIBR
 					writer.Write(ge.pitcherTeamId);
 					writer.Write(ge.homeScore, NpgsqlTypes.NpgsqlDbType.Numeric);
 					writer.Write(ge.awayScore, NpgsqlTypes.NpgsqlDbType.Numeric);
-					writer.Write(ge.homeStrikeCount, NpgsqlTypes.NpgsqlDbType.Smallint);
-					writer.Write(ge.awayStrikeCount, NpgsqlTypes.NpgsqlDbType.Smallint);
+					writer.Write(ge.homeStrikeCount, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.awayStrikeCount, NpgsqlTypes.NpgsqlDbType.Integer);
 					writer.Write(ge.batterCount, NpgsqlTypes.NpgsqlDbType.Integer);
 					writer.Write(ge.pitchesList, NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Varchar);
 					writer.Write(ge.totalStrikes, NpgsqlTypes.NpgsqlDbType.Smallint);
