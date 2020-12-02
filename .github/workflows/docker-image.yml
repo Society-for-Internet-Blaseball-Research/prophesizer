@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
       - name: Create Tag
         uses: salsify/action-detect-and-tag-new-version@v2
         with:
