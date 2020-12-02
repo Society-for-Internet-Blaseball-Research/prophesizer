@@ -12,6 +12,11 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
+      - name: Create Tag
+        uses: salsify/action-detect-and-tag-new-version@v2
+        with:
+          version-command: |
+            grep "<Version>" prophesizer.csproj | sed 's/ *<\/*Version>//g'
       - name: Get version
         run: ./get_version.sh
       - name: Push to Docker Hub
