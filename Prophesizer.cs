@@ -320,7 +320,7 @@ namespace SIBR
 				{
 					using (var sr = new StreamReader(patchFilename))
 					{
-						string cmdText = sr.ReadToEnd();
+						string cmdText = sr.ReadToEnd().Replace("\r\n", "\n");
 						var hashBytes = md5.ComputeHash(Encoding.UTF8.GetBytes(cmdText));
 						var hash = new Guid(hashBytes);
 
