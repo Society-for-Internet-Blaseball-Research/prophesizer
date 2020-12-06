@@ -1,4 +1,4 @@
-﻿
+﻿DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.gamestate_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.timestamp_from_gameday(in_season integer, in_gameday integer) CASCADE;
 DROP FUNCTION IF EXISTS data.teams_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -302,6 +302,43 @@ SELECT
 			)	
 		)
 	,0)
+);
+$$ ROWS 1;
+
+--
+-- Name: gamephase_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
+--
+CREATE FUNCTION data.gamephase_from_timestamp(in_timestamp timestamp without time zone) 
+RETURNS TABLE(season integer, tournament integer, gameday integer, phase_type VARCHAR)
+    LANGUAGE sql
+    AS $$
+SELECT 
+CASE
+	WHEN phase_type NOT IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON')
+	THEN season
+	ELSE NULL
+END AS season,
+CASE
+	WHEN phase_type IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON')
+	THEN 0
+	ELSE NULL
+END AS tournament,
+CASE
+	WHEN phase_type IN ('GAMEDAY','TOURNAMENT_GAMEDAY','POSTSEASON','TOURNAMENT_POSTSEASON')
+	THEN day
+	ELSE NULL
+END AS DAY,
+phase_type
+FROM DATA.time_map tm
+JOIN taxa.phases xp
+ON (tm.phase_id = xp.phase_id)
+LEFT JOIN taxa.tournaments xt
+ON (tm.season = xt.tournament_id)
+WHERE first_time = 
+(
+	SELECT max(first_time)
+	FROM data.time_map 
+	WHERE first_time < in_timestamp
 );
 $$ ROWS 1;
 --

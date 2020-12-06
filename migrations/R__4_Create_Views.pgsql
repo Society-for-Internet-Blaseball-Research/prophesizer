@@ -275,14 +275,14 @@ CASE
 END AS current_team_status,
 ts.timestampd AS valid_from,
 lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
-(
-	SELECT gd1.gameday
-	FROM data.gameday_from_timestamp(ts.timestampd) gd1(season, gameday)
-) AS gameday_from,
-(
-	SELECT gd2.season
-	FROM data.gameday_from_timestamp(ts.timestampd) gd2(season, gameday)
-) AS season_from,
+    ( SELECT gd1.gameday
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd1) AS gameday_from,
+    ( SELECT gd2.season
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd2) AS season_from,
+    ( SELECT gd3.tournament
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd3) AS tournament_from,
+    ( SELECT gd4.phase_type
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd4) AS phase_type_from,
 d.division_text AS division,
 d.division_id,
 l.league_text AS league,
@@ -447,13 +447,14 @@ CASE
 	THEN NULL
 	ELSE lead(ts.timestampd) OVER (PARTITION BY ts.player_id ORDER BY ts.timestampd) 
 END AS valid_until,
-(
-	SELECT gd1.gameday FROM data.gameday_from_timestamp(ts.timestampd) gd1(season, gameday)
-) AS gameday_from,
-(
-	SELECT gd2.season FROM data.gameday_from_timestamp(ts.timestampd) gd2(season, gameday)
-) AS season_from,
-DATA.gamestate_from_timestamp(ts.timestampd) AS gamestate_from,
+    ( SELECT gd1.gameday
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd1) AS gameday_from,
+    ( SELECT gd2.season
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd2) AS season_from,
+    ( SELECT gd3.tournament
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd3) AS tournament_from,
+    ( SELECT gd4.phase_type
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd4) AS phase_type_from,
 p.deceased,
 p.anticapitalism,
 p.base_thirst,
@@ -2005,10 +2006,14 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
 --
 CREATE VIEW data.rosters_current AS
  SELECT r.valid_from,
-    ( SELECT gameday_from_timestamp.gameday
-           FROM data.gameday_from_timestamp(r.valid_from) gameday_from_timestamp(season, gameday)) AS gameday_from,
-    ( SELECT gameday_from_timestamp.season
-           FROM data.gameday_from_timestamp(r.valid_from) gameday_from_timestamp(season, gameday)) AS season_from,
+    ( SELECT gd1.gameday
+           FROM data.gamephase_from_timestamp(r.valid_from) gd1) AS gameday_from,
+    ( SELECT gd2.season
+           FROM data.gamephase_from_timestamp(r.valid_from) gd2) AS season_from,
+    ( SELECT gd3.tournament
+           FROM data.gamephase_from_timestamp(r.valid_from) gd3) AS tournament_from,
+    ( SELECT gd4.phase_type
+           FROM data.gamephase_from_timestamp(r.valid_from) gd4) AS phase_type_from,
     r.team_id,
     t.nickname,
     r.player_id,
@@ -2026,10 +2031,14 @@ CREATE VIEW data.rosters_current AS
 --
 CREATE VIEW data.rosters_extended_current AS
  SELECT r.valid_from,
-    ( SELECT gameday_from_timestamp.gameday
-           FROM data.gameday_from_timestamp(r.valid_from) gameday_from_timestamp(season, gameday)) AS gameday_from,
-    ( SELECT gameday_from_timestamp.season
-           FROM data.gameday_from_timestamp(r.valid_from) gameday_from_timestamp(season, gameday)) AS season_from,
+    ( SELECT gd1.gameday
+           FROM data.gamephase_from_timestamp(r.valid_from) gd1) AS gameday_from,
+    ( SELECT gd2.season
+           FROM data.gamephase_from_timestamp(r.valid_from) gd2) AS season_from,
+    ( SELECT gd3.tournament
+           FROM data.gamephase_from_timestamp(r.valid_from) gd3) AS tournament_from,
+    ( SELECT gd4.phase_type
+           FROM data.gamephase_from_timestamp(r.valid_from) gd4) AS phase_type_from,
     r.team_id,
     t.nickname,
     r.player_id,

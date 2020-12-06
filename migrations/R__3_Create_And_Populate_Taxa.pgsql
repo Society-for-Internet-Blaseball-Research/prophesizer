@@ -999,7 +999,8 @@ VALUES
 (13, 'Reverb'),
 (14, 'Black Hole'),
 (15, 'Coffee'),
-(16, 'Coffee 2');
+(16, 'Coffee 2'),
+(17, 'Coffee 3s');
 
 --
 -- Name: attributes attributes_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -
