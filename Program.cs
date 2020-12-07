@@ -1,5 +1,6 @@
 ﻿using Npgsql;
 using System;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace SIBR
@@ -11,7 +12,8 @@ namespace SIBR
 			try
 			{
 				// Try to migrate the DB to the latest schema
-				var connection  = new NpgsqlConnection (Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
+				var connString = Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING");
+				var connection  = new NpgsqlConnection(connString);
 				var evolve = new Evolve.Evolve(connection, msg => Console.WriteLine(msg))
 				{
 					Locations = new[] { "migrations" },
@@ -19,6 +21,21 @@ namespace SIBR
 					CommandTimeout = 60,
 					//IsEraseDisabled = true, //< Recommended in production
 				};
+
+				// Find the DB name from the connection string
+				string dbName = "blaseball";
+				var splits = connString.Split(';');
+				foreach(var s in splits)
+				{
+					var halves = s.Split('=');
+					if(halves[0] == "database")
+					{
+						dbName = halves[1];
+					}
+				}
+
+				// Add a placeholder for the DB name
+				evolve.Placeholders.Add("${database}", dbName);
 
 				evolve.Migrate();
 			}

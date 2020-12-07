@@ -16,7 +16,7 @@ EXCEPTION WHEN DUPLICATE_OBJECT THEN
 END
 $$;
 
-ALTER ROLE datazealot IN DATABASE blaseball SET statement_timeout TO '10000';
+ALTER ROLE datazealot IN DATABASE ${database} SET statement_timeout TO '10000';
 COMMENT ON ROLE datazealot IS 'Average SIBR member who wants to crunch some stats on the DB';
 
 DO $$
