@@ -773,6 +773,7 @@ REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
 REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
 REFRESH MATERIALIZED VIEW data.running_stats_all_events;
 REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
+REFRESH MATERIALIZED VIEW data.player_debuts;
 $$;
 --
 -- Name: rosters_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -

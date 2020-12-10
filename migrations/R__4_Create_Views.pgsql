@@ -2153,3 +2153,49 @@ CREATE INDEX batting_stats_all_events_indx_season ON data.batting_stats_all_even
 -- Name: running_stats_all_events_indx_player_id; Type: INDEX; Schema: data; Owner: -
 --
 CREATE INDEX running_stats_all_events_indx_player_id ON data.running_stats_all_events USING btree (player_id);
+
+
+
+-- View: data.player_debuts
+-- TODO: players appear twice if they pitched and batted
+-- TODO: it would be cooler to select the team name at the time of the debut instead of the current record
+
+DROP MATERIALIZED VIEW IF EXISTS data.player_debuts CASCADE;
+
+CREATE MATERIALIZED VIEW data.player_debuts
+TABLESPACE pg_default
+AS
+ SELECT p.player_name,
+    p.player_id,
+    debuts.team_id,
+    t.full_name AS team_full_name,
+    t.nickname AS team_nickname,
+    debuts.debut_time,
+    ( SELECT gd.tournament
+           FROM data.gamephase_from_timestamp(debuts.debut_time) gd(season, tournament, gameday, phase_type)) AS tournament,
+    ( SELECT gd.season
+           FROM data.gamephase_from_timestamp(debuts.debut_time) gd(season, tournament, gameday, phase_type)) AS calc_season,
+    ( SELECT gd.gameday
+           FROM data.gamephase_from_timestamp(debuts.debut_time) gd(season, tournament, gameday, phase_type)) AS calc_gameday,
+    ( SELECT gd.phase_type
+           FROM data.gamephase_from_timestamp(debuts.debut_time) gd(season, tournament, gameday, phase_type)) AS phase_type
+   FROM (( SELECT DISTINCT ON (game_events.pitcher_id) game_events.pitcher_id AS player_id,
+            game_events.pitcher_team_id AS team_id,
+            game_events.perceived_at AS debut_time
+           FROM data.game_events
+          WHERE game_events.pitcher_id <> ''
+          ORDER BY game_events.pitcher_id, game_events.perceived_at)
+        UNION
+        ( SELECT DISTINCT ON (game_events.batter_id) game_events.batter_id AS player_id,
+            game_events.batter_team_id AS team_id,
+            game_events.perceived_at AS debut_time
+           FROM data.game_events
+          WHERE game_events.batter_id <> ''
+          ORDER BY game_events.batter_id, game_events.perceived_at)) debuts
+     LEFT JOIN data.players p ON p.player_id = debuts.player_id
+     LEFT JOIN data.teams t ON t.team_id = debuts.team_id
+  WHERE p.valid_until IS NULL AND t.valid_until IS NULL
+  ORDER BY debuts.debut_time
+WITH DATA;
+
+
