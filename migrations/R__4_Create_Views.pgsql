@@ -47,6 +47,38 @@ DROP VIEW IF EXISTS data.batting_records_team_tournament CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_tournament CASCADE;
 
 --
+-- Name: player_debuts; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+
+DROP MATERIALIZED VIEW IF EXISTS data.player_debuts CASCADE;
+
+CREATE MATERIALIZED VIEW data.player_debuts
+AS
+SELECT DISTINCT game_id AS debut_game_id, player_id, season AS debut_season, DAY AS debut_gameday, tournament AS debut_tournament
+FROM DATA.game_events ge
+JOIN
+(
+    SELECT MIN(first_appearance) AS perceived_at, 
+    player_id
+    FROM
+    (
+        SELECT batter_id AS player_id, min(perceived_at) AS first_appearance
+        FROM DATA.game_events
+        WHERE batter_id NOT IN ('','UNKNOWN')
+        GROUP BY batter_id
+        UNION
+        SELECT pitcher_id AS player_id, min(perceived_at) AS first_appearance
+        FROM DATA.game_events
+        WHERE pitcher_id NOT IN ('','UNKNOWN')
+        GROUP BY pitcher_id
+    ) a
+    GROUP BY player_id
+) b
+ON (ge.perceived_at = b.perceived_at AND (b.player_id = ge.batter_id OR b.player_id = ge.pitcher_id))
+ORDER BY tournament, season, DAY, player_id
+WITH NO DATA;
+
+--
 -- Name: batting_records_combined_teams_playoffs_single_game; Type: VIEW; Schema: data; Owner: -
 --
 CREATE VIEW data.batting_records_combined_teams_playoffs_single_game AS
@@ -436,6 +468,9 @@ SELECT p.player_id,
 p.player_name,
 ps.current_state,
 ps.current_location,
+pd.debut_gameday,
+pd.debut_season,
+pd.debut_tournament,
 r.team_id,
 t.team_abbreviation,
 t.nickname AS team,
@@ -534,6 +569,7 @@ JOIN data.players p ON
 	AND ts.timestampd < COALESCE(p.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
 )
 JOIN data.player_status_flags ps ON (ts.player_id = ps.player_id)
+JOIN data.player_debuts pd ON (ts.player_id = pd.player_id)
 LEFT JOIN 	  
 (
 	SELECT rt.team_id, rr.player_id, rr.position_type_id, rr.position_id, rr.valid_from, 
@@ -1744,7 +1780,7 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
  SELECT a.player_name,
     p.player_id,
     p.season,
-    array_agg(p.team_id) AS team_ids,
+    p.team_id,
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
@@ -1776,7 +1812,7 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
    FROM data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON a.player_id::text = p.player_id::text AND a.valid_until IS NULL
   WHERE p.season < 0
-  GROUP BY a.player_name, p.player_id, p.season;  
+  GROUP BY a.player_name, p.player_id, p.season, p.team_id;  
 --
 -- Name: pitching_records_player_single_game; Type: VIEW; Schema: data; Owner: -
 --
@@ -1884,7 +1920,6 @@ CREATE VIEW data.pitching_records_player_single_game AS
 CREATE VIEW data.pitching_stats_player_lifetime AS
  SELECT a.player_name,
     p.player_id,
-    array_agg(p.team_id) AS team_ids,
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
@@ -1923,7 +1958,7 @@ CREATE VIEW data.pitching_stats_player_season AS
  SELECT a.player_name,
     p.player_id,
     p.season,
-    array_agg(p.team_id) AS team_ids,
+    p.team_id,
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
@@ -1955,51 +1990,7 @@ CREATE VIEW data.pitching_stats_player_season AS
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
-  GROUP BY a.player_name, p.player_id, p.season;
-
---
--- Name: pitching_stats_player_tournament; Type: VIEW; Schema: data; Owner: -
---
-CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
- AS
- SELECT a.player_name,
-    p.player_id,
-    p.season,
-    array_agg(p.team_id) AS team_ids,
-    count(1) AS games,
-    sum(p.win) AS wins,
-    sum(p.loss) AS losses,
-    sum(p.pitch_count) AS pitch_count,
-    sum(p.batters_faced) AS batters_faced,
-    sum(p.outs_recorded) AS outs_recorded,
-    round(floor(sum(p.outs_recorded) / 3::numeric) + mod(sum(p.outs_recorded), 3::numeric) / 10::numeric, 1) AS innings,
-    sum(p.runs_allowed) AS runs_allowed,
-    sum(
-        CASE
-            WHEN p.runs_allowed = 0::numeric THEN 1
-            ELSE 0
-        END) AS shutouts,
-    sum(
-        CASE
-            WHEN p.runs_allowed < 4::numeric AND p.outs_recorded > 18 THEN 1
-            ELSE 0
-        END) AS quality_starts,
-    sum(p.strikeouts) AS strikeouts,
-    sum(p.walks) AS walks,
-    sum(p.hrs_allowed) AS hrs_allowed,
-    sum(p.hits_allowed) AS hits_allowed,
-    sum(p.hit_by_pitches) AS hbps,
-    round(9::numeric * sum(p.runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS era,
-    round(9::numeric * sum(p.walks) / (sum(p.outs_recorded) / 3::numeric), 2) AS bb_per_9,
-    round(9::numeric * sum(p.hits_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hits_per_9,
-    round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS k_per_9,
-    round(9::numeric * sum(p.hrs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9
-   FROM data.pitching_stats_all_appearances p
-     JOIN data.players_info_expanded_all a ON a.player_id::text = p.player_id::text AND a.valid_until IS NULL
-  WHERE p.season < 0
-  GROUP BY a.player_name, p.player_id, p.season;
-
-
+  GROUP BY a.player_name, p.player_id, p.season, p.team_id;
 
 --
 -- Name: rosters_current; Type: VIEW; Schema: data; Owner: -
@@ -2154,48 +2145,5 @@ CREATE INDEX batting_stats_all_events_indx_season ON data.batting_stats_all_even
 --
 CREATE INDEX running_stats_all_events_indx_player_id ON data.running_stats_all_events USING btree (player_id);
 
-
-
--- View: data.player_debuts
--- TODO: players appear twice if they pitched and batted
--- TODO: it would be cooler to select the team name at the time of the debut instead of the current record
-
-DROP MATERIALIZED VIEW IF EXISTS data.player_debuts CASCADE;
-
-CREATE MATERIALIZED VIEW data.player_debuts
-TABLESPACE pg_default
-AS
- SELECT p.player_name,
-    p.player_id,
-    debuts.team_id,
-    t.full_name AS team_full_name,
-    t.nickname AS team_nickname,
-    debuts.debut_time,
-    ( SELECT gd.tournament
-           FROM data.gamephase_from_timestamp(debuts.debut_time) gd(season, tournament, gameday, phase_type)) AS tournament,
-    ( SELECT gd.season
-           FROM data.gamephase_from_timestamp(debuts.debut_time) gd(season, tournament, gameday, phase_type)) AS calc_season,
-    ( SELECT gd.gameday
-           FROM data.gamephase_from_timestamp(debuts.debut_time) gd(season, tournament, gameday, phase_type)) AS calc_gameday,
-    ( SELECT gd.phase_type
-           FROM data.gamephase_from_timestamp(debuts.debut_time) gd(season, tournament, gameday, phase_type)) AS phase_type
-   FROM (( SELECT DISTINCT ON (game_events.pitcher_id) game_events.pitcher_id AS player_id,
-            game_events.pitcher_team_id AS team_id,
-            game_events.perceived_at AS debut_time
-           FROM data.game_events
-          WHERE game_events.pitcher_id <> ''
-          ORDER BY game_events.pitcher_id, game_events.perceived_at)
-        UNION
-        ( SELECT DISTINCT ON (game_events.batter_id) game_events.batter_id AS player_id,
-            game_events.batter_team_id AS team_id,
-            game_events.perceived_at AS debut_time
-           FROM data.game_events
-          WHERE game_events.batter_id <> ''
-          ORDER BY game_events.batter_id, game_events.perceived_at)) debuts
-     LEFT JOIN data.players p ON p.player_id = debuts.player_id
-     LEFT JOIN data.teams t ON t.team_id = debuts.team_id
-  WHERE p.valid_until IS NULL AND t.valid_until IS NULL
-  ORDER BY debuts.debut_time
-WITH DATA;
 
 

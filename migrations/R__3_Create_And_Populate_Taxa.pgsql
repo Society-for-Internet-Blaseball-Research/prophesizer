@@ -1,21 +1,4 @@
-﻿/*
-ALTER TABLE taxa.event_types DROP CONSTRAINT IF EXISTS event_types_pkey;
-ALTER TABLE taxa.event_types DROP CONSTRAINT IF EXISTS event_types_event_type_key;
-ALTER TABLE taxa.card DROP CONSTRAINT IF EXISTS card_pkey;
-ALTER TABLE taxa.attributes DROP CONSTRAINT IF EXISTS attributes_pkey;
-ALTER TABLE taxa.vibe_to_arrows ALTER COLUMN vibe_to_arrow_id DROP DEFAULT;
-ALTER TABLE taxa.team_divine_favor ALTER COLUMN team_divine_favor_id DROP DEFAULT;
-ALTER TABLE taxa.team_abbreviations ALTER COLUMN team_abbreviation_id DROP DEFAULT;
-ALTER TABLE taxa.player_url_slugs ALTER COLUMN player_url_slug_id DROP DEFAULT;
-ALTER TABLE taxa.modifications ALTER COLUMN modification_db_id DROP DEFAULT;
-ALTER TABLE taxa.leagues ALTER COLUMN league_db_id DROP DEFAULT;
-ALTER TABLE taxa.event_types ALTER COLUMN event_type_id DROP DEFAULT;
-ALTER TABLE taxa.divisions ALTER COLUMN division_db_id DROP DEFAULT;
-ALTER TABLE taxa.division_teams ALTER COLUMN division_teams_id DROP DEFAULT;
-ALTER TABLE taxa.attributes ALTER COLUMN attribute_id DROP DEFAULT;
-*/
-
-DROP TABLE IF EXISTS taxa.weather CASCADE;
+﻿DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
 DROP TABLE IF EXISTS taxa.vibe_to_arrows CASCADE;
 DROP SEQUENCE IF EXISTS taxa.team_divine_favor_team_divine_favor_id_seq CASCADE;
@@ -138,11 +121,12 @@ CREATE TABLE taxa.player_url_slugs (
 --
 CREATE TABLE taxa.attributes (
     attribute_id integer NOT NULL,
-    attribute_text character varying,
+    attribute character varying,
     attribute_desc character varying,
-    attribute_objects integer[],
-    attributes_short character varying,
-    attribute_short character varying
+    attribute_category character varying,
+    attribute_short character varying,
+	attribute_datatype character varying,
+	attribute_directionality character varying
 );
 --
 -- Name: attributes_attribute_id_seq; Type: SEQUENCE; Schema: taxa; Owner: -
@@ -464,39 +448,36 @@ ALTER TABLE ONLY taxa.vibe_to_arrows ALTER COLUMN vibe_to_arrow_id SET DEFAULT n
 
 INSERT INTO taxa.attributes 
 VALUES 
-(1, 'suppression', NULL, NULL, NULL, ''),
-(2, 'pressurization', NULL, NULL, NULL, 'Pr'),
-(3, 'chasiness', NULL, NULL, NULL, 'Ch'),
-(4, 'peanut_allergy', NULL, NULL, NULL, ''),
-(5, 'unthwackability', NULL, NULL, NULL, 'Un'),
-(6, 'moxie', NULL, NULL, NULL, 'Mo'),
-(7, 'base_thirst', NULL, NULL, NULL, 'Bt'),
-(8, 'soul', NULL, NULL, NULL, ''),
-(9, 'indulgence', NULL, NULL, NULL, 'I'),
-(10, 'tragicness', NULL, NULL, NULL, 'Tr'),
-(11, 'musclitude', NULL, NULL, NULL, 'Ms'),
-(12, 'anticapitalism', NULL, NULL, NULL, 'A'),
-(13, 'total_fingers', NULL, NULL, NULL, ''),
-(14, 'ground_friction', NULL, NULL, NULL, 'G'),
-(15, 'divinity', NULL, NULL, NULL, 'Dv'),
-(16, 'overpowerment', NULL, NULL, NULL, 'Ov'),
-(17, 'coffee', NULL, NULL, NULL, ''),
-(18, 'thwackability', NULL, NULL, NULL, 'Tw'),
-(19, 'shakespearianism', NULL, NULL, NULL, 'S'),
-(20, 'laserlikeness', NULL, NULL, NULL, 'L'),
-(21, 'tenaciousness', NULL, NULL, NULL, 'Te'),
-(22, 'continuation', NULL, NULL, NULL, 'Cn'),
-(23, 'cinnamon', NULL, NULL, NULL, 'Ci'),
-(24, 'watchfulness', NULL, NULL, NULL, 'W'),
-(25, 'martyrdom', NULL, NULL, NULL, 'Mr'),
-(26, 'omniscience', NULL, NULL, NULL, 'Om'),
-(27, 'blood', NULL, NULL, NULL, ''),
-(28, 'fate', NULL, NULL, NULL, ''),
-(29, 'coldness', NULL, NULL, NULL, 'Co'),
-(30, 'buoyancy', NULL, NULL, NULL, 'Bu'),
-(31, 'ruthlessness', NULL, NULL, NULL, 'R'),
-(32, 'patheticism', NULL, NULL, NULL, 'Pa');
-
+(1,'base_thirst','Increases stolen base attempts.','baserunning','Bt','NUMERIC','larger'),
+(2,'continuation','Whether the runner advances 1 or 2 bases on a hit. (also linked to indulgence somewhat).','baserunning','Cn','NUMERIC','larger'),
+(3,'ground_friction','Appears to govern the rate of triples, slight negative correlation with doubles hit, possibly by stretching them into triples instead?','baserunning','G','NUMERIC','larger'),
+(4,'indulgence','Seems to be related to runner advancement on an out (base advancement, scoring on a sacrifice), in concert with laserlikeness.','baserunning','I','NUMERIC','larger'),
+(5,'laserlikeness','Steal success, steal attempts (correlation stronger than base_thirst); along with Indulgence, appears to impact runner advancement on outs (and may just be a general running speed/ability).','baserunning','L','NUMERIC','larger'),
+(6,'divinity','Home run frequency.  Also part of Soulscream formula.','batting','Dv','NUMERIC','larger'),
+(7,'martyrdom','Determines whether a runner advances or whether an out is a Fielder’s Choice.','batting','Mr','NUMERIC','larger'),
+(8,'moxie','Ability to draw walks - (current theory is it represents some kind of plate discipline, as opposed to impacting the rate of pitcher balls).','batting','Mo','NUMERIC','larger'),
+(9,'musclitude','Extra base hits (specifically seems to be for doubles), also appears to impact fouls.','batting','Ms','NUMERIC','larger'),
+(10,'patheticism','Likelihood of the batter making contact with the ball; generally correlates with high strikeout rate.','batting','Pa','NUMERIC','smaller'),
+(11,'thwackability','Quality of contact with the ball, reducing the chance of balls being fielded (probably in some kind of thwack vs unthwack contest).','batting','Tw','NUMERIC','larger'),
+(12,'tragicness','Direct use unknown, but gets set to 0.1 at the start of seasons and upon siestas/delays etc throughout the season.  Also part of Soulscream formula.','batting','Tr','NUMERIC','smaller'),
+(13,'anticapitalism','Related to steal attempts in some form.','defense','A','NUMERIC','larger'),
+(14,'chasiness','Defensive ability to prevent extra base hits (by holding runners to first?)','defense','Ch','NUMERIC','larger'),
+(15,'omniscience','Defensive odds on turning a batted ball into an out.','defense','Om','NUMERIC','larger'),
+(16,'tenaciousness','Related to steal attempts in some form.','defense','Te','NUMERIC','larger'),
+(17,'watchfulness','Reduces baserunner attempts to steal (impact on success rate not known).','defense','W','NUMERIC','larger'),
+(18,'coldness','Unknown.','pitching','Co','NUMERIC','larger'),
+(19,'overpowerment','Lowers home runs - seems to be involved in all hit types, potentially used to counter triples and doubles as well (likely by reducing the power of batted balls).','pitching','Ov','NUMERIC','larger'),
+(20,'ruthlessness','Reduces walks and increases strikeouts - seems to essentially determine whether a given pitch is in or out of the strike zone.  Also part of Soulscream formula.','pitching','R','NUMERIC','larger'),
+(21,'shakespearianism','“is linked to Tragicness” for whatever use that is (basically none).  Also part of Soulscream formula.  The White Whale of attributes.','pitching','S','NUMERIC','larger'),
+(22,'suppression','Appears to be opposed to Buoyancy and helps determine if a ball in play will become a groundout or a fly out.  Not part of pitching rating formula.','pitching','','NUMERIC','larger'),
+(23,'unthwackability','Lowers hits allowed - reduces “quality” of batter contact, increasing likelihood of a ball being fielded .','pitching','Un','NUMERIC','larger'),
+(24,'buoyancy','Determines frequency of curve in Vibes.','vibes','Bu','NUMERIC','larger'),
+(25,'cinnamon','Determines maximum level of Vibes.','vibes','Ci','NUMERIC','larger'),
+(26,'pressurization','Determines minimum level of Vibes.  Also part of Soulscream formula.','vibes','Pr','NUMERIC','larger'),
+(27,'fate','Unknown; appears to re-roll for most (but not all) stat, modification or Feedback changes.',NULL, NULL,'INTEGER','See taxonomy'),
+(28,'peanut_allergy','Determines whether a peanut interaction affects player positively or negatively.',NULL, NULL,'BOOLEAN',''),
+(29,'soul','Determines length of Soulscream/Soulsong; only has changed for one player once (Chorby Soul, which results in broken Soulscream).',NULL, NULL,'INTEGER','See taxonomy'),
+(30,'total_fingers','Represents instances of change to pitching stats. Players impacted by general stat buffs all receive +1 finger, regardless of the size of their buff. EPT seems to not grant fingers.',NULL, NULL,'INTEGER','See taxonomy');
 
 --
 -- Data for Name: blood; Type: TABLE DATA; Schema: taxa; Owner: -

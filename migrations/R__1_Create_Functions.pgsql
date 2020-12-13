@@ -1,5 +1,4 @@
 ﻿DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
-DROP FUNCTION IF EXISTS data.gamestate_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.timestamp_from_gameday(in_season integer, in_gameday integer) CASCADE;
 DROP FUNCTION IF EXISTS data.teams_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.team_slug_creation() CASCADE;
@@ -37,34 +36,6 @@ DROP FUNCTION IF EXISTS data.baserunning_rating_raw(in_laserlikeness numeric, in
 DROP FUNCTION IF EXISTS data.baserunning_rating(in_player_id character varying, in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.bankers_round(in_val numeric, in_prec integer) CASCADE;
 
---
--- Name: data.gamestate_from_timestamp(in_timestamp timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
---
-CREATE OR REPLACE FUNCTION data.gamestate_from_timestamp(in_timestamp timestamp without time zone) RETURNS varchar
-    LANGUAGE sql
-    AS $$
-SELECT 
-CASE
-	WHEN phase_type IN ('END_REGULAR_SEASON','END_POSTSEASON','ELECTION_RESULTS','PRESEASON','BOSS_FIGHT')
-	THEN 'Season: ' || season || ', ' || phase_type
-	WHEN phase_type IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT') 
-	THEN 'Tournament: Coffee Cup, ' || phase_type
-	WHEN phase_type IN ('TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON')
-	THEN 'Tournament: Coffee Cup, Game: ' || day
-	ELSE 'Season: ' || season || ', Game: ' || day
-END AS gamestate
-FROM DATA.time_map tm
-JOIN taxa.phases xp
-ON (tm.phase_id = xp.phase_id)
-LEFT JOIN taxa.tournaments xt
-ON (tm.season = xt.tournament_id)
-WHERE first_time = 
-(
-	SELECT max(first_time)
-	FROM data.time_map 
-	WHERE first_time < in_timestamp
-);
-$$;
 --
 -- Name: round_half_even(numeric, integer); Type: FUNCTION; Schema: data; Owner: -
 --
@@ -767,13 +738,13 @@ $$;
 CREATE FUNCTION data.refresh_matviews() RETURNS void
     LANGUAGE sql SECURITY DEFINER
     AS $$
+REFRESH MATERIALIZED VIEW data.player_debuts;
 REFRESH MATERIALIZED VIEW data.players_info_expanded_all;
 REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
 REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
 REFRESH MATERIALIZED VIEW data.running_stats_all_events;
 REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
-REFRESH MATERIALIZED VIEW data.player_debuts;
 $$;
 --
 -- Name: rosters_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
