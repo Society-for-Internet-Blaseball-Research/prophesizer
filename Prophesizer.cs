@@ -540,8 +540,7 @@ namespace SIBR
 					m_processor.GameComplete -= Processor_GameComplete;
 
 					Console.WriteLine($"  Processed {page.Data.Count()} updates (through {page.Data.Last().Timestamp}).\n  Inserting {m_eventsToInsert.Count()} game events and {m_pitcherResults.Count()} pitching results...");
-					//Console.WriteLine($"    {m_processor.NumNetworkOutcomes} games used the network outcomes.json file, {m_processor.NumLocalOutcomes} did not.");
-					//await PersistTimeMap(m_eventsToInsert, psqlConnection);
+
 					// Process any game events we received
 					while (m_eventsToInsert.Count > 0)
 					{
@@ -1532,31 +1531,84 @@ namespace SIBR
 			insertGameStatement.Parameters.AddWithValue("rules_id", game.rules);
 			insertGameStatement.Parameters.AddWithValue("statsheet_id", game.statsheet);
 			insertGameStatement.Parameters.AddWithValue("tournament", game.tournament);
-			//insertGameStatement.Prepare();
 			return insertGameStatement;
+		}
+
+		private NpgsqlCommand UpdateGameCommand(NpgsqlConnection psqlConnection, Game game, string winPitcher, string losePitcher)
+		{
+			var updateGameStatement = new NpgsqlCommand(@"
+            UPDATE data.games SET
+            (
+                day, season, home_odds, away_odds, weather, is_postseason, series_index, series_length,
+                home_team, away_team, home_score, away_score, number_of_innings, ended_on_top_of_inning, ended_in_shame,
+                terminology_id, rules_id, statsheet_id, tournament, outcomes, winning_pitcher_id, losing_pitcher_id
+            )
+            =
+            (
+                @day, @season, @home_odds, @away_odds, @weather, @is_postseason, @series_index, @series_length,
+                @home_team, @away_team, @home_score, @away_score, @number_of_innings, @ended_on_top_of_inning, @ended_in_shame,
+                @terminology_id, @rules_id, @statsheet_id, @tournament, @outcomes, @winPitcher, @losePitcher
+            )
+			WHERE game_id = @game_id;
+            ", psqlConnection);
+
+			updateGameStatement.Parameters.AddWithValue("game_id", game.gameId);
+			updateGameStatement.Parameters.AddWithValue("day", game.day);
+			updateGameStatement.Parameters.AddWithValue("season", game.season);
+			updateGameStatement.Parameters.AddWithValue("home_odds", game.homeOdds);
+			updateGameStatement.Parameters.AddWithValue("away_odds", game.awayOdds);
+			updateGameStatement.Parameters.AddWithValue("weather", game.weather.HasValue ? game.weather.Value : -1);
+			updateGameStatement.Parameters.AddWithValue("is_postseason", game.isPostseason);
+			updateGameStatement.Parameters.AddWithValue("series_index", game.seriesIndex);
+			updateGameStatement.Parameters.AddWithValue("series_length", game.seriesLength);
+			updateGameStatement.Parameters.AddWithValue("home_team", game.homeTeam);
+			updateGameStatement.Parameters.AddWithValue("away_team", game.awayTeam);
+			updateGameStatement.Parameters.AddWithValue("home_score", game.homeScore);
+			updateGameStatement.Parameters.AddWithValue("away_score", game.awayScore);
+			updateGameStatement.Parameters.AddWithValue("number_of_innings", game.inning);
+			updateGameStatement.Parameters.AddWithValue("ended_on_top_of_inning", game.topOfInning);
+			updateGameStatement.Parameters.AddWithValue("ended_in_shame", game.shame);
+			updateGameStatement.Parameters.AddWithValue("terminology_id", game.terminology);
+			updateGameStatement.Parameters.AddWithValue("rules_id", game.rules);
+			updateGameStatement.Parameters.AddWithValue("statsheet_id", game.statsheet);
+			updateGameStatement.Parameters.AddWithValue("tournament", game.tournament);
+			updateGameStatement.Parameters.AddWithValue("outcomes", game.outcomes);
+			updateGameStatement.Parameters.AddWithValue("winPitcher", winPitcher);
+			updateGameStatement.Parameters.AddWithValue("losePitcher", losePitcher);
+
+			return updateGameStatement;
 		}
 
 		private async Task PersistPitcherResults(NpgsqlConnection psqlConnection, string gameId, string winPitcher, string losePitcher, GameEvent lastEvent)
 		{
-			using (var updateCommand = new NpgsqlCommand(@"
-        UPDATE data.games SET 
-			winning_pitcher_id=@winPitcher, 
-			losing_pitcher_id=@losePitcher,
-			home_score=@homeScore,
-			away_score=@awayScore,
-			number_of_innings=@numInnings
-        WHERE game_id=@gameId",
-			  psqlConnection))
-			{
-				updateCommand.Parameters.AddWithValue("winPitcher", winPitcher);
-				updateCommand.Parameters.AddWithValue("losePitcher", losePitcher);
-				updateCommand.Parameters.AddWithValue("gameId", gameId);
-				updateCommand.Parameters.AddWithValue("homeScore", lastEvent.homeScore);
-				updateCommand.Parameters.AddWithValue("awayScore", lastEvent.awayScore);
-				updateCommand.Parameters.AddWithValue("numInnings", lastEvent.inning);
+			var game = await GetGameById(gameId);
 
-				await updateCommand.ExecuteNonQueryAsync();
+			var updateCmd = UpdateGameCommand(psqlConnection, game, winPitcher, losePitcher);
+
+			await updateCmd.ExecuteNonQueryAsync();
+		}
+
+		private async Task<Game> GetGameById(string id)
+		{
+			JsonSerializerOptions options = new JsonSerializerOptions();
+			options.IgnoreNullValues = true;
+
+			string query = $"gameById/{id}";
+
+			HttpResponseMessage response = await m_blaseballClient.GetAsync(query);
+
+			if (response.IsSuccessStatusCode)
+			{
+
+				string strResponse = await response.Content.ReadAsStringAsync();
+				return JsonSerializer.Deserialize<Game>(strResponse, options);
 			}
+			else
+			{
+				Console.WriteLine($"Got response {response.StatusCode} from {response.RequestMessage.RequestUri}!");
+			}
+
+			return null;
 		}
 
 		private async Task<IEnumerable<Game>> GetGames(int season, int day, int tournament = -1)
