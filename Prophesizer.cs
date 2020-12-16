@@ -757,7 +757,8 @@ namespace SIBR
 					is_last_event_for_plate_appearance, bases_hit, runs_batted_in, is_sacrifice_hit,
 					is_sacrifice_fly, outs_on_play, is_double_play, is_triple_play, is_wild_pitch,
 					batted_ball_type, is_bunt, errors_on_play, batter_base_after_play, is_last_game_event,
-					event_text, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list, tournament
+					event_text, season, day, parsing_error, parsing_error_list, fixed_error, fixed_error_list, tournament,
+					home_base_count, away_base_count, home_ball_count, away_ball_count
 				)FROM STDIN (FORMAT BINARY)"))
 			{
 				foreach(var ge in gameEvents)
@@ -822,6 +823,10 @@ namespace SIBR
 					writer.Write(ge.fixedError);
 					writer.Write(ge.fixedErrorList);
 					writer.Write(ge.tournament, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.homeBaseCount, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.awayBaseCount, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.homeBallCount, NpgsqlTypes.NpgsqlDbType.Integer);
+					writer.Write(ge.awayBallCount, NpgsqlTypes.NpgsqlDbType.Integer);
 
 					m_gameEventId++;
 				}
