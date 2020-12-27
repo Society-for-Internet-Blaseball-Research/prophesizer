@@ -1,12 +1,16 @@
 ﻿DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_season CASCADE;
+DROP VIEW IF EXISTS data.running_stats_player_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_lifetime CASCADE;
+DROP VIEW IF EXISTS data.running_stats_player_playoffs_lifetime CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events CASCADE;
 DROP VIEW IF EXISTS data.rosters_extended_current CASCADE;
 DROP VIEW IF EXISTS data.rosters_current CASCADE;
 DROP VIEW IF EXISTS data.players_extended_current CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_season CASCADE;
+DROP VIEW IF EXISTS data.pitching_stats_player_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_lifetime CASCADE;
+DROP VIEW IF EXISTS data.pitching_stats_player_playoffs_lifetime CASCADE;
 DROP VIEW IF EXISTS data.pitching_records_player_single_game CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_all_appearances CASCADE;
 DROP VIEW IF EXISTS data.fielder_stats_season CASCADE;
@@ -1398,6 +1402,56 @@ CREATE VIEW data.batting_stats_player_lifetime AS
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((NOT a.is_postseason) AND (a.season > 0))
   GROUP BY a.player_id, p.player_name;
+  
+--
+-- Name: batting_stats_player_playoffs_lifetime; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW data.batting_stats_player_playoffs_lifetime AS
+ SELECT p.player_name,
+    a.player_id,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
+        END AS batting_average,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+        END AS on_base_percentage,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.slugging(sum(a.total_bases), sum(a.at_bat))
+        END AS slugging,
+    sum(a.plate_appearance) AS plate_appearances,
+    sum(a.at_bat) AS at_bats,
+    sum(a.hit) AS hits,
+    sum(a.walk) AS walks,
+    sum(a.single) AS singles,
+    sum(a.double) AS doubles,
+    sum(a.triple) AS triples,
+    sum(a.home_run) AS home_runs,
+    sum(a.runs_batted_in) AS runs_batted_in,
+    sum(a.strikeout) AS strikeouts,
+    sum(a.sacrifice) AS sacrifices,
+    sum(a.at_bat_risp) AS at_bats_risp,
+    sum(a.hits_risp) AS hits_risps,
+        CASE
+            WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
+            ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
+        END AS batting_average_risp,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+        END AS on_base_slugging,
+    sum(a.total_bases) AS total_bases,
+    sum(a.hbp) AS hbps,
+    sum(a.ground_out) AS ground_outs,
+    sum(a.flyout) AS flyouts,
+    sum(a.gidp) AS gidps
+   FROM (data.batting_stats_all_events a
+     JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+  WHERE ((a.is_postseason) AND (a.season > 0))
+  GROUP BY a.player_id, p.player_name;
+
 --
 -- Name: batting_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
 --
@@ -1784,7 +1838,8 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
-    sum(p.pitch_count) AS pitch_count,
+ 	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+	sum(p.pitch_count) AS pitch_count,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
     round(floor(sum(p.outs_recorded) / 3::numeric) + mod(sum(p.outs_recorded), 3::numeric) / 10::numeric, 1) AS innings,
@@ -1808,7 +1863,11 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
     round(9::numeric * sum(p.walks) / (sum(p.outs_recorded) / 3::numeric), 2) AS bb_per_9,
     round(9::numeric * sum(p.hits_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hits_per_9,
     round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS k_per_9,
-    round(9::numeric * sum(p.hrs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9
+    round(9::numeric * sum(p.hrs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9,
+	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	case
+		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
+	end AS k_bb
    FROM data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON a.player_id::text = p.player_id::text AND a.valid_until IS NULL
   WHERE p.season < 0
@@ -1923,6 +1982,7 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
+	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
     sum(p.pitch_count) AS pitch_count,
     sum(p.outs_recorded) AS outs_recorded,
     round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
@@ -1946,11 +2006,59 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
     round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS bb_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9
+    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	case
+		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
+	end AS k_bb
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
   GROUP BY a.player_name, p.player_id;
+  
+--
+-- Name: pitching_stats_player_playoffs_lifetime; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW data.pitching_stats_player_playoffs_lifetime AS
+ SELECT a.player_name,
+    p.player_id,
+    count(1) AS games,
+    sum(p.win) AS wins,
+    sum(p.loss) AS losses,
+	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+    sum(p.pitch_count) AS pitch_count,
+    sum(p.outs_recorded) AS outs_recorded,
+    round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
+    sum(p.runs_allowed) AS runs_allowed,
+    sum(
+        CASE
+            WHEN (p.runs_allowed = (0)::numeric) THEN 1
+            ELSE 0
+        END) AS shutouts,
+    sum(
+        CASE
+            WHEN ((p.runs_allowed < (4)::numeric) AND (p.outs_recorded > 18)) THEN 1
+            ELSE 0
+        END) AS quality_starts,
+    sum(p.strikeouts) AS strikeouts,
+    sum(p.walks) AS walks,
+    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.hits_allowed) AS hits_allowed,
+    sum(p.hit_by_pitches) AS hpbs,
+    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS era,
+    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS bb_per_9,
+    round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
+    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
+    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	case
+		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
+	end AS k_bb
+   FROM (data.pitching_stats_all_appearances p
+     JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
+  WHERE ((p.is_postseason) AND (p.season > 0))
+  GROUP BY a.player_name, p.player_id;
+  
 --
 -- Name: pitching_stats_player_season; Type: VIEW; Schema: data; Owner: -
 --
@@ -1962,6 +2070,7 @@ CREATE VIEW data.pitching_stats_player_season AS
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
+	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
     sum(p.pitch_count) AS pitch_count,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
@@ -1986,10 +2095,60 @@ CREATE VIEW data.pitching_stats_player_season AS
     round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS bb_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9
+    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	case
+		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
+	end AS k_bb
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
+  GROUP BY a.player_name, p.player_id, p.season, p.team_id;
+
+--
+-- Name: pitching_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW data.pitching_stats_player_playoffs_season AS
+ SELECT a.player_name,
+    p.player_id,
+    p.season,
+    p.team_id,
+    count(1) AS games,
+    sum(p.win) AS wins,
+    sum(p.loss) AS losses,
+	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+    sum(p.pitch_count) AS pitch_count,
+    sum(p.batters_faced) AS batters_faced,
+    sum(p.outs_recorded) AS outs_recorded,
+    round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
+    sum(p.runs_allowed) AS runs_allowed,
+    sum(
+        CASE
+            WHEN (p.runs_allowed = (0)::numeric) THEN 1
+            ELSE 0
+        END) AS shutouts,
+    sum(
+        CASE
+            WHEN ((p.runs_allowed < (4)::numeric) AND (p.outs_recorded > 18)) THEN 1
+            ELSE 0
+        END) AS quality_starts,
+    sum(p.strikeouts) AS strikeouts,
+    sum(p.walks) AS walks,
+    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.hits_allowed) AS hits_allowed,
+    sum(p.hit_by_pitches) AS hbps,
+    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS era,
+    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS bb_per_9,
+    round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
+    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
+    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	case
+		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
+	end AS k_bb
+   FROM (data.pitching_stats_all_appearances p
+     JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
+  WHERE ((p.is_postseason) AND (p.season > 0))
   GROUP BY a.player_name, p.player_id, p.season, p.team_id;
 
 --
@@ -2063,6 +2222,7 @@ CREATE MATERIALIZED VIEW data.running_stats_all_events AS
      JOIN data.game_events ge ON ((geb.game_event_id = ge.id)))
      JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
   WITH NO DATA;
+  
 --
 -- Name: running_stats_player_lifetime; Type: VIEW; Schema: data; Owner: -
 --
@@ -2076,6 +2236,21 @@ CREATE VIEW data.running_stats_player_lifetime AS
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((rs.day < 99) AND (rs.season > 0))
   GROUP BY rs.player_id, p.player_name;
+  
+--
+-- Name: running_stats_player_playoffs_lifetime; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW data.running_stats_player_playoffs_lifetime AS
+ SELECT rs.player_id,
+    p.player_name,
+    sum(rs.was_base_stolen) AS stolen_bases,
+    sum(rs.was_caught_stealing) AS caught_stealing,
+    sum(rs.runner_scored) AS runs
+   FROM (data.running_stats_all_events rs
+     JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+  WHERE ((rs.day > 98) AND (rs.season > 0))
+  GROUP BY rs.player_id, p.player_name;  
+  
 --
 -- Name: running_stats_player_season; Type: VIEW; Schema: data; Owner: -
 --
@@ -2091,6 +2266,21 @@ CREATE VIEW data.running_stats_player_season AS
   WHERE ((rs.day < 99) AND (rs.season > 0))
   GROUP BY rs.player_id, rs.season, p.player_name;
 
+--
+-- Name: running_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW data.running_stats_player_playoffs_season AS
+ SELECT rs.player_id,
+    p.player_name,
+    rs.season,
+    sum(rs.was_base_stolen) AS stolen_bases,
+    sum(rs.was_caught_stealing) AS caught_stealing,
+    sum(rs.runner_scored) AS runs
+   FROM (data.running_stats_all_events rs
+     JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+  WHERE ((rs.day > 98) AND (rs.season > 0))
+  GROUP BY rs.player_id, rs.season, p.player_name;
+  
 --
 -- Name: running_stats_player_tournament_lifetime; Type: VIEW; Schema: data; Owner: -
 --
