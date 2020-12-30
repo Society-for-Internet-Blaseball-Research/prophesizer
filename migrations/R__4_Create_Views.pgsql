@@ -34,6 +34,7 @@ DROP VIEW IF EXISTS data.batting_records_player_playoffs_single_game CASCADE;
 DROP VIEW IF EXISTS data.batting_records_player_playoffs_season CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.players_info_expanded_all CASCADE;
 DROP VIEW IF EXISTS data.player_status_flags CASCADE;
+DROP VIEW IF EXISTS data.player_incinerations CASCADE;
 DROP VIEW IF EXISTS data.teams_info_expanded_all CASCADE;
 DROP VIEW IF EXISTS data.batting_records_league_season CASCADE;
 DROP VIEW IF EXISTS data.batting_records_league_playoffs_season CASCADE;
@@ -464,6 +465,33 @@ END AS current_location
 FROM data.players p;
 
 --
+-- Name: player_incinerations; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+CREATE VIEW DATA.player_incinerations 
+AS
+
+	SELECT RIGHT(piece, LENGTH(piece) - cutpart) AS player_name, p.player_id,
+	game_id, season, DAY, tournament
+	FROM
+	(
+		SELECT game_id,
+		left(original_text, POSITION('! Replaced by' IN original_text)-1) AS piece,
+		CASE
+			WHEN POSITION(' hitter ' IN original_text) > 0
+			THEN POSITION(' hitter ' IN original_text) + 7
+			ELSE POSITION(' pitcher ' IN original_text) + 8
+		END AS cutpart,
+		season, DAY, tournament
+		FROM DATA.outcomes o
+		JOIN DATA.game_events ge
+		ON (o.game_event_id = ge.id)
+		WHERE o.event_type = 'INCINERATION'
+	) a
+	JOIN DATA.players p
+	ON (RIGHT(a.piece, LENGTH(a.piece) - a.cutpart) = p.player_name AND p.valid_until IS NULL)
+	ORDER BY tournament, season, DAY, player_name;
+
+--
 -- Name: players_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 
@@ -495,6 +523,8 @@ END AS valid_until,
     ( SELECT gd4.phase_type
            FROM data.gamephase_from_timestamp(ts.timestampd) gd4) AS phase_type_from,
 p.deceased,
+pi.season as incineration_season,
+pi.day as incineration_gameday,
 p.anticapitalism,
 p.base_thirst,
 p.buoyancy,
@@ -574,6 +604,7 @@ JOIN data.players p ON
 )
 JOIN data.player_status_flags ps ON (ts.player_id = ps.player_id)
 JOIN data.player_debuts pd ON (ts.player_id = pd.player_id)
+LEFT JOIN data.player_incinerations pi ON (ts.player_id = pi.player_id)
 LEFT JOIN 	  
 (
 	SELECT rt.team_id, rr.player_id, rr.position_type_id, rr.position_id, rr.valid_from, 
