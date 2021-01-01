@@ -470,26 +470,29 @@ FROM data.players p;
 CREATE VIEW DATA.player_incinerations 
 AS
 
-	SELECT RIGHT(piece, LENGTH(piece) - cutpart) AS player_name, p.player_id,
-	game_id, season, DAY, tournament
-	FROM
+	SELECT b.*, p.player_id FROM
 	(
-		SELECT game_id,
-		left(original_text, POSITION('! Replaced by' IN original_text)-1) AS piece,
+		SELECT season, DAY, tournament, phase_type,
 		CASE
-			WHEN POSITION(' hitter ' IN original_text) > 0
-			THEN POSITION(' hitter ' IN original_text) + 7
-			ELSE POSITION(' pitcher ' IN original_text) + 8
-		END AS cutpart,
-		season, DAY, tournament
-		FROM DATA.outcomes o
-		JOIN DATA.game_events ge
-		ON (o.game_event_id = ge.id)
-		WHERE o.event_type = 'INCINERATION'
-	) a
+			WHEN POSITION('hitter' IN outcome) > 0 
+			THEN right(left(outcome, POSITION('!' IN outcome) - 1),length(left(outcome, POSITION('!' IN outcome) - 1)) - POSITION('hitter' IN outcome) - 6)
+			ELSE right(left(outcome, POSITION('!' IN outcome) - 1),length(left(outcome, POSITION('!' IN outcome) - 1)) - POSITION('pitcher' IN outcome) - 7)
+		END AS player_name
+		FROM
+		(
+			SELECT game_id, ga.season, ga.DAY, ga.tournament, unnest(outcomes) AS outcome, 'GAMEDAY' AS phase_type
+			FROM DATA.games ga			
+		) a
+			WHERE 
+		--Needs 'Umpire ' to exclude Iffey Jr scenario
+		POSITION('Umpire incinerated' IN outcome) > 0
+	) b
 	JOIN DATA.players p
-	ON (RIGHT(a.piece, LENGTH(a.piece) - a.cutpart) = p.player_name AND p.valid_until IS NULL)
-	ORDER BY tournament, season, DAY, player_name;
+	ON (b.player_name = p.player_name AND p.valid_until IS NULL)
+	--Manually include S2 and Election Result Incinerations
+	UNION
+	SELECT * FROM  taxa.player_incinerations_unrecorded
+	ORDER BY season, DAY, player_name;
 
 --
 -- Name: players_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
@@ -525,6 +528,7 @@ END AS valid_until,
 p.deceased,
 pi.season as incineration_season,
 pi.day as incineration_gameday,
+pi.phase_type as incineration_phase,
 p.anticapitalism,
 p.base_thirst,
 p.buoyancy,
@@ -810,6 +814,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
             ELSE 'away'::text
         END AS ballfield,
     ge.season,
+	ge.day,
     ge.game_id,
     xe.plate_appearance,
     xe.at_bat,
@@ -1391,6 +1396,7 @@ CREATE VIEW data.batting_records_team_tournmament AS
 CREATE VIEW data.batting_stats_player_lifetime AS
  SELECT p.player_name,
     a.player_id,
+		count(distinct a.game_id) as appearances,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
@@ -1410,6 +1416,7 @@ CREATE VIEW data.batting_stats_player_lifetime AS
     sum(a.single) AS singles,
     sum(a.double) AS doubles,
     sum(a.triple) AS triples,
+    sum(a.quadruple) AS quadruples,
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
@@ -1440,6 +1447,8 @@ CREATE VIEW data.batting_stats_player_lifetime AS
 CREATE VIEW data.batting_stats_player_playoffs_lifetime AS
  SELECT p.player_name,
     a.player_id,
+	
+	count(distinct a.game_id) as appearances,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
@@ -1459,6 +1468,7 @@ CREATE VIEW data.batting_stats_player_playoffs_lifetime AS
     sum(a.single) AS singles,
     sum(a.double) AS doubles,
     sum(a.triple) AS triples,
+    sum(a.quadruple) AS quadruples,
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
@@ -1489,6 +1499,7 @@ CREATE VIEW data.batting_stats_player_playoffs_lifetime AS
 CREATE VIEW data.batting_stats_player_playoffs_season AS
  SELECT p.player_name,
     a.player_id,
+		count(distinct a.game_id) as appearances,
     (t.team_id)::character varying(36) AS team_id,
     t.nickname AS team,
     a.season,
@@ -1511,6 +1522,7 @@ CREATE VIEW data.batting_stats_player_playoffs_season AS
     sum(a.single) AS singles,
     sum(a.double) AS doubles,
     sum(a.triple) AS triples,
+    sum(a.quadruple) AS quadruples,
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
@@ -1544,6 +1556,8 @@ CREATE VIEW data.batting_stats_player_season AS
     (t.team_id)::character varying(36) AS team_id,
     t.nickname AS team,
     a.season,
+	count(distinct a.game_id) as appearances,
+	min(a.day) as first_appearance,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
@@ -1618,6 +1632,7 @@ CREATE VIEW data.batting_stats_player_tournament AS
     sum(a.single) AS singles,
     sum(a.double) AS doubles,
     sum(a.triple) AS triples,
+    sum(a.quadruple) AS quadruples,
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
@@ -1650,6 +1665,7 @@ CREATE VIEW data.batting_stats_player_tournament AS
 CREATE VIEW data.batting_stats_player_tournament_lifetime AS
  SELECT p.player_name,
     a.player_id,
+	count(distinct a.game_id) as appearances,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
@@ -1669,6 +1685,7 @@ CREATE VIEW data.batting_stats_player_tournament_lifetime AS
     sum(a.single) AS singles,
     sum(a.double) AS doubles,
     sum(a.triple) AS triples,
+    sum(a.quadruple) AS quadruples,
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,

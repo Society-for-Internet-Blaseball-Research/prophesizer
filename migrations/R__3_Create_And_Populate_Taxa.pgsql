@@ -29,6 +29,19 @@ DROP TABLE IF EXISTS taxa.tournaments CASCADE;
 DROP TABLE IF EXISTS taxa.tournament_teams CASCADE;
 DROP SEQUENCE IF EXISTS taxa.tournaments_tournament_db_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS taxa.tournament_teams_tournament_team_id_seq CASCADE;
+DROP TABLE IF EXISTS taxa.player_incinerations_unrecorded CASCADE;
+
+--
+-- Name: player_incinerations_unrecorded; Type: TABLE; Schema: taxa; Owner: -
+--
+CREATE TABLE taxa.player_incinerations_unrecorded (
+	season INTEGER NULL DEFAULT NULL,
+	"day" INTEGER NULL DEFAULT NULL,
+	tournament INTEGER NULL DEFAULT NULL,
+	phase VARCHAR NULL DEFAULT NULL,
+	player_name VARCHAR NULL DEFAULT NULL,
+	player_id VARCHAR(36) NULL DEFAULT NULL
+);
 
 --
 -- Name: event_types; Type: TABLE; Schema: taxa; Owner: -
@@ -1004,7 +1017,6 @@ ALTER TABLE ONLY taxa.event_types
 ALTER TABLE ONLY taxa.event_types
     ADD CONSTRAINT event_types_pkey PRIMARY KEY (event_type_id);
 
-
 --
 -- Data for Name: player_url_slugs; Type: TABLE DATA; Schema: taxa; Owner: -
 --
@@ -1025,3 +1037,26 @@ VALUES
 (13, 'ea44bd36-65b4-4f3b-ac71-78d87a540b48', 'wyatt-mason-13', 'Wyatt Mason'),
 (14, 'f741dc01-2bae-4459-bfc0-f97536193eea', 'wyatt-mason-14', 'Wyatt Mason'),
 (15, '80e474a3-7d2b-431d-8192-2f1e27162607', 'wyatt-mason-15', 'Wyatt Mason');
+
+INSERT INTO taxa.player_incinerations_unrecorded
+VALUES
+(1, 87, -1, 'GAMEDAY', 'Aldon Anthony', (SELECT distinct player_id from data.players where player_name = 'Aldon Anthony')),
+(1, 79, -1, 'GAMEDAY', 'Alexandria Dracaena', (SELECT distinct player_id from data.players where player_name = 'Alexandria Dracaena')),
+(1, 92, -1, 'GAMEDAY', 'Cedric Gonzalez', (SELECT distinct player_id from data.players where player_name = 'Cedric Gonzalez')),
+(1, 64, -1, 'GAMEDAY', 'Dickerson Greatness', (SELECT distinct player_id from data.players where player_name = 'Dickerson Greatness')),
+(1, 64, -1, 'GAMEDAY', 'Famous Oconnor', (SELECT distinct player_id from data.players where player_name = 'Famous Oconnor')),
+(1, 12, -1, 'GAMEDAY', 'Fitzgerald Massey', (SELECT distinct player_id from data.players where player_name = 'Fitzgerald Massey')),
+(1, 75, -1, 'GAMEDAY', 'Hurley Pacheco', (SELECT distinct player_id from data.players where player_name = 'Hurley Pacheco')),
+(1, 21, -1, 'GAMEDAY', 'Jenna Maldonado', (SELECT distinct player_id from data.players where player_name = 'Jenna Maldonado')),
+(1, 73, -1, 'GAMEDAY', 'Jessi Wise', (SELECT distinct player_id from data.players where player_name = 'Jessi Wise')),
+(1, 51, -1, 'GAMEDAY', 'Lars Mendoza', (SELECT distinct player_id from data.players where player_name = 'Lars Mendoza')),
+(1, 24, -1, 'GAMEDAY', 'Nora Perez', (SELECT distinct player_id from data.players where player_name = 'Nora Perez')),
+(1, 39, -1, 'GAMEDAY', 'Scrap Murphy', (SELECT distinct player_id from data.players where player_name = 'Scrap Murphy')),
+(1, 63, -1, 'GAMEDAY', 'Sosa Elftower', (SELECT distinct player_id from data.players where player_name = 'Sosa Elftower')),
+(1, 71, -1, 'GAMEDAY', 'Trevino Merritt', (SELECT distinct player_id from data.players where player_name = 'Trevino Merritt')),
+(1, 23, -1, 'GAMEDAY', 'Tyreek Olive', (SELECT distinct player_id from data.players where player_name = 'Tyreek Olive')),
+(1, 71, -1, 'GAMEDAY', 'Zi Delacruz', (SELECT distinct player_id from data.players where player_name = 'Zi Delacruz')),
+(7, NULL, -1, 'ELECTION_RESULTS', 'Ron Monstera','41949d4d-b151-4f46-8bf7-73119a48fac8'),
+(8, NULL, -1, 'ELECTION_RESULTS', 'August Mina','c17a4397-4dcc-440e-8c53-d897e971cae9'),
+(8, NULL, -1, 'ELECTION_RESULTS', 'Thomas Kirby','f73009c5-2ede-4dc4-b96d-84ba93c8a429'),
+(0, NULL, -1, 'ELECTION_RESULTS', 'Jaylen Hotdogfingers','04e14d7b-5021-4250-a3cd-932ba8e0a889');
