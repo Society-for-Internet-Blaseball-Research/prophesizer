@@ -88,7 +88,7 @@ $$;
 --
 -- Name: players_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone DEFAULT timezone('utc'::text, now())) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric, pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint, url_slug character varying)
+CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone DEFAULT timezone('utc'::text, now())) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric, pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint, url_slug character varying, tournament integer)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -437,7 +437,7 @@ $$;
 --
 -- Name: player_mods_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.player_mods_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(player_modifications_id integer, player_id character varying, modification character varying, valid_from timestamp without time zone, valid_until timestamp without time zone)
+CREATE FUNCTION data.player_mods_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(player_modifications_id integer, player_id character varying, modification character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, tournament integer)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -750,7 +750,7 @@ $$;
 --
 -- Name: rosters_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.rosters_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(team_roster_id integer, team_id character varying, position_id integer, valid_from timestamp without time zone, valid_until timestamp without time zone, player_id character varying, position_type_id numeric)
+CREATE FUNCTION data.rosters_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(team_roster_id integer, team_id character varying, position_id integer, valid_from timestamp without time zone, valid_until timestamp without time zone, player_id character varying, position_type_id numeric, tournament integer)
     LANGUAGE plpgsql
     AS $$
 begin
