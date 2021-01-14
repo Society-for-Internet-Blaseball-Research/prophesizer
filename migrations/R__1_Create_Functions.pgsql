@@ -740,6 +740,7 @@ CREATE FUNCTION data.refresh_matviews() RETURNS void
     AS $$
 REFRESH MATERIALIZED VIEW data.player_debuts;
 REFRESH MATERIALIZED VIEW data.players_info_expanded_all;
+REFRESH MATERIALIZED VIEW data.players_info_expanded_tourney;
 REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
 REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
