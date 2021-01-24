@@ -2752,7 +2752,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 		pa.home_runs_per_9,
 		pa.strikeouts_per_9,
 		pa.strikeouts_per_walk,
-		pa.bb_pct,
+		pa.walk_percentage,
 		pa.era_rank,
 		pa.bb9_rank,
 		pa.hits9_rank,
@@ -2765,7 +2765,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			SELECT x.player_id,
 			walks,
 			strikeouts,
-			ROUND(strikeouts/batters_faced,3) AS k_pct,
+			ROUND(strikeouts/batters_faced,3) AS strikeout_percentage,
 			runs_allowed,
 			hits_allowed,
 			home_runs_allowed,
@@ -2805,7 +2805,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			case
 				WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
 			end AS strikeouts_per_walk,			
-			ROUND(walks/batters_faced,3) AS bb_pct,
+			ROUND(walks/batters_faced,3) AS walk_percentage,
 			rank() OVER (ORDER BY earned_run_average) AS era_rank,
 			rank() OVER (ORDER BY walks_per_9) AS bb9_rank,
 			rank() OVER (ORDER BY hits_per_9) AS hits9_rank,
@@ -2822,9 +2822,9 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 	(
 		VALUES 
 		(a.walks, a.bb_rank, 'walks'),
-		(a.bb_pct, a.bbpct_rank, 'walk_percentage'),
+		(a.walk_percentage, a.bbpct_rank, 'walk_percentage'),
 		(a.strikeouts, a.k_rank, 'strikeouts'),
-		(a.k_pct, a.kpct_rank, 'strikeout_percentage'),
+		(a.strikeout_percentage, a.kpct_rank, 'strikeout_percentage'),
 		(a.runs_allowed, a.runs_rank, 'runs_allowed'),
 		(a.hits_allowed, a.hits_rank, 'hits_allowed'),
 		(a.home_runs_allowed, a.hrs_rank, 'home_runs_allowed'),
