@@ -323,6 +323,10 @@ lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS val
            FROM data.gamephase_from_timestamp(ts.timestampd) gd3) AS tournament_from,
     ( SELECT gd4.phase_type
            FROM data.gamephase_from_timestamp(ts.timestampd) gd4) AS phase_type_from,
+ta.team_main_color,
+ta.team_secondary_color,
+ta.team_slogan,
+ta.team_emoji,
 d.division_text AS division,
 d.division_id,
 l.league_text AS league,
@@ -362,7 +366,7 @@ JOIN data.teams t ON
 	AND t.valid_from <= ts.timestampd
 	AND ts.timestampd < COALESCE(t.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
 )
-LEFT JOIN taxa.team_abbreviations ta ON (ts.team_id = ta.team_id)
+LEFT JOIN taxa.team_additional_info ta ON (ts.team_id = ta.team_id)
 LEFT JOIN taxa.division_teams dt ON 
 (
 	ts.team_id = dt.team_id 
@@ -990,148 +994,166 @@ CREATE VIEW data.batting_records_player_season AS
 -- Name: batting_stats_all_events; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
- SELECT ge.batter_team_id,
-    ge.batter_id AS player_id,
-    ge.pitcher_team_id,
-    ge.pitcher_id,
-    ge.inning,
-        CASE
-            WHEN ge.top_of_inning THEN 'home'::text
-            ELSE 'away'::text
-        END AS ballfield,
-    ge.season,
+	SELECT ge.batter_team_id,
+	ge.batter_id AS player_id,
+	ge.pitcher_team_id,
+	ge.pitcher_id,
+	ge.inning,
+	CASE
+		WHEN ge.top_of_inning THEN 'home'
+		ELSE 'away'
+	END AS ballfield,
+	ge.season,
 	ge.day,
-    ge.game_id,
-    xe.plate_appearance,
-    xe.at_bat,
-        CASE
-            WHEN (ge.top_of_inning AND ((ge.away_base_count - COALESCE(geb.max_base_before, ge.away_base_count)) > 1)) THEN xe.at_bat
-            WHEN ((NOT ge.top_of_inning) AND ((ge.home_base_count - COALESCE(geb.max_base_before, ge.home_base_count)) > 1)) THEN xe.at_bat
-            ELSE 0
-        END AS at_bat_risp,
-        CASE
-            WHEN (ge.top_of_inning AND ((ge.away_base_count - COALESCE(geb.max_base_before, ge.away_base_count)) > 1)) THEN xe.hit
-            WHEN ((NOT ge.top_of_inning) AND ((ge.home_base_count - COALESCE(geb.max_base_before, ge.home_base_count)) > 1)) THEN xe.hit
-            ELSE 0
-        END AS hits_risp,
-    xe.hit,
-    xe.total_bases,
-    ge.runs_batted_in,
-        CASE
-            WHEN (ge.event_type = 'SINGLE'::text) THEN 1
-            ELSE 0
-        END AS single,
-        CASE
-            WHEN (ge.event_type = 'DOUBLE'::text) THEN 1
-            ELSE 0
-        END AS double,
-        CASE
-            WHEN (ge.event_type = 'TRIPLE'::text) THEN 1
-            ELSE 0
-        END AS triple,
-        CASE
-            WHEN (ge.event_type = 'QUADRUPLE'::text) THEN 1
-            ELSE 0
-        END AS quadruple,
-        CASE
-            WHEN (ge.event_type = ANY (ARRAY['HOME_RUN'::text, 'HOME_RUN_5'::text])) THEN 1
-            ELSE 0
-        END AS home_run,
-        CASE
-            WHEN (ge.event_type = ANY (ARRAY['WALK'::text, 'CHARM_WALK'::text])) THEN 1
-            ELSE 0
-        END AS walk,
-        CASE
-            WHEN (ge.event_type = ANY (ARRAY['STRIKEOUT'::text, 'CHARM_STRIKEOUT'::text])) THEN 1
-            ELSE 0
-        END AS strikeout,
-        CASE
-            WHEN (ge.event_type = 'SACRIFICE'::text) THEN 1
-            ELSE 0
-        END AS sacrifice,
-        CASE
-            WHEN (ge.event_type = 'HIT_BY_PITCH'::text) THEN 1
-            ELSE 0
-        END AS hbp,
-        CASE
-            WHEN ((ge.batted_ball_type = 'GROUNDER'::text) AND (ge.event_type = 'OUT'::text)) THEN 1
-            ELSE 0
-        END AS ground_out,
-        CASE
-            WHEN ((ge.batted_ball_type = 'FLY'::text) AND (ge.event_type = 'OUT'::text)) THEN 1
-            ELSE 0
-        END AS flyout,
-        CASE
-            WHEN ge.is_double_play THEN 1
-            ELSE 0
-        END AS gidp,
-    ga.is_postseason,
-    ga.weather AS weather_id
-   FROM (((data.game_events ge
-     JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
-     JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
-     LEFT JOIN ( SELECT max(game_event_base_runners.base_before_play) AS max_base_before,
-            game_event_base_runners.game_event_id
-           FROM data.game_event_base_runners
-          GROUP BY game_event_base_runners.game_event_id) geb ON ((ge.id = geb.game_event_id)))
-  WHERE (xe.plate_appearance = 1)
+	ge.game_id,
+	xe.plate_appearance,
+	xe.at_bat,
+	CASE
+		WHEN (ge.top_of_inning AND ((ge.away_base_count - COALESCE(geb.max_base_before, ge.away_base_count)) > 1)) THEN xe.at_bat
+		WHEN ((NOT ge.top_of_inning) AND ((ge.home_base_count - COALESCE(geb.max_base_before, ge.home_base_count)) > 1)) THEN xe.at_bat
+		ELSE 0
+		END AS at_bat_risp,
+	CASE
+		WHEN (ge.top_of_inning AND ((ge.away_base_count - COALESCE(geb.max_base_before, ge.away_base_count)) > 1)) THEN xe.hit
+		WHEN ((NOT ge.top_of_inning) AND ((ge.home_base_count - COALESCE(geb.max_base_before, ge.home_base_count)) > 1)) THEN xe.hit
+		ELSE 0
+	END AS hits_risp,
+	xe.hit,
+	xe.total_bases,
+	ge.runs_batted_in,
+	CASE
+		WHEN (ge.event_type = 'SINGLE') THEN 1
+		ELSE 0
+	END AS single,
+	CASE
+		WHEN (ge.event_type = 'DOUBLE') THEN 1
+		ELSE 0
+	END AS double,
+	CASE
+		WHEN (ge.event_type = 'TRIPLE') THEN 1
+		ELSE 0
+	END AS triple,
+	CASE
+		WHEN (ge.event_type = 'QUADRUPLE') THEN 1
+		ELSE 0
+	END AS quadruple,
+	CASE
+		WHEN (ge.event_type = ANY (ARRAY['HOME_RUN', 'HOME_RUN_5'])) THEN 1
+		ELSE 0
+	END AS home_run,
+	CASE
+		WHEN (ge.event_type = ANY (ARRAY['WALK', 'CHARM_WALK'])) THEN 1
+		ELSE 0
+	END AS walk,
+	CASE
+		WHEN (ge.event_type = ANY (ARRAY['STRIKEOUT', 'CHARM_STRIKEOUT'])) THEN 1
+		ELSE 0
+	END AS strikeout,
+	CASE
+		WHEN is_sacrifice_hit THEN 1
+		ELSE 0
+	END AS sacrifice_bunt,
+	CASE
+		WHEN is_sacrifice_fly THEN 1
+		ELSE 0
+	END AS sacrifice_fly,
+	CASE
+		WHEN (ge.event_type = 'HIT_BY_PITCH') THEN 1
+		ELSE 0
+	END AS hbp,
+	CASE
+		WHEN ((ge.batted_ball_type = 'GROUNDER') AND (ge.event_type = 'OUT')) THEN 1
+		ELSE 0
+	END AS ground_out,
+	CASE
+		WHEN ((ge.batted_ball_type = 'FLY') AND (ge.event_type = 'OUT')) THEN 1
+		ELSE 0
+	END AS flyout,
+	CASE
+		WHEN ge.is_double_play THEN 1
+		ELSE 0
+	END AS gidp,
+	ga.is_postseason,
+	CASE
+		WHEN POSITION(' is Inhabiting' IN event_text::TEXT) > 0 THEN 1
+		ELSE 0
+	END AS is_haunting,
+	ga.weather AS weather_id
+	FROM data.game_events ge
+	JOIN taxa.event_types xe 
+	ON (ge.event_type = xe.event_type)
+	JOIN data.games ga 
+	ON (ge.game_id = ga.game_id)
+	LEFT JOIN 
+	(
+		SELECT max(base_before_play) AS max_base_before,
+		game_event_id
+		FROM data.game_event_base_runners
+		GROUP BY game_event_id
+	) geb 
+	ON (ge.id = geb.game_event_id)
+	WHERE xe.plate_appearance = 1
   WITH NO DATA;
 --
 -- Name: batting_stats_player_single_game; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.batting_stats_player_single_game AS
- SELECT p.player_name,
-    a.player_id,
-    t.team_id,
-    t.nickname AS team,
-    a.game_id,
-    ga.season,
-    ga.day,
-    a.is_postseason,
-        CASE
-            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
-        END AS batting_average,
-        CASE
-            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
-        END AS on_base_percentage,
-        CASE
-            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.slugging(sum(a.total_bases), sum(a.at_bat))
-        END AS slugging,
-    sum(a.plate_appearance) AS plate_appearances,
-    sum(a.at_bat) AS at_bats,
-    sum(a.hit) AS hits,
-    sum(a.walk) AS walks,
-    sum(a.single) AS singles,
-    sum(a.double) AS doubles,
-    sum(a.triple) AS triples,
-    sum(a.quadruple) AS quadruples,
-    sum(a.home_run) AS home_runs,
-    sum(a.runs_batted_in) AS runs_batted_in,
-    sum(a.strikeout) AS strikeouts,
-    sum(a.sacrifice) AS sacrifices,
-    sum(a.at_bat_risp) AS at_bats_risp,
-    sum(a.hits_risp) AS hits_risps,
-        CASE
-            WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
-            ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
-        END AS batting_average_risp,
-        CASE
-            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
-        END AS on_base_slugging,
-    sum(a.total_bases) AS total_bases,
-    sum(a.hbp) AS hbps,
-    sum(a.ground_out) AS ground_outs,
-    sum(a.flyout) AS flyouts,
-    sum(a.gidp) AS gidps
-   FROM (((data.batting_stats_all_events a
-     JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
-     JOIN data.games ga ON (((a.game_id)::text = (ga.game_id)::text)))
-  GROUP BY a.player_id, a.is_postseason, p.player_name, a.game_id, t.nickname, t.team_id, ga.season, ga.day
+	SELECT p.player_name,
+	a.player_id,
+	t.team_id,
+	t.nickname AS team,
+	a.game_id,
+	ga.season,
+	ga.day,
+	a.is_postseason,
+	CASE
+		WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+		ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
+	END AS batting_average,
+	CASE
+		WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+		ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
+	END AS on_base_percentage,
+	CASE
+		WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+		ELSE data.slugging(sum(a.total_bases), sum(a.at_bat))
+	END AS slugging,
+	sum(a.plate_appearance) AS plate_appearances,
+	sum(a.at_bat) AS at_bats,
+	sum(a.hit) AS hits,
+	sum(a.walk) AS walks,
+	sum(a.single) AS singles,
+	sum(a.double) AS doubles,
+	sum(a.triple) AS triples,
+	sum(a.quadruple) AS quadruples,
+	sum(a.home_run) AS home_runs,
+	sum(a.runs_batted_in) AS runs_batted_in,
+	sum(a.strikeout) AS strikeouts,
+	sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
+	sum(a.at_bat_risp) AS at_bats_risp,
+	sum(a.hits_risp) AS hits_risp,
+	CASE
+		WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
+		ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
+	END AS batting_average_risp,
+	CASE
+		WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+		ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+	END AS on_base_slugging,
+	sum(a.total_bases) AS total_bases,
+	sum(a.hbp) AS hit_by_pitches,
+	sum(a.ground_out) AS ground_outs,
+	sum(a.flyout) AS flyouts,
+	sum(a.gidp) AS gidp
+	FROM data.batting_stats_all_events a
+	JOIN data.players_info_expanded_all p 
+	ON (a.player_id = p.player_id AND p.valid_until IS NULL)
+	JOIN data.teams_info_expanded_all t 
+	ON (a.batter_team_id = t.team_id AND t.valid_until IS NULL)
+	JOIN data.games ga 
+	ON (a.game_id = ga.game_id)
+	GROUP BY a.player_id, a.is_postseason, p.player_name, a.game_id, t.nickname, t.team_id, ga.season, ga.day
   WITH NO DATA;
 --
 -- Name: batting_records_player_single_game; Type: VIEW; Schema: data; Owner: -
@@ -1153,7 +1175,7 @@ CREATE VIEW data.batting_records_player_single_game AS
             x.team_id,
             x.team,
             x.game_id,
-            x.hits_risps,
+            x.hits_risp,
             x.walks,
             x.singles,
             x.doubles,
@@ -1163,9 +1185,10 @@ CREATE VIEW data.batting_records_player_single_game AS
             x.total_bases,
             x.hits,
             x.runs_batted_in,
-            x.sacrifices,
+            x.sacrifice_bunts,
+            x.sacrifice_flies,
             x.strikeouts,
-            rank() OVER (ORDER BY x.hits_risps DESC) AS hits_risp_rank,
+            rank() OVER (ORDER BY x.hits_risp DESC) AS hits_risp_rank,
             rank() OVER (ORDER BY x.walks DESC) AS bb_rank,
             rank() OVER (ORDER BY x.singles DESC) AS sng_rank,
             rank() OVER (ORDER BY x.doubles DESC) AS dbl_rank,
@@ -1175,10 +1198,27 @@ CREATE VIEW data.batting_records_player_single_game AS
             rank() OVER (ORDER BY x.quadruples DESC) AS qd_rank,
             rank() OVER (ORDER BY x.hits DESC) AS hits_rank,
             rank() OVER (ORDER BY x.runs_batted_in DESC) AS rbi_rank,
-            rank() OVER (ORDER BY x.sacrifices DESC) AS sac_rank,
+			rank() OVER (ORDER BY x.sacrifice_bunts DESC) AS sacbunts_rank,
+            rank() OVER (ORDER BY x.sacrifice_flies DESC) AS sacflies_rank,
             rank() OVER (ORDER BY x.strikeouts DESC) AS k_rank
            FROM data.batting_stats_player_single_game x) a
-     CROSS JOIN LATERAL ( VALUES (a.hits_risps,a.hits_risp_rank,'hits_risp'::text), (a.walks,a.bb_rank,'walks'::text), (a.singles,a.sng_rank,'singles'::text), (a.doubles,a.dbl_rank,'doubles'::text), (a.triples,a.trp_rank,'triples'::text), (a.quadruples,a.qd_rank,'quadruples'::text), (a.home_runs,a.hr_rank,'home_runs'::text), (a.total_bases,a.tb_rank,'total_bases'::text), (a.hits,a.hits_rank,'hits'::text), (a.runs_batted_in,a.rbi_rank,'runs_batted_in'::text), (a.sacrifices,a.sac_rank,'sacrifices'::text), (a.strikeouts,a.k_rank,'strikeouts'::text)) c(value, rank, stat))
+     CROSS JOIN LATERAL 
+	  (
+	  VALUES 
+	  (a.hits_risp,a.hits_risp_rank,'hits_risp'), 
+	  (a.walks,a.bb_rank,'walks'), 
+	  (a.singles,a.sng_rank,'singles'), 
+	  (a.doubles,a.dbl_rank,'doubles'), 
+	  (a.triples,a.trp_rank,'triples'), 
+	  (a.quadruples,a.qd_rank,'quadruples'), 
+	  (a.home_runs,a.hr_rank,'home_runs'), 
+	  (a.total_bases,a.tb_rank,'total_bases'), 
+	  (a.hits,a.hits_rank,'hits'), 
+	  (a.runs_batted_in,a.rbi_rank,'runs_batted_in'), 
+	  (a.sacrifice_bunts,a.sacbunts_rank,'sacrifice_bunts'), 
+	  (a.sacrifice_flies,a.sacflies_rank,'sacrifice_flies'), 
+	  (a.strikeouts,a.k_rank,'strikeouts')
+	  ) c(value, rank, stat))
   WHERE (c.rank = 1)
   ORDER BY c.stat, a.player_name;
 
@@ -1589,7 +1629,7 @@ CREATE VIEW data.batting_stats_player_lifetime AS
         END AS batting_average,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
         END AS on_base_percentage,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
@@ -1606,22 +1646,23 @@ CREATE VIEW data.batting_stats_player_lifetime AS
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
-    sum(a.sacrifice) AS sacrifices,
+    sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
     sum(a.at_bat_risp) AS at_bats_risp,
-    sum(a.hits_risp) AS hits_risps,
+    sum(a.hits_risp) AS hits_risp,
         CASE
             WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
         END AS batting_average_risp,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
         END AS on_base_slugging,
     sum(a.total_bases) AS total_bases,
-    sum(a.hbp) AS hbps,
+    sum(a.hbp) AS hit_by_pitches,
     sum(a.ground_out) AS ground_outs,
     sum(a.flyout) AS flyouts,
-    sum(a.gidp) AS gidps
+    sum(a.gidp) AS gidp
    FROM (data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((NOT a.is_postseason) AND (a.season > 0))
@@ -1641,7 +1682,7 @@ CREATE VIEW data.batting_stats_player_playoffs_lifetime AS
         END AS batting_average,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
         END AS on_base_percentage,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
@@ -1658,22 +1699,23 @@ CREATE VIEW data.batting_stats_player_playoffs_lifetime AS
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
-    sum(a.sacrifice) AS sacrifices,
+    sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
     sum(a.at_bat_risp) AS at_bats_risp,
-    sum(a.hits_risp) AS hits_risps,
+    sum(a.hits_risp) AS hits_risp,
         CASE
             WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
         END AS batting_average_risp,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
         END AS on_base_slugging,
     sum(a.total_bases) AS total_bases,
-    sum(a.hbp) AS hbps,
+    sum(a.hbp) AS hit_by_pitches,
     sum(a.ground_out) AS ground_outs,
     sum(a.flyout) AS flyouts,
-    sum(a.gidp) AS gidps
+    sum(a.gidp) AS gidp
    FROM (data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((a.is_postseason) AND (a.season > 0))
@@ -1695,7 +1737,7 @@ CREATE VIEW data.batting_stats_player_playoffs_season AS
         END AS batting_average,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
         END AS on_base_percentage,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
@@ -1712,22 +1754,23 @@ CREATE VIEW data.batting_stats_player_playoffs_season AS
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
-    sum(a.sacrifice) AS sacrifices,
+    sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
     sum(a.at_bat_risp) AS at_bats_risp,
-    sum(a.hits_risp) AS hits_risps,
+    sum(a.hits_risp) AS hits_risp,
         CASE
             WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
         END AS batting_average_risp,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
         END AS on_base_slugging,
     sum(a.total_bases) AS total_bases,
-    sum(a.hbp) AS hbps,
+    sum(a.hbp) AS hit_by_pitches,
     sum(a.ground_out) AS ground_outs,
     sum(a.flyout) AS flyouts,
-    sum(a.gidp) AS gidps
+    sum(a.gidp) AS gidp
    FROM ((data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
@@ -1750,7 +1793,7 @@ CREATE VIEW data.batting_stats_player_season AS
         END AS batting_average,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
         END AS on_base_percentage,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
@@ -1767,22 +1810,23 @@ CREATE VIEW data.batting_stats_player_season AS
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
-    sum(a.sacrifice) AS sacrifices,
+    sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
     sum(a.at_bat_risp) AS at_bats_risp,
-    sum(a.hits_risp) AS hits_risps,
+    sum(a.hits_risp) AS hits_risp,
         CASE
             WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
         END AS batting_average_risp,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
         END AS on_base_slugging,
     sum(a.total_bases) AS total_bases,
-    sum(a.hbp) AS hbps,
+    sum(a.hbp) AS hit_by_pitches,
     sum(a.ground_out) AS ground_outs,
     sum(a.flyout) AS flyouts,
-    sum(a.gidp) AS gidps
+    sum(a.gidp) AS gidp
    FROM ((data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
@@ -1805,7 +1849,7 @@ CREATE VIEW data.batting_stats_player_tournament AS
         END AS batting_average,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
         END AS on_base_percentage,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
@@ -1822,22 +1866,23 @@ CREATE VIEW data.batting_stats_player_tournament AS
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
-    sum(a.sacrifice) AS sacrifices,
+    sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
     sum(a.at_bat_risp) AS at_bats_risp,
-    sum(a.hits_risp) AS hits_risps,
+    sum(a.hits_risp) AS hits_risp,
         CASE
             WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
         END AS batting_average_risp,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
         END AS on_base_slugging,
     sum(a.total_bases) AS total_bases,
-    sum(a.hbp) AS hbps,
+    sum(a.hbp) AS hit_by_pitches,
     sum(a.ground_out) AS ground_outs,
     sum(a.flyout) AS flyouts,
-    sum(a.gidp) AS gidps
+    sum(a.gidp) AS gidp
    FROM ((data.batting_stats_all_events a
      JOIN data.players_info_expanded_tourney p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
@@ -1858,7 +1903,7 @@ CREATE VIEW data.batting_stats_player_tournament_lifetime AS
         END AS batting_average,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice))
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
         END AS on_base_percentage,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
@@ -1875,22 +1920,23 @@ CREATE VIEW data.batting_stats_player_tournament_lifetime AS
     sum(a.home_run) AS home_runs,
     sum(a.runs_batted_in) AS runs_batted_in,
     sum(a.strikeout) AS strikeouts,
-    sum(a.sacrifice) AS sacrifices,
+    sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
     sum(a.at_bat_risp) AS at_bats_risp,
-    sum(a.hits_risp) AS hits_risps,
+    sum(a.hits_risp) AS hits_risp,
         CASE
             WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
             ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
         END AS batting_average_risp,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
-            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
         END AS on_base_slugging,
     sum(a.total_bases) AS total_bases,
-    sum(a.hbp) AS hbps,
+    sum(a.hbp) AS hit_by_pitches,
     sum(a.ground_out) AS ground_outs,
     sum(a.flyout) AS flyouts,
-    sum(a.gidp) AS gidps
+    sum(a.gidp) AS gidp
    FROM (data.batting_stats_all_events a
      JOIN data.players_info_expanded_tourney p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE (a.season < 0)
@@ -2025,7 +2071,7 @@ CREATE MATERIALIZED VIEW data.pitching_stats_all_appearances AS
             WHEN ((ga.losing_pitcher_id)::text = (ge.pitcher_id)::text) THEN 1
             ELSE 0
         END AS loss,
-    sum(array_length(ge.pitches, 1)) AS pitch_count,
+    sum(array_length(ge.pitches, 1)) AS pitches_thrown,
     ge.top_of_inning,
     sum(ge.outs_on_play) AS outs_recorded,
     sum(ge.runs_batted_in) AS runs_allowed,
@@ -2043,7 +2089,7 @@ CREATE MATERIALIZED VIEW data.pitching_stats_all_appearances AS
         CASE
             WHEN (ge.event_type = ANY (ARRAY['HOME_RUN'::text, 'HOME_RUN_5'::text])) THEN 1
             ELSE 0
-        END) AS hrs_allowed,
+        END) AS home_runs_allowed,
     sum(
         CASE
             WHEN (ge.event_type = 'HIT_BY_PITCH'::text) THEN 1
@@ -2073,7 +2119,7 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
  	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
-	sum(p.pitch_count) AS pitch_count,
+	sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
     round(floor(sum(p.outs_recorded) / 3::numeric) + mod(sum(p.outs_recorded), 3::numeric) / 10::numeric, 1) AS innings,
@@ -2090,18 +2136,18 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
         END) AS quality_starts,
     sum(p.strikeouts) AS strikeouts,
     sum(p.walks) AS walks,
-    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.home_runs_allowed) AS home_runs_allowed,
     sum(p.hits_allowed) AS hits_allowed,
-    sum(p.hit_by_pitches) AS hbps,
-    round(9::numeric * sum(p.runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS era,
-    round(9::numeric * sum(p.walks) / (sum(p.outs_recorded) / 3::numeric), 2) AS bb_per_9,
+    sum(p.hit_by_pitches) AS hit_by_pitches,
+    round(9::numeric * sum(p.runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS earned_run_average,
+    round(9::numeric * sum(p.walks) / (sum(p.outs_recorded) / 3::numeric), 2) AS walks_per_9,
     round(9::numeric * sum(p.hits_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hits_per_9,
     round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS k_per_9,
-    round(9::numeric * sum(p.hrs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9,
+    round(9::numeric * sum(p.home_runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
-	end AS k_bb
+	end AS strikeouts_per_walk
    FROM data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_tourney a ON a.player_id::text = p.player_id::text AND a.valid_until IS NULL
   WHERE p.season < 0
@@ -2145,15 +2191,15 @@ CREATE VIEW data.pitching_records_player_single_game AS
             pitching_stats_all_appearances.day
            FROM data.pitching_stats_all_appearances
         UNION
-         SELECT rank() OVER (ORDER BY pitching_stats_all_appearances.pitch_count DESC) AS rank,
-            'pitch_count'::text AS event,
-            pitching_stats_all_appearances.pitch_count AS record,
+         SELECT rank() OVER (ORDER BY pitching_stats_all_appearances.pitches_thrown DESC) AS rank,
+            'pitches_thrown'::text AS event,
+            pitching_stats_all_appearances.pitches_thrown AS record,
             pitching_stats_all_appearances.player_id,
             pitching_stats_all_appearances.game_id,
             pitching_stats_all_appearances.season,
             pitching_stats_all_appearances.day
            FROM data.pitching_stats_all_appearances
-          WHERE (COALESCE(pitching_stats_all_appearances.pitch_count, (0)::bigint) > 0)
+          WHERE (COALESCE(pitching_stats_all_appearances.pitches_thrown, (0)::bigint) > 0)
         UNION
          SELECT rank() OVER (ORDER BY pitching_stats_all_appearances.runs_allowed DESC) AS rank,
             'runs_allowed'::text AS event,
@@ -2175,15 +2221,15 @@ CREATE VIEW data.pitching_records_player_single_game AS
            FROM data.pitching_stats_all_appearances
           WHERE (COALESCE(pitching_stats_all_appearances.walks, (0)::bigint) > 0)
         UNION
-         SELECT rank() OVER (ORDER BY pitching_stats_all_appearances.hrs_allowed DESC) AS rank,
-            'hrs_allowed'::text AS event,
-            pitching_stats_all_appearances.hrs_allowed AS record,
+         SELECT rank() OVER (ORDER BY pitching_stats_all_appearances.home_runs_allowed DESC) AS rank,
+            'home_runs_allowed'::text AS event,
+            pitching_stats_all_appearances.home_runs_allowed AS record,
             pitching_stats_all_appearances.player_id,
             pitching_stats_all_appearances.game_id,
             pitching_stats_all_appearances.season,
             pitching_stats_all_appearances.day
            FROM data.pitching_stats_all_appearances
-          WHERE (COALESCE(pitching_stats_all_appearances.hrs_allowed, (0)::bigint) > 0)
+          WHERE (COALESCE(pitching_stats_all_appearances.home_runs_allowed, (0)::bigint) > 0)
         UNION
          SELECT rank() OVER (ORDER BY pitching_stats_all_appearances.runs_allowed DESC) AS rank,
             'runs_allowed'::text AS event,
@@ -2217,7 +2263,7 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
 	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
-    sum(p.pitch_count) AS pitch_count,
+    sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
     round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
@@ -2234,18 +2280,18 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
         END) AS quality_starts,
     sum(p.strikeouts) AS strikeouts,
     sum(p.walks) AS walks,
-    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.home_runs_allowed) AS home_runs_allowed,
     sum(p.hits_allowed) AS hits_allowed,
     sum(p.hit_by_pitches) AS hpbs,
-    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS era,
-    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS bb_per_9,
+    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
+    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
-	end AS k_bb
+	end AS strikeouts_per_walk
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
@@ -2261,7 +2307,7 @@ CREATE VIEW data.pitching_stats_player_playoffs_lifetime AS
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
 	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
-    sum(p.pitch_count) AS pitch_count,
+    sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.outs_recorded) AS outs_recorded,
     round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
     sum(p.runs_allowed) AS runs_allowed,
@@ -2277,18 +2323,18 @@ CREATE VIEW data.pitching_stats_player_playoffs_lifetime AS
         END) AS quality_starts,
     sum(p.strikeouts) AS strikeouts,
     sum(p.walks) AS walks,
-    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.home_runs_allowed) AS home_runs_allowed,
     sum(p.hits_allowed) AS hits_allowed,
     sum(p.hit_by_pitches) AS hpbs,
-    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS era,
-    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS bb_per_9,
+    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
+    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
-	end AS k_bb
+	end AS strikeouts_per_walk
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((p.is_postseason) AND (p.season > 0))
@@ -2306,7 +2352,7 @@ CREATE VIEW data.pitching_stats_player_season AS
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
 	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
-    sum(p.pitch_count) AS pitch_count,
+    sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
     round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
@@ -2323,18 +2369,18 @@ CREATE VIEW data.pitching_stats_player_season AS
         END) AS quality_starts,
     sum(p.strikeouts) AS strikeouts,
     sum(p.walks) AS walks,
-    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.home_runs_allowed) AS home_runs_allowed,
     sum(p.hits_allowed) AS hits_allowed,
-    sum(p.hit_by_pitches) AS hbps,
-    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS era,
-    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS bb_per_9,
+    sum(p.hit_by_pitches) AS hit_by_pitches,
+    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
+    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
-	end AS k_bb
+	end AS strikeouts_per_walk
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
@@ -2352,7 +2398,7 @@ CREATE VIEW data.pitching_stats_player_playoffs_season AS
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
 	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
-    sum(p.pitch_count) AS pitch_count,
+    sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
     round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
@@ -2369,18 +2415,18 @@ CREATE VIEW data.pitching_stats_player_playoffs_season AS
         END) AS quality_starts,
     sum(p.strikeouts) AS strikeouts,
     sum(p.walks) AS walks,
-    sum(p.hrs_allowed) AS hrs_allowed,
+    sum(p.home_runs_allowed) AS home_runs_allowed,
     sum(p.hits_allowed) AS hits_allowed,
-    sum(p.hit_by_pitches) AS hbps,
-    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS era,
-    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS bb_per_9,
+    sum(p.hit_by_pitches) AS hit_by_pitches,
+    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
+    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.hrs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
-	end AS k_bb
+	end AS strikeouts_per_walk
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((p.is_postseason) AND (p.season > 0))
@@ -2556,7 +2602,7 @@ CREATE VIEW data.stars_team_all_current AS
   GROUP BY p.nickname, b.batting, b.running, b.defense, p.pitching
   ORDER BY (((b.batting + b.running) + b.defense) + p.pitching) DESC;
 
-  --
+--
 -- Name: batting_stats_all_events_indx_player_id; Type: INDEX; Schema: data; Owner: -
 --
 CREATE INDEX batting_stats_all_events_indx_player_id ON data.batting_stats_all_events USING btree (player_id);
@@ -2600,7 +2646,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_batting AS
 		from
 		(
 			SELECT x.player_id,
-			hits_risps,
+			hits_risp,
 			walks,
 			doubles,
 			triples,
@@ -2609,11 +2655,12 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_batting AS
 			total_bases,
 			hits,
 			runs_batted_in,
-			sacrifices,
+			sacrifice_bunts,
+			sacrifice_flies,
 			strikeouts,
-			hbps,
-			gidps,
-			rank() OVER (ORDER BY hits_risps DESC) AS hits_risp_rank,
+			hit_by_pitches,
+			gidp,
+			rank() OVER (ORDER BY hits_risp DESC) AS hits_risp_rank,
 			rank() OVER (ORDER BY walks DESC) AS bb_rank,
 			rank() OVER (ORDER BY doubles DESC) AS dbl_rank,
 			rank() OVER (ORDER BY triples DESC) AS trp_rank,
@@ -2622,10 +2669,11 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_batting AS
 			rank() OVER (ORDER BY quadruples DESC) AS qd_rank,
 			rank() OVER (ORDER BY hits DESC) AS hits_rank,
 			rank() OVER (ORDER BY runs_batted_in DESC) AS rbi_rank,
-			rank() OVER (ORDER BY sacrifices DESC) AS sac_rank,
+			rank() OVER (ORDER BY x.sacrifice_bunts DESC) AS sacbunts_rank,
+			rank() OVER (ORDER BY x.sacrifice_flies DESC) AS sacflies_rank,
 			rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
-			rank() OVER (ORDER BY hbps DESC) AS hbp_rank,
-			rank() OVER (ORDER BY gidps DESC) AS gidp_rank
+			rank() OVER (ORDER BY hit_by_pitches DESC) AS hbp_rank,
+			rank() OVER (ORDER BY gidp DESC) AS gidp_rank
 			FROM DATA.batting_stats_player_lifetime x
 		) b
 		LEFT JOIN
@@ -2663,7 +2711,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_batting AS
 		(a.slugging, a.slugging_rank, 'slugging'),
 		(a.batting_average,a.ba_rank,'batting_average'), 
 		(a.on_base_slugging,a.ops_rank,'on_base_slugging'),
-		(a.hits_risps,a.hits_risp_rank,'hits_risp'), 
+		(a.hits_risp,a.hits_risp_rank,'hits_risp'), 
 		(a.walks,a.bb_rank,'walks'), 
 		(a.doubles,a.dbl_rank,'doubles'), 
 		(a.triples,a.trp_rank,'triples'), 
@@ -2672,10 +2720,11 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_batting AS
 		(a.total_bases,a.tb_rank,'total_bases'), 
 		(a.hits,a.hits_rank,'hits'), 
 		(a.runs_batted_in,a.rbi_rank,'runs_batted_in'), 
-		(a.sacrifices,a.sac_rank,'sacrifices'), 
+		(a.sacrifice_bunts,a.sacbunts_rank,'sacrifice_bunts'), 
+		(a.sacrifice_flies,a.sacflies_rank,'sacrifice_flies'), 
 		(a.strikeouts,a.k_rank,'strikeouts'),
-		(a.hbps,a.hbp_rank,'hit_by_pitches'),
-		(a.gidps,a.gidp_rank,'gidp'),
+		(a.hit_by_pitches,a.hbp_rank,'hit_by_pitches'),
+		(a.gidp,a.gidp_rank,'gidp'),
 		(a.runs,a.runs_rank,'runs_scored'),
 		(a.stolen_bases,a.sb_rank,'stolen_bases'),
 		(a.caught_stealing,a.cs_rank,'caught_stealing')
@@ -2697,12 +2746,12 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 	FROM 
 	(
 		SELECT p.*,
-		pa.era,
-		pa.bb_per_9,
+		pa.earned_run_average,
+		pa.walks_per_9,
 		pa.hits_per_9,
 		pa.hr_per_9,
 		pa.k_per_9,
-		pa.k_bb,
+		pa.strikeouts_per_walk,
 		pa.bb_pct,
 		pa.era_rank,
 		pa.bb9_rank,
@@ -2719,9 +2768,9 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			ROUND(strikeouts/batters_faced,3) AS k_pct,
 			runs_allowed,
 			hits_allowed,
-			hrs_allowed,
+			home_runs_allowed,
 			innings,
-			pitch_count,
+			pitches_thrown,
 			hpbs,
 			wins,
 			losses,
@@ -2734,9 +2783,9 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			rank() OVER (ORDER BY round(strikeouts/batters_faced,3) DESC) AS kpct_rank,		
 			rank() OVER (ORDER BY runs_allowed DESC) AS runs_rank,
 			rank() OVER (ORDER BY hits_allowed DESC) AS hits_rank,
-			rank() OVER (ORDER BY hrs_allowed DESC) AS hrs_rank,
+			rank() OVER (ORDER BY home_runs_allowed DESC) AS hrs_rank,
 			rank() OVER (ORDER BY innings DESC) AS inn_rank,
-			rank() OVER (ORDER BY pitch_count DESC) AS ptch_rank,
+			rank() OVER (ORDER BY pitches_thrown DESC) AS ptch_rank,
 			rank() OVER (ORDER BY hpbs DESC) AS hbp_rank,
 			rank() OVER (ORDER BY wins DESC) AS win_rank,
 			rank() OVER (ORDER BY losses DESC) AS loss_rank,
@@ -2748,17 +2797,17 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 		LEFT JOIN
 		(
 			SELECT x.player_id,
-			era,
-			bb_per_9,
+			earned_run_average,
+			walks_per_9,
 			hits_per_9,
 			hr_per_9,
 			k_per_9,
 			case
 				WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
-			end AS k_bb,			
+			end AS strikeouts_per_walk,			
 			ROUND(walks/batters_faced,3) AS bb_pct,
-			rank() OVER (ORDER BY era) AS era_rank,
-			rank() OVER (ORDER BY bb_per_9) AS bb9_rank,
+			rank() OVER (ORDER BY earned_run_average) AS era_rank,
+			rank() OVER (ORDER BY walks_per_9) AS bb9_rank,
 			rank() OVER (ORDER BY hits_per_9) AS hits9_rank,
 			rank() OVER (ORDER BY hr_per_9) AS hr9_rank,
 			rank() OVER (ORDER BY k_per_9 DESC) AS k9_rank,
@@ -2778,20 +2827,20 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 		(a.k_pct, a.kpct_rank, 'strikeout_percentage'),
 		(a.runs_allowed, a.runs_rank, 'runs_allowed'),
 		(a.hits_allowed, a.hits_rank, 'hits_allowed'),
-		(a.hrs_allowed, a.hrs_rank, 'home_runs_allowed'),
+		(a.home_runs_allowed, a.hrs_rank, 'home_runs_allowed'),
 		(a.innings, a.inn_rank, 'innings'),
-		(a.pitch_count, a.ptch_rank, 'pitches_thrown'),
+		(a.pitches_thrown, a.ptch_rank, 'pitches_thrown'),
 		(a.hpbs, a.hbp_rank, 'hit_by_pitches'),
 		(a.wins, a.win_rank, 'wins'),
 		(a.losses, a.loss_rank, 'losses'),
 		(a.shutouts, a.shut_rank, 'shutouts'),
 		(a.quality_starts, a.qual_rank, 'quality_starts'),
-		(a.era, a.era_rank, 'earned_run_average'),
-		(a.bb_per_9, a.bb9_rank, 'walks_per_9'),
+		(a.earned_run_average, a.era_rank, 'earned_run_average'),
+		(a.walks_per_9, a.bb9_rank, 'walks_per_9'),
 		(a.hits_per_9, a.hits9_rank, 'hits_per_9'),
 		(a.hr_per_9, a.hr9_rank, 'home_runs_per_9'),
 		(a.k_per_9, a.k9_rank, 'strikeouts_per_9'),
-		(a.k_bb, a.kbb_rank, 'strikeouts_per_walk')
+		(a.strikeouts_per_walk, a.kbb_rank, 'strikeouts_per_walk')
 	) AS c(value, rank, stat)
 	JOIN data.players_info_expanded_all p ON (a.player_id = p.player_id AND p.valid_until IS NULL)
 	WHERE c.rank <= 10 
