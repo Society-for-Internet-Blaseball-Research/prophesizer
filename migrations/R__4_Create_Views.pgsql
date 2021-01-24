@@ -2142,8 +2142,8 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
     round(9::numeric * sum(p.runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS earned_run_average,
     round(9::numeric * sum(p.walks) / (sum(p.outs_recorded) / 3::numeric), 2) AS walks_per_9,
     round(9::numeric * sum(p.hits_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hits_per_9,
-    round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS k_per_9,
-    round(9::numeric * sum(p.home_runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hr_per_9,
+    round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS strikeouts_per_9,
+    round(9::numeric * sum(p.home_runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS home_runs_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
@@ -2282,12 +2282,12 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
     sum(p.walks) AS walks,
     sum(p.home_runs_allowed) AS home_runs_allowed,
     sum(p.hits_allowed) AS hits_allowed,
-    sum(p.hit_by_pitches) AS hpbs,
+    sum(p.hit_by_pitches) AS hit_by_pitches,
     round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
     round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
-    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
@@ -2325,12 +2325,12 @@ CREATE VIEW data.pitching_stats_player_playoffs_lifetime AS
     sum(p.walks) AS walks,
     sum(p.home_runs_allowed) AS home_runs_allowed,
     sum(p.hits_allowed) AS hits_allowed,
-    sum(p.hit_by_pitches) AS hpbs,
+    sum(p.hit_by_pitches) AS hit_by_pitches,
     round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
     round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
-    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
@@ -2375,8 +2375,8 @@ CREATE VIEW data.pitching_stats_player_season AS
     round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
     round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
-    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
@@ -2421,8 +2421,8 @@ CREATE VIEW data.pitching_stats_player_playoffs_season AS
     round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
     round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
-    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS k_per_9,
-    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hr_per_9,
+    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
 	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
@@ -2749,8 +2749,8 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 		pa.earned_run_average,
 		pa.walks_per_9,
 		pa.hits_per_9,
-		pa.hr_per_9,
-		pa.k_per_9,
+		pa.home_runs_per_9,
+		pa.strikeouts_per_9,
 		pa.strikeouts_per_walk,
 		pa.bb_pct,
 		pa.era_rank,
@@ -2771,7 +2771,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			home_runs_allowed,
 			innings,
 			pitches_thrown,
-			hpbs,
+			hit_by_pitches,
 			wins,
 			losses,
 			shutouts,
@@ -2786,7 +2786,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			rank() OVER (ORDER BY home_runs_allowed DESC) AS hrs_rank,
 			rank() OVER (ORDER BY innings DESC) AS inn_rank,
 			rank() OVER (ORDER BY pitches_thrown DESC) AS ptch_rank,
-			rank() OVER (ORDER BY hpbs DESC) AS hbp_rank,
+			rank() OVER (ORDER BY hit_by_pitches DESC) AS hbp_rank,
 			rank() OVER (ORDER BY wins DESC) AS win_rank,
 			rank() OVER (ORDER BY losses DESC) AS loss_rank,
 			rank() OVER (ORDER BY shutouts DESC) AS shut_rank,
@@ -2800,8 +2800,8 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			earned_run_average,
 			walks_per_9,
 			hits_per_9,
-			hr_per_9,
-			k_per_9,
+			home_runs_per_9,
+			strikeouts_per_9,
 			case
 				WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
 			end AS strikeouts_per_walk,			
@@ -2809,8 +2809,8 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			rank() OVER (ORDER BY earned_run_average) AS era_rank,
 			rank() OVER (ORDER BY walks_per_9) AS bb9_rank,
 			rank() OVER (ORDER BY hits_per_9) AS hits9_rank,
-			rank() OVER (ORDER BY hr_per_9) AS hr9_rank,
-			rank() OVER (ORDER BY k_per_9 DESC) AS k9_rank,
+			rank() OVER (ORDER BY home_runs_per_9) AS hr9_rank,
+			rank() OVER (ORDER BY strikeouts_per_9 DESC) AS k9_rank,
 			rank() OVER (ORDER BY CASE WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2) END DESC) AS kbb_rank,
 			rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank
 			FROM DATA.pitching_stats_player_lifetime x
@@ -2830,7 +2830,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 		(a.home_runs_allowed, a.hrs_rank, 'home_runs_allowed'),
 		(a.innings, a.inn_rank, 'innings'),
 		(a.pitches_thrown, a.ptch_rank, 'pitches_thrown'),
-		(a.hpbs, a.hbp_rank, 'hit_by_pitches'),
+		(a.hit_by_pitches, a.hbp_rank, 'hit_by_pitches'),
 		(a.wins, a.win_rank, 'wins'),
 		(a.losses, a.loss_rank, 'losses'),
 		(a.shutouts, a.shut_rank, 'shutouts'),
@@ -2838,8 +2838,8 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 		(a.earned_run_average, a.era_rank, 'earned_run_average'),
 		(a.walks_per_9, a.bb9_rank, 'walks_per_9'),
 		(a.hits_per_9, a.hits9_rank, 'hits_per_9'),
-		(a.hr_per_9, a.hr9_rank, 'home_runs_per_9'),
-		(a.k_per_9, a.k9_rank, 'strikeouts_per_9'),
+		(a.home_runs_per_9, a.hr9_rank, 'home_runs_per_9'),
+		(a.strikeouts_per_9, a.k9_rank, 'strikeouts_per_9'),
 		(a.strikeouts_per_walk, a.kbb_rank, 'strikeouts_per_walk')
 	) AS c(value, rank, stat)
 	JOIN data.players_info_expanded_all p ON (a.player_id = p.player_id AND p.valid_until IS NULL)
