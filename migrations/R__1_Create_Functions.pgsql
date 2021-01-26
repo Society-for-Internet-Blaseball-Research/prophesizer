@@ -486,10 +486,10 @@ begin
 	return query 
 SELECT 
 a.player_id, 
-p.player_name, 
-p.url_slug,
-p.team_id,
-p.team,
+a.player_name, 
+(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
+a.team_id,
+t.nickname AS team,
 c.*
 FROM 
 (
@@ -511,6 +511,8 @@ FROM
 	from
 	(
 		SELECT x.player_id,
+		x.player_name,
+		x.team_id,
 		season,
 		hits_risp,
 		walks,
@@ -600,13 +602,13 @@ CROSS JOIN LATERAL
 	(a.stolen_bases,a.sb_rank,'stolen_bases'),
 	(a.caught_stealing,a.cs_rank,'caught_stealing')
 ) AS c(value, rank, stat)
-JOIN data.players_info_expanded_all p ON (a.player_id = p.player_id 
+JOIN DATA.teams t
+ON (a.team_id = t.team_id AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
+	AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) >= t.valid_from
 AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
-	AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) >= p.valid_from
-AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
-	AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) <= p.valid_until)
+	AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) <= t.valid_until)
 WHERE c.rank <= 10 
-ORDER BY c.stat, c.rank, p.player_name;	
+ORDER BY c.stat, c.rank, a.player_name;	
 	end;
 $$;
 --
@@ -618,11 +620,12 @@ CREATE FUNCTION data.ref_leaderboard_season_pitching(in_season integer) RETURNS 
 begin
 	return query 
 SELECT 
+
 a.player_id, 
-p.player_name, 
-p.url_slug,
-p.team_id,
-p.team,
+a.player_name, 
+(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
+a.team_id,
+t.nickname AS team,
 c.*
 FROM 
 (
@@ -640,14 +643,16 @@ FROM
 	from
 	(
 		SELECT x.player_id,
+		x.player_name,
+		x.team_id,
 		season,
 		walks,
-		ROUND(walks/batters_faced,3) AS walk_percentage,
+		ROUND(walks/batters_faced,3) AS bb_pct,
 		strikeouts,
 		case
 			WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
 		end AS strikeouts_per_walk,
-		ROUND(strikeouts/batters_faced,3) AS strikeout_percentage,
+		ROUND(strikeouts/batters_faced,3) AS k_pct,
 		runs_allowed,
 		hits_allowed,
 		home_runs_allowed,
@@ -705,10 +710,10 @@ CROSS JOIN LATERAL
 (
 	VALUES 
 	(a.walks, a.bb_rank, 'walks'),
-	(a.walk_percentage, a.bbpct_rank, 'walk_percentage'),
+	(a.bb_pct, a.bbpct_rank, 'walk_percentage'),
 	(a.strikeouts, a.k_rank, 'strikeouts'),
 	(a.strikeouts_per_walk, a.kbb_rank, 'strikeouts_per_walk'),
-	(a.strikeout_percentage, a.kpct_rank, 'strikeout_percentage'),
+	(a.k_pct, a.kpct_rank, 'strikeout_percentage'),
 	(a.runs_allowed, a.runs_rank, 'runs_allowed'),
 	(a.hits_allowed, a.hits_rank, 'hits_allowed'),
 	(a.home_runs_allowed, a.hrs_rank, 'home_runs_allowed'),
@@ -725,13 +730,13 @@ CROSS JOIN LATERAL
 	(a.home_runs_per_9, a.hr9_rank, 'home_runs_per_9'),
 	(a.strikeouts_per_9, a.k9_rank, 'strikeouts_per_9')
 ) AS c(value, rank, stat)
-JOIN data.players_info_expanded_all p ON (a.player_id = p.player_id 
+JOIN DATA.teams t
+ON (a.team_id = t.team_id AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
+	AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) >= t.valid_from
 AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
-AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) >= p.valid_from
-AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
-AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) <= p.valid_until)
+	AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) <= t.valid_until)
 WHERE c.rank <= 10 
-ORDER BY c.stat, c.rank, p.player_name;	
+ORDER BY c.stat, c.rank, a.player_name;	
 	end;
 $$;
 
