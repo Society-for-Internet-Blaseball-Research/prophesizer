@@ -471,6 +471,7 @@ CASE
 END AS current_location
 FROM data.players p;
 
+
 --
 -- Name: player_incinerations; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
