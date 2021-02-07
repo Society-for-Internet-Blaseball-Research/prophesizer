@@ -58,7 +58,29 @@ namespace SIBR
 				numUpdates += result.NumUpdatesProcessed;
 				if ((hour > lastHour) || (hour==0 && lastHour == 23))
 				{
-					Prophesizer.ConsoleOrWebhook($"Processed {numUpdates} updates in the past hour. Last recorded game is {result.Latest.HumanReadable}.");
+					string[] goofs = new string[]
+					{
+						"\nI'm hungry.",
+						"\nI miss blaseball.",
+						"\nIs it time for the next Era yet?",
+						"\nAre we there yet?",
+						"\nSIBR are all love blaseball.",
+						"\nThe commissioner is doing a great job."
+					};
+
+					string g = "";
+
+					if (numUpdates == 0)
+					{
+						var r = new Random();
+						if (r.Next(100) < 10)
+						{
+							var i = r.Next(goofs.Length);
+							g = goofs[i];
+						}
+					}
+
+					Prophesizer.ConsoleOrWebhook($"Processed {numUpdates} updates in the past hour. Last recorded game is {result.Latest.HumanReadable}.{g}");
 					//Prophesizer.ConsoleOrWebhook($"    {prophesizer.NumNetworkOutcomes} games used the network outcomes.json file, {prophesizer.NumLocalOutcomes} did not.");
 					lastHour = hour;
 					numUpdates = 0;
