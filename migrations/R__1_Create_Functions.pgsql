@@ -486,10 +486,10 @@ begin
 	return query 
 SELECT 
 a.player_id, 
-p.player_name, 
-p.url_slug,
-p.team_id,
-p.team,
+a.player_name, 
+(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
+a.team_id,
+(SELECT nickname FROM DATA.teams_from_timestamp(DATA.timestamp_from_gameday(in_season,0)) tt WHERE tt.team_id = a.team_id) AS team,
 c.*
 FROM 
 (
@@ -511,8 +511,10 @@ FROM
 	from
 	(
 		SELECT x.player_id,
+		x.player_name,
+		x.team_id,
 		season,
-		hits_risps,
+		hits_risp,
 		walks,
 		doubles,
 		triples,
@@ -521,11 +523,12 @@ FROM
 		total_bases,
 		hits,
 		runs_batted_in,
-		sacrifices,
+		sacrifice_bunts,
+		sacrifice_flies,
 		strikeouts,
-		hbps,
-		gidps,
-		rank() OVER (ORDER BY hits_risps DESC) AS hits_risp_rank,
+		hit_by_pitches,
+		gidp,
+		rank() OVER (ORDER BY hits_risp DESC) AS hits_risp_rank,
 		rank() OVER (ORDER BY walks DESC) AS bb_rank,
 		rank() OVER (ORDER BY doubles DESC) AS dbl_rank,
 		rank() OVER (ORDER BY triples DESC) AS trp_rank,
@@ -534,10 +537,11 @@ FROM
 		rank() OVER (ORDER BY quadruples DESC) AS qd_rank,
 		rank() OVER (ORDER BY hits DESC) AS hits_rank,
 		rank() OVER (ORDER BY runs_batted_in DESC) AS rbi_rank,
-		rank() OVER (ORDER BY sacrifices DESC) AS sac_rank,
+		rank() OVER (ORDER BY x.sacrifice_bunts DESC) AS sacbunts_rank,
+        rank() OVER (ORDER BY x.sacrifice_flies DESC) AS sacflies_rank,
 		rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
-		rank() OVER (ORDER BY hbps DESC) AS hbp_rank,
-		rank() OVER (ORDER BY gidps DESC) AS gidp_rank
+		rank() OVER (ORDER BY hit_by_pitches DESC) AS hbp_rank,
+		rank() OVER (ORDER BY gidp DESC) AS gidp_rank
 		FROM DATA.batting_stats_player_season x
 		WHERE season = in_season
 	) b
@@ -580,7 +584,7 @@ CROSS JOIN LATERAL
 	(a.slugging, a.slugging_rank, 'slugging'),
 	(a.batting_average,a.ba_rank,'batting_average'), 
 	(a.on_base_slugging,a.ops_rank,'on_base_slugging'),
-	(a.hits_risps,a.hits_risp_rank,'hits_risp'), 
+	(a.hits_risp,a.hits_risp_rank,'hits_risp'), 
 	(a.walks,a.bb_rank,'walks'), 
 	(a.doubles,a.dbl_rank,'doubles'), 
 	(a.triples,a.trp_rank,'triples'), 
@@ -589,21 +593,17 @@ CROSS JOIN LATERAL
 	(a.total_bases,a.tb_rank,'total_bases'), 
 	(a.hits,a.hits_rank,'hits'), 
 	(a.runs_batted_in,a.rbi_rank,'runs_batted_in'), 
-	(a.sacrifices,a.sac_rank,'sacrifices'), 
+	(a.sacrifice_bunts,a.sacbunts_rank,'sacrifice_bunts'), 
+	(a.sacrifice_flies,a.sacflies_rank,'sacrifice_flies'),  
 	(a.strikeouts,a.k_rank,'strikeouts'),
-	(a.hbps,a.hbp_rank,'hit_by_pitches'),
-	(a.gidps,a.gidp_rank,'gidp'),
+	(a.hit_by_pitches,a.hbp_rank,'hit_by_pitches'),
+	(a.gidp,a.gidp_rank,'gidp'),
 	(a.runs,a.runs_rank,'runs_scored'),
 	(a.stolen_bases,a.sb_rank,'stolen_bases'),
 	(a.caught_stealing,a.cs_rank,'caught_stealing')
 ) AS c(value, rank, stat)
-JOIN data.players_info_expanded_all p ON (a.player_id = p.player_id 
-AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
-	AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) >= p.valid_from
-AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
-	AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) <= p.valid_until)
 WHERE c.rank <= 10 
-ORDER BY c.stat, c.rank, p.player_name;	
+ORDER BY c.stat, c.rank, a.player_name;	
 	end;
 $$;
 --
@@ -614,121 +614,120 @@ CREATE FUNCTION data.ref_leaderboard_season_pitching(in_season integer) RETURNS 
     AS $$
 begin
 	return query 
-SELECT 
-a.player_id, 
-p.player_name, 
-p.url_slug,
-p.team_id,
-p.team,
-c.*
-FROM 
-(
-	SELECT p.*,
-	pa.era,
-	pa.bb_per_9,
-	pa.hits_per_9,
-	pa.hr_per_9,
-	pa.k_per_9,
-	pa.era_rank,
-	pa.bb9_rank,
-	pa.hits9_rank,
-	pa.hr9_rank,
-	pa.k9_rank
-	from
+
+	SELECT 
+
+	a.player_id, 
+	a.player_name, 
+	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
+	a.team_id,
+	(SELECT nickname FROM DATA.teams_from_timestamp(DATA.timestamp_from_gameday(in_season,0)) tt WHERE tt.team_id = a.team_id) AS team,
+	c.*
+	FROM 
 	(
-		SELECT x.player_id,
-		season,
-		walks,
-		ROUND(walks/batters_faced,3) AS bb_pct,
-		strikeouts,
-		case
-			WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
-		end AS k_bb,
-		ROUND(strikeouts/batters_faced,3) AS k_pct,
-		runs_allowed,
-		hits_allowed,
-		hrs_allowed,
-		innings,
-		pitch_count,
-		hbps,
-		wins,
-		losses,
-		shutouts,
-		quality_starts,
-		ROUND((walks+hits_allowed)/innings,3) AS whip,
-		round(wins::DECIMAL/(wins::DECIMAL+losses::DECIMAL),3) AS win_pct,
-		rank() OVER (ORDER BY walks DESC) AS bb_rank,
-		rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank,		
-		rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
-		rank() OVER (ORDER BY CASE WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2) END DESC) AS kbb_rank,
-		rank() OVER (ORDER BY round(strikeouts/batters_faced,3) DESC) AS kpct_rank,		
-		rank() OVER (ORDER BY runs_allowed DESC) AS runs_rank,
-		rank() OVER (ORDER BY hits_allowed DESC) AS hits_rank,
-		rank() OVER (ORDER BY hrs_allowed DESC) AS hrs_rank,
-		rank() OVER (ORDER BY innings DESC) AS inn_rank,
-		rank() OVER (ORDER BY pitch_count DESC) AS ptch_rank,
-		rank() OVER (ORDER BY hbps DESC) AS hbp_rank,
-		rank() OVER (ORDER BY wins DESC) AS win_rank,
-		rank() OVER (ORDER BY losses DESC) AS loss_rank,
-		rank() OVER (ORDER BY shutouts DESC) AS shut_rank,
-		rank() OVER (ORDER BY quality_starts DESC) AS qual_rank,
-		rank() OVER (ORDER BY ROUND((walks+hits_allowed)/innings,3)) AS whip_rank
-		FROM DATA.pitching_stats_player_season x
-		WHERE season = in_season
-	) p
-	LEFT JOIN
+		SELECT p.*,
+		pa.earned_run_average,
+		pa.walks_per_9,
+		pa.hits_per_9,
+		pa.home_runs_per_9,
+		pa.strikeouts_per_9,
+		pa.era_rank,
+		pa.bb9_rank,
+		pa.hits9_rank,
+		pa.hr9_rank,
+		pa.k9_rank
+		from
+		(
+			SELECT x.player_id,
+			x.player_name,
+			x.team_id,
+			season,
+			walks,
+			ROUND(walks/batters_faced,3) AS walk_percentage,
+			strikeouts,
+			case
+				WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
+			end AS strikeouts_per_walk,
+			ROUND(strikeouts/batters_faced,3) AS strikeout_percentage,
+			runs_allowed,
+			hits_allowed,
+			home_runs_allowed,
+			innings,
+			pitches_thrown,
+			hit_by_pitches,
+			wins,
+			losses,
+			shutouts,
+			quality_starts,
+			ROUND((walks+hits_allowed)/innings,3) AS whip,
+			round(wins::DECIMAL/(wins::DECIMAL+losses::DECIMAL),3) AS win_pct,
+			rank() OVER (ORDER BY walks DESC) AS bb_rank,
+			rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank,		
+			rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
+			rank() OVER (ORDER BY CASE WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2) END DESC) AS kbb_rank,
+			rank() OVER (ORDER BY round(strikeouts/batters_faced,3) DESC) AS kpct_rank,		
+			rank() OVER (ORDER BY runs_allowed DESC) AS runs_rank,
+			rank() OVER (ORDER BY hits_allowed DESC) AS hits_rank,
+			rank() OVER (ORDER BY home_runs_allowed DESC) AS hrs_rank,
+			rank() OVER (ORDER BY innings DESC) AS inn_rank,
+			rank() OVER (ORDER BY pitches_thrown DESC) AS ptch_rank,
+			rank() OVER (ORDER BY hit_by_pitches DESC) AS hbp_rank,
+			rank() OVER (ORDER BY wins DESC) AS win_rank,
+			rank() OVER (ORDER BY losses DESC) AS loss_rank,
+			rank() OVER (ORDER BY shutouts DESC) AS shut_rank,
+			rank() OVER (ORDER BY quality_starts DESC) AS qual_rank,
+			rank() OVER (ORDER BY ROUND((walks+hits_allowed)/innings,3)) AS whip_rank
+			FROM DATA.pitching_stats_player_season x
+			WHERE season = in_season
+		) p
+		LEFT JOIN
+		(
+			SELECT x.player_id,
+			earned_run_average,
+			walks_per_9,
+			hits_per_9,
+			home_runs_per_9,
+			strikeouts_per_9,
+			rank() OVER (ORDER BY earned_run_average) AS era_rank,
+			rank() OVER (ORDER BY walks_per_9) AS bb9_rank,
+			rank() OVER (ORDER BY hits_per_9) AS hits9_rank,
+			rank() OVER (ORDER BY home_runs_per_9) AS hr9_rank,
+			rank() OVER (ORDER BY strikeouts_per_9 DESC) AS k9_rank
+			FROM DATA.pitching_stats_player_season x
+			WHERE season = in_season
+			
+			--at least 1 inning per team's regular season games for averaging stats
+			AND outs_recorded > (SELECT MAX(DAY)+1 FROM DATA.games WHERE season = in_season
+			AND NOT is_postseason)*3
+		) pa
+		ON (p.player_id = pa.player_id)
+	) a
+	CROSS JOIN LATERAL 
 	(
-		SELECT x.player_id,
-		era,
-		bb_per_9,
-		hits_per_9,
-		hr_per_9,
-		k_per_9,
-		rank() OVER (ORDER BY era) AS era_rank,
-		rank() OVER (ORDER BY bb_per_9) AS bb9_rank,
-		rank() OVER (ORDER BY hits_per_9) AS hits9_rank,
-		rank() OVER (ORDER BY hr_per_9) AS hr9_rank,
-		rank() OVER (ORDER BY k_per_9 DESC) AS k9_rank
-		FROM DATA.pitching_stats_player_season x
-		WHERE season = in_season
-		
-		--at least 1 inning per team's regular season games for averaging stats
-		AND outs_recorded > (SELECT MAX(DAY)+1 FROM DATA.games WHERE season = in_season
-		AND NOT is_postseason)*3
-	) pa
-	ON (p.player_id = pa.player_id)
-) a
-CROSS JOIN LATERAL 
-(
-	VALUES 
-	(a.walks, a.bb_rank, 'walks'),
-	(a.bb_pct, a.bbpct_rank, 'walk_percentage'),
-	(a.strikeouts, a.k_rank, 'strikeouts'),
-	(a.k_bb, a.kbb_rank, 'strikeouts_per_walk'),
-	(a.k_pct, a.kpct_rank, 'strikeout_percentage'),
-	(a.runs_allowed, a.runs_rank, 'runs_allowed'),
-	(a.hits_allowed, a.hits_rank, 'hits_allowed'),
-	(a.hrs_allowed, a.hrs_rank, 'home_runs_allowed'),
-	(a.innings, a.inn_rank, 'innings'),
-	(a.pitch_count, a.ptch_rank, 'pitches_thrown'),
-	(a.hbps, a.hbp_rank, 'hit_by_pitches'),
-	(a.wins, a.win_rank, 'wins'),
-	(a.losses, a.loss_rank, 'losses'),
-	(a.shutouts, a.shut_rank, 'shutouts'),
-	(a.quality_starts, a.qual_rank, 'quality_starts'),
-	(a.era, a.era_rank, 'earned_run_average'),
-	(a.bb_per_9, a.bb9_rank, 'walks_per_9'),
-	(a.hits_per_9, a.hits9_rank, 'hits_per_9'),
-	(a.hr_per_9, a.hr9_rank, 'home_runs_per_9'),
-	(a.k_per_9, a.k9_rank, 'strikeouts_per_9')
-) AS c(value, rank, stat)
-JOIN data.players_info_expanded_all p ON (a.player_id = p.player_id 
-AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
-AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) >= p.valid_from
-AND (SELECT max(tm.first_time) FROM data.time_map tm WHERE tm.season = a.season 
-AND tm.day = (SELECT max(DAY) FROM DATA.games WHERE season = in_season AND NOT is_postseason)) <= p.valid_until)
-WHERE c.rank <= 10 
-ORDER BY c.stat, c.rank, p.player_name;	
+		VALUES 
+		(a.walks, a.bb_rank, 'walks'),
+		(a.walk_percentage, a.bbpct_rank, 'walk_percentage'),
+		(a.strikeouts, a.k_rank, 'strikeouts'),
+		(a.strikeouts_per_walk, a.kbb_rank, 'strikeouts_per_walk'),
+		(a.strikeout_percentage, a.kpct_rank, 'strikeout_percentage'),
+		(a.runs_allowed, a.runs_rank, 'runs_allowed'),
+		(a.hits_allowed, a.hits_rank, 'hits_allowed'),
+		(a.home_runs_allowed, a.hrs_rank, 'home_runs_allowed'),
+		(a.innings, a.inn_rank, 'innings'),
+		(a.pitches_thrown, a.ptch_rank, 'pitches_thrown'),
+		(a.hit_by_pitches, a.hbp_rank, 'hit_by_pitches'),
+		(a.wins, a.win_rank, 'wins'),
+		(a.losses, a.loss_rank, 'losses'),
+		(a.shutouts, a.shut_rank, 'shutouts'),
+		(a.quality_starts, a.qual_rank, 'quality_starts'),
+		(a.earned_run_average, a.era_rank, 'earned_run_average'),
+		(a.walks_per_9, a.bb9_rank, 'walks_per_9'),
+		(a.hits_per_9, a.hits9_rank, 'hits_per_9'),
+		(a.home_runs_per_9, a.hr9_rank, 'home_runs_per_9'),
+		(a.strikeouts_per_9, a.k9_rank, 'strikeouts_per_9')
+	) AS c(value, rank, stat)
+	WHERE c.rank <= 10 
+	ORDER BY c.stat, c.rank, a.player_name;		
 	end;
 $$;
 
