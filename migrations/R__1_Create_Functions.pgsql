@@ -643,12 +643,12 @@ begin
 			x.team_id,
 			season,
 			walks,
-			ROUND(walks/batters_faced,3) AS bb_pct,
+			ROUND(walks/batters_faced,3) AS walk_percentage,
 			strikeouts,
 			case
 				WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
 			end AS strikeouts_per_walk,
-			ROUND(strikeouts/batters_faced,3) AS k_pct,
+			ROUND(strikeouts/batters_faced,3) AS strikeout_percentage,
 			runs_allowed,
 			hits_allowed,
 			home_runs_allowed,
@@ -706,10 +706,10 @@ begin
 	(
 		VALUES 
 		(a.walks, a.bb_rank, 'walks'),
-		(a.bb_pct, a.bbpct_rank, 'walk_percentage'),
+		(a.walk_percentage, a.bbpct_rank, 'walk_percentage'),
 		(a.strikeouts, a.k_rank, 'strikeouts'),
 		(a.strikeouts_per_walk, a.kbb_rank, 'strikeouts_per_walk'),
-		(a.k_pct, a.kpct_rank, 'strikeout_percentage'),
+		(a.strikeout_percentage, a.kpct_rank, 'strikeout_percentage'),
 		(a.runs_allowed, a.runs_rank, 'runs_allowed'),
 		(a.hits_allowed, a.hits_rank, 'hits_allowed'),
 		(a.home_runs_allowed, a.hrs_rank, 'home_runs_allowed'),
