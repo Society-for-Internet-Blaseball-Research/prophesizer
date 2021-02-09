@@ -1,4 +1,6 @@
-﻿DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
+﻿-- LAST UPDATE: 2/9/2021
+
+DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
 DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_season CASCADE;
@@ -384,7 +386,7 @@ ORDER BY t.full_name, ts.timestampd;
 -- Name: player_status_flags; Type: VIEW; Schema: data; Owner: -
 --
 CREATE VIEW data.player_status_flags AS
-SELECT DISTINCT p.player_id,
+SELECT DISTINCT p.player_id, p.player_name,
 CASE
 	WHEN p.player_id = 'bc4187fa-459a-4c06-bbf2-4e0e013d27ce' 
 	THEN 'deprecated'
@@ -421,6 +423,21 @@ CASE
 	ELSE NULL::text
 END AS current_state,
 CASE
+	WHEN player_id = '555b0a07-a3e0-41bc-b3db-ca8f520857bc' THEN 'outer_space'
+	WHEN EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = 'COFFEE_EXIT'
+	)
+	THEN 'percolated'
+	WHEN EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = 'RETIRED'
+	)
+	THEN NULL	
 	WHEN EXISTS 
 	(
 		SELECT 1
@@ -469,8 +486,8 @@ CASE
 	THEN 'shadow_known'
 	ELSE NULL::text
 END AS current_location
-FROM data.players p;
-
+FROM data.players p
+WHERE valid_until IS null;
 
 --
 -- Name: player_incinerations; Type: MATERIALIZED VIEW; Schema: data; Owner: -
