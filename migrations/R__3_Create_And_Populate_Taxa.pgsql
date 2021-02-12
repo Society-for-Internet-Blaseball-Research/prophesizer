@@ -1,4 +1,6 @@
-﻿DROP TABLE IF EXISTS taxa.weather CASCADE;
+﻿-- LAST UPDATE: 2/12/2021
+
+DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
 DROP TABLE IF EXISTS taxa.vibe_to_arrows CASCADE;
 DROP SEQUENCE IF EXISTS taxa.team_divine_favor_team_divine_favor_id_seq CASCADE;

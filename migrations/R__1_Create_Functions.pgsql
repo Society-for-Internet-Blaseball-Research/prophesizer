@@ -1,4 +1,7 @@
-﻿DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
+﻿-- LAST UPDATE: 2/12/2021
+
+DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
+DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.timestamp_from_gameday(in_season integer, in_gameday integer) CASCADE;
 DROP FUNCTION IF EXISTS data.teams_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.team_slug_creation() CASCADE;
@@ -476,140 +479,163 @@ CREATE FUNCTION data.reblase_gameid(in_game_id character varying) RETURNS charac
     AS $$
 select 'https://reblase.sibr.dev/game/' || in_game_id;
 $$;
+
+--
+-- Name: reblase_gameeventid(character varying); Type: FUNCTION; Schema: data; Owner: -
+--
+CREATE FUNCTION data.reblase_gameeventid(in_game_event_id bigint) RETURNS UUID
+    LANGUAGE sql
+    AS $$
+SELECT update_hash
+FROM DATA.chronicler_hash_game_event ch
+JOIN
+(
+	SELECT MIN(chronicler_hash_game_event_id) AS chronicler_hash_game_event_id
+	FROM DATA.chronicler_hash_game_event
+	GROUP BY game_event_id
+) mch
+ON (ch.chronicler_hash_game_event_id = mch.chronicler_hash_game_event_id)
+WHERE game_event_id = in_game_event_id;
+$$;
+
 --
 -- Name: ref_leaderboard_season_batting(integer); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.ref_leaderboard_season_batting(in_season integer) RETURNS TABLE(player_id character varying, player_name character varying, url_slug character varying, team_id character varying, team text, value numeric, rank bigint, stat text)
+CREATE FUNCTION data.ref_leaderboard_season_batting(in_season integer) RETURNS TABLE(player_id character varying, player_name character varying, url_slug character varying, team_id character varying, team text, team_valid_from timestamp without time zone, team_valid_until timestamp without time zone, value numeric, rank bigint, stat text)
     LANGUAGE plpgsql
     AS $$
 begin
 	return query 
-SELECT 
-a.player_id, 
-a.player_name, 
-(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
-a.team_id,
-(SELECT nickname FROM DATA.teams_from_timestamp(DATA.timestamp_from_gameday(in_season,0)) tt WHERE tt.team_id = a.team_id) AS team,
-c.*
-FROM 
-(
-	SELECT b.*, 
-	ba.on_base_percentage, 
-	ba.slugging, 
-	ba.batting_average, 
-	ba.on_base_slugging,
-	ba.obp_rank, 
-	ba.slugging_rank, 
-	ba.ba_rank, 
-	ba.ops_rank,
-	r.runs,
-	r.stolen_bases,
-	r.caught_stealing,
-	r.runs_rank,
-	r.sb_rank,
-	r.cs_rank
-	from
+	SELECT 
+	a.player_id, 
+	a.player_name, 
+	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
+	a.team_id,
+	tt.nickname AS team,
+	tt.valid_from AS team_valid_from,
+	tt.valid_until AS team_valid_until,
+	c.*
+	FROM 
 	(
-		SELECT x.player_id,
-		x.player_name,
-		x.team_id,
-		season,
-		hits_risp,
-		walks,
-		doubles,
-		triples,
-		quadruples,
-		home_runs,
-		total_bases,
-		hits,
-		runs_batted_in,
-		sacrifice_bunts,
-		sacrifice_flies,
-		strikeouts,
-		hit_by_pitches,
-		gidp,
-		rank() OVER (ORDER BY hits_risp DESC) AS hits_risp_rank,
-		rank() OVER (ORDER BY walks DESC) AS bb_rank,
-		rank() OVER (ORDER BY doubles DESC) AS dbl_rank,
-		rank() OVER (ORDER BY triples DESC) AS trp_rank,
-		rank() OVER (ORDER BY home_runs DESC) AS hr_rank,
-		rank() OVER (ORDER BY total_bases DESC) AS tb_rank,
-		rank() OVER (ORDER BY quadruples DESC) AS qd_rank,
-		rank() OVER (ORDER BY hits DESC) AS hits_rank,
-		rank() OVER (ORDER BY runs_batted_in DESC) AS rbi_rank,
-		rank() OVER (ORDER BY x.sacrifice_bunts DESC) AS sacbunts_rank,
-        rank() OVER (ORDER BY x.sacrifice_flies DESC) AS sacflies_rank,
-		rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
-		rank() OVER (ORDER BY hit_by_pitches DESC) AS hbp_rank,
-		rank() OVER (ORDER BY gidp DESC) AS gidp_rank
-		FROM DATA.batting_stats_player_season x
-		WHERE season = in_season
-	) b
-	LEFT JOIN
+		SELECT b.*, 
+		ba.on_base_percentage, 
+		ba.slugging, 
+		ba.batting_average, 
+		ba.on_base_slugging,
+		ba.obp_rank, 
+		ba.slugging_rank, 
+		ba.ba_rank, 
+		ba.ops_rank,
+		r.runs,
+		r.stolen_bases,
+		r.caught_stealing,
+		r.runs_rank,
+		r.sb_rank,
+		r.cs_rank
+		from
+		(
+			SELECT x.player_id,
+			x.player_name,
+			x.team_id,
+			season,
+			hits_risp,
+			walks,
+			doubles,
+			triples,
+			quadruples,
+			home_runs,
+			total_bases,
+			hits,
+			runs_batted_in,
+			sacrifice_bunts,
+			sacrifice_flies,
+			strikeouts,
+			hit_by_pitches,
+			gidp,
+			rank() OVER (ORDER BY hits_risp DESC) AS hits_risp_rank,
+			rank() OVER (ORDER BY walks DESC) AS bb_rank,
+			rank() OVER (ORDER BY doubles DESC) AS dbl_rank,
+			rank() OVER (ORDER BY triples DESC) AS trp_rank,
+			rank() OVER (ORDER BY home_runs DESC) AS hr_rank,
+			rank() OVER (ORDER BY total_bases DESC) AS tb_rank,
+			rank() OVER (ORDER BY quadruples DESC) AS qd_rank,
+			rank() OVER (ORDER BY hits DESC) AS hits_rank,
+			rank() OVER (ORDER BY runs_batted_in DESC) AS rbi_rank,
+			rank() OVER (ORDER BY x.sacrifice_bunts DESC) AS sacbunts_rank,
+	        rank() OVER (ORDER BY x.sacrifice_flies DESC) AS sacflies_rank,
+			rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
+			rank() OVER (ORDER BY hit_by_pitches DESC) AS hbp_rank,
+			rank() OVER (ORDER BY gidp DESC) AS gidp_rank
+			FROM DATA.batting_stats_player_season x
+			WHERE season = in_season
+		) b
+		LEFT JOIN
+		(
+			SELECT y.player_id,
+			on_base_percentage,
+			slugging,
+			batting_average,
+			on_base_slugging,
+			rank() OVER (ORDER BY on_base_percentage DESC) AS obp_rank,
+			rank() OVER (ORDER BY slugging DESC) AS slugging_rank,
+			rank() OVER (ORDER BY batting_average DESC) AS ba_rank,           
+			rank() OVER (ORDER BY on_base_slugging DESC) AS ops_rank
+			FROM DATA.batting_stats_player_season y
+			WHERE season = in_season
+			AND plate_appearances > (SELECT MAX(DAY)+1 FROM DATA.games WHERE season = in_season
+			AND NOT is_postseason)*2
+		) ba
+		ON (b.player_id = ba.player_id)
+		LEFT JOIN
+		(
+			SELECT z.player_id,
+			season,
+			runs,
+			stolen_bases,
+			caught_stealing,
+			rank() OVER (ORDER BY runs DESC) AS runs_rank,
+			rank() OVER (ORDER BY stolen_bases DESC) AS sb_rank,
+			rank() OVER (ORDER BY caught_stealing DESC) AS cs_rank
+			FROM DATA.running_stats_player_season z
+			WHERE season = in_season
+		) r
+		ON (b.player_id = r.player_id)
+	) a
+	JOIN DATA.teams_from_timestamp(DATA.timestamp_from_gameday(in_season,0)) tt 
+	ON (tt.team_id = a.team_id)
+	CROSS JOIN LATERAL 
 	(
-		SELECT y.player_id,
-		on_base_percentage,
-		slugging,
-		batting_average,
-		on_base_slugging,
-		rank() OVER (ORDER BY on_base_percentage DESC) AS obp_rank,
-		rank() OVER (ORDER BY slugging DESC) AS slugging_rank,
-		rank() OVER (ORDER BY batting_average DESC) AS ba_rank,           
-		rank() OVER (ORDER BY on_base_slugging DESC) AS ops_rank
-		FROM DATA.batting_stats_player_season y
-		WHERE season = in_season
-		AND plate_appearances > (SELECT MAX(DAY)+1 FROM DATA.games WHERE season = in_season
-		AND NOT is_postseason)*2
-	) ba
-	ON (b.player_id = ba.player_id)
-	LEFT JOIN
-	(
-		SELECT z.player_id,
-		season,
-		runs,
-		stolen_bases,
-		caught_stealing,
-		rank() OVER (ORDER BY runs DESC) AS runs_rank,
-		rank() OVER (ORDER BY stolen_bases DESC) AS sb_rank,
-		rank() OVER (ORDER BY caught_stealing DESC) AS cs_rank
-		FROM DATA.running_stats_player_season z
-		WHERE season = in_season
-	) r
-	ON (b.player_id = r.player_id)
-) a
-CROSS JOIN LATERAL 
-(
-	VALUES 
-	(a.on_base_percentage, a.obp_rank, 'on_base_percentage'),
-	(a.slugging, a.slugging_rank, 'slugging'),
-	(a.batting_average,a.ba_rank,'batting_average'), 
-	(a.on_base_slugging,a.ops_rank,'on_base_slugging'),
-	(a.hits_risp,a.hits_risp_rank,'hits_risp'), 
-	(a.walks,a.bb_rank,'walks'), 
-	(a.doubles,a.dbl_rank,'doubles'), 
-	(a.triples,a.trp_rank,'triples'), 
-	(a.quadruples,a.qd_rank,'quadruples'),
-	(a.home_runs,a.hr_rank,'home_runs'), 
-	(a.total_bases,a.tb_rank,'total_bases'), 
-	(a.hits,a.hits_rank,'hits'), 
-	(a.runs_batted_in,a.rbi_rank,'runs_batted_in'), 
-	(a.sacrifice_bunts,a.sacbunts_rank,'sacrifice_bunts'), 
-	(a.sacrifice_flies,a.sacflies_rank,'sacrifice_flies'),  
-	(a.strikeouts,a.k_rank,'strikeouts'),
-	(a.hit_by_pitches,a.hbp_rank,'hit_by_pitches'),
-	(a.gidp,a.gidp_rank,'gidp'),
-	(a.runs,a.runs_rank,'runs_scored'),
-	(a.stolen_bases,a.sb_rank,'stolen_bases'),
-	(a.caught_stealing,a.cs_rank,'caught_stealing')
-) AS c(value, rank, stat)
-WHERE c.rank <= 10 
-ORDER BY c.stat, c.rank, a.player_name;	
+		VALUES 
+		(a.on_base_percentage, a.obp_rank, 'on_base_percentage'),
+		(a.slugging, a.slugging_rank, 'slugging'),
+		(a.batting_average,a.ba_rank,'batting_average'), 
+		(a.on_base_slugging,a.ops_rank,'on_base_slugging'),
+		(a.hits_risp,a.hits_risp_rank,'hits_risp'), 
+		(a.walks,a.bb_rank,'walks'), 
+		(a.doubles,a.dbl_rank,'doubles'), 
+		(a.triples,a.trp_rank,'triples'), 
+		(a.quadruples,a.qd_rank,'quadruples'),
+		(a.home_runs,a.hr_rank,'home_runs'), 
+		(a.total_bases,a.tb_rank,'total_bases'), 
+		(a.hits,a.hits_rank,'hits'), 
+		(a.runs_batted_in,a.rbi_rank,'runs_batted_in'), 
+		(a.sacrifice_bunts,a.sacbunts_rank,'sacrifice_bunts'), 
+		(a.sacrifice_flies,a.sacflies_rank,'sacrifice_flies'),  
+		(a.strikeouts,a.k_rank,'strikeouts'),
+		(a.hit_by_pitches,a.hbp_rank,'hit_by_pitches'),
+		(a.gidp,a.gidp_rank,'gidp'),
+		(a.runs,a.runs_rank,'runs_scored'),
+		(a.stolen_bases,a.sb_rank,'stolen_bases'),
+		(a.caught_stealing,a.cs_rank,'caught_stealing')
+	) AS c(value, rank, stat)
+	WHERE c.rank <= 10 
+	ORDER BY c.stat, c.rank, a.player_name;	
 	end;
 $$;
 --
 -- Name: ref_leaderboard_season_pitching(integer); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.ref_leaderboard_season_pitching(in_season integer) RETURNS TABLE(player_id character varying, player_name character varying, url_slug character varying, team_id character varying, team text, value numeric, rank bigint, stat text)
+CREATE FUNCTION data.ref_leaderboard_season_pitching(in_season integer) RETURNS TABLE(player_id character varying, player_name character varying, url_slug character varying, team_id character varying, team text, team_valid_from timestamp without time zone, team_valid_until timestamp without time zone, value numeric, rank bigint, stat text)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -621,7 +647,9 @@ begin
 	a.player_name, 
 	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
 	a.team_id,
-	(SELECT nickname FROM DATA.teams_from_timestamp(DATA.timestamp_from_gameday(in_season,0)) tt WHERE tt.team_id = a.team_id) AS team,
+	tt.nickname AS team,
+	tt.valid_from AS team_valid_from,
+	tt.valid_until AS team_valid_until,
 	c.*
 	FROM 
 	(
@@ -702,6 +730,8 @@ begin
 		) pa
 		ON (p.player_id = pa.player_id)
 	) a
+	JOIN DATA.teams_from_timestamp(DATA.timestamp_from_gameday(in_season,0)) tt 
+	ON (tt.team_id = a.team_id)
 	CROSS JOIN LATERAL 
 	(
 		VALUES 
@@ -802,17 +832,18 @@ $$;
 --
 -- Name: teams_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(id integer, team_id character varying, location text, nickname text, full_name text, valid_from timestamp without time zone, valid_until timestamp without time zone, hash uuid, url_slug character varying, card integer)
+CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(team_id character varying, location text, nickname text, full_name text, team_abbreviation character varying, url_slug character varying, current_team_status text, valid_from timestamp without time zone, valid_until timestamp without time zone, gameday_from integer, season_from integer, tournament_from integer, phase_type_from character varying, team_main_color character varying, team_secondary_color character varying, team_slogan character varying, team_emoji character varying, division character varying, division_id character varying, league character varying, league_id character varying, tournament_name character varying, modifications character varying[])
     LANGUAGE plpgsql
     AS $$
 begin
 	return query 
 		select *
-		from data.teams t
+		from data.teams_info_expanded_all t
 		where t.valid_from <= in_timestamp 
 		and in_timestamp < coalesce(t.valid_until,timezone('utc'::text, now()) + (INTERVAL '1 millisecond'));
 end;
 $$;
+
 --
 -- Name: timestamp_from_gameday(integer, integer); Type: FUNCTION; Schema: data; Owner: -
 --
