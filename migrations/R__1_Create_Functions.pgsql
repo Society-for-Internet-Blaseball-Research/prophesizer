@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 2/9/2021
+﻿-- LAST UPDATE: 2/12/2021
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -501,7 +501,7 @@ $$;
 --
 -- Name: ref_leaderboard_season_batting(integer); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.ref_leaderboard_season_batting(in_season integer) RETURNS TABLE(player_id character varying, player_name character varying, url_slug character varying, team_id character varying, team text, value numeric, rank bigint, stat text)
+CREATE FUNCTION data.ref_leaderboard_season_batting(in_season integer) RETURNS TABLE(player_id character varying, player_name character varying, url_slug character varying, team_id character varying, team text, team_valid_from timestamp without time zone, team_valid_until timestamp without time zone, value numeric, rank bigint, stat text)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -635,7 +635,7 @@ $$;
 --
 -- Name: ref_leaderboard_season_pitching(integer); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.ref_leaderboard_season_pitching(in_season integer) RETURNS TABLE(player_id character varying, player_name character varying, url_slug character varying, team_id character varying, team text, value numeric, rank bigint, stat text)
+CREATE FUNCTION data.ref_leaderboard_season_pitching(in_season integer) RETURNS TABLE(player_id character varying, player_name character varying, url_slug character varying, team_id character varying, team text, team_valid_from timestamp without time zone, team_valid_until timestamp without time zone, value numeric, rank bigint, stat text)
     LANGUAGE plpgsql
     AS $$
 begin
