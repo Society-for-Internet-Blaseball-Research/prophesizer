@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 2/14/2021
+﻿-- LAST UPDATE: 2/17/2021
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
@@ -1017,6 +1017,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
 	ge.pitcher_team_id,
 	ge.pitcher_id,
 	ge.inning,
+	ge.top_of_inning,
 	geb.bases_occupied_before,
 	case
 		WHEN ge.top_of_inning THEN ge.away_score
@@ -1039,13 +1040,13 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
 	END AS at_bat,
 	xe.plate_appearance,
 	CASE
-		WHEN (ge.top_of_inning AND ((ge.away_base_count - COALESCE(geb.max_base_before, ge.away_base_count)) > 1)) THEN xe.at_bat
-		WHEN ((NOT ge.top_of_inning) AND ((ge.home_base_count - COALESCE(geb.max_base_before, ge.home_base_count)) > 1)) THEN xe.at_bat
+		WHEN (ge.top_of_inning AND ((ge.away_base_count - COALESCE(geb.max_base_before, 0)) < 3)) THEN xe.at_bat
+		WHEN ((NOT ge.top_of_inning) AND ((ge.home_base_count - COALESCE(geb.max_base_before, 0)) < 3)) THEN xe.at_bat
 		ELSE 0
 		END AS at_bat_risp,
 	CASE
-		WHEN (ge.top_of_inning AND ((ge.away_base_count - COALESCE(geb.max_base_before, ge.away_base_count)) > 1)) THEN xe.hit
-		WHEN ((NOT ge.top_of_inning) AND ((ge.home_base_count - COALESCE(geb.max_base_before, ge.home_base_count)) > 1)) THEN xe.hit
+		WHEN (ge.top_of_inning AND ((ge.away_base_count - COALESCE(geb.max_base_before, 0)) < 3)) THEN xe.hit
+		WHEN ((NOT ge.top_of_inning) AND ((ge.home_base_count - COALESCE(geb.max_base_before, 0)) < 3)) THEN xe.hit
 		ELSE 0
 	END AS hits_risp,
 	xe.hit,
@@ -1133,7 +1134,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
 	(
 		SELECT max(base_before_play) AS max_base_before, 
 		case
-			when array_length(array_remove(array_agg(DISTINCT base_before_play ORDER BY base_before_play),0),1) = 0 THEN null
+			when array_length(array_remove(array_agg(DISTINCT base_before_play ORDER BY base_before_play),0),1) is null THEN NULL
 			ELSE array_remove(array_agg(DISTINCT base_before_play ORDER BY base_before_play),0)
 		end AS bases_occupied_before,
 		game_event_id
