@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 2/17/2021
+﻿-- LAST UPDATE: 2/21/2021
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
@@ -2782,7 +2782,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_batting AS
 			rank() OVER (ORDER BY batting_average DESC) AS ba_rank,           
 			rank() OVER (ORDER BY on_base_slugging DESC) AS ops_rank
 			FROM DATA.batting_stats_player_lifetime y
-			WHERE appearances > 100
+			WHERE plate_appearances > 399
 		) ba
 		ON (b.player_id = ba.player_id)
 		LEFT JOIN
@@ -2908,7 +2908,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			rank() OVER (ORDER BY CASE WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2) END DESC) AS kbb_rank,
 			rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank
 			FROM DATA.pitching_stats_player_lifetime x
-			WHERE games > 100
+			WHERE batters_faced > 699
 		) pa
 		ON (p.player_id = pa.player_id)
 	) a
