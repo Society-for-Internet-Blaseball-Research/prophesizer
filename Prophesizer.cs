@@ -282,6 +282,7 @@ namespace SIBR
 					await BatchLoadGameUpdates(psqlConnection, missingGames);
 				}
 
+				Console.WriteLine($"Starting incremental update from {simSeasonDay.HumanReadable} at time {m_dbGameTimestamp}");
 				result = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
 			}
 
