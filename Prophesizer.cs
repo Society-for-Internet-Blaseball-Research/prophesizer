@@ -393,7 +393,8 @@ namespace SIBR
 					Int64 numFinishedGames = (Int64)response;
 					ConsoleOrWebhook($"{numFinishedGames} of {numGames} games complete for {m_dbSeasonDay.HumanReadable}...");
 					// If all games are done, refresh our materialized views
-					if (numGames > 0 && numFinishedGames >= numGames)
+					if ((numGames > 0 && numFinishedGames >= numGames) || 
+						(numGames == 0 && m_dbSeasonDay.Season > m_lastMaterializedRefresh.Season))
 					{
 						printMatviewTime = true;
 						ConsoleOrWebhook($"All games complete for {m_dbSeasonDay.HumanReadable}, refreshing materialized views!");
