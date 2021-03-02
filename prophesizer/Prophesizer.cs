@@ -55,7 +55,7 @@ namespace SIBR
 		private const bool TIMING_FILE = true;
 		private const bool DO_HOURLY = true;
 		private const bool DO_EVENTS = true;
-		private const bool DO_REFRESH_MATVIEWS = true;
+		private bool DO_REFRESH_MATVIEWS = true;
 
 		private HttpClient m_chroniclerClient;
 		private HttpClient m_blaseballClient;
@@ -100,6 +100,9 @@ namespace SIBR
 			m_options = new JsonSerializerOptions();
 			m_options.IgnoreNullValues = true;
 			m_options.PropertyNameCaseInsensitive = true;
+
+			// Assume that we refresh matviews
+			DO_REFRESH_MATVIEWS = bool.Parse(Environment.GetEnvironmentVariable("prophesizer.refreshMatViews") ?? "true");
 		}
 
 		/// <summary>
