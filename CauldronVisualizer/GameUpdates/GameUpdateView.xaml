@@ -1,0 +1,108 @@
+﻿<UserControl x:Class="CauldronVisualizer.GameUpdates.GameUpdateView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:CauldronVisualizer.GameUpdates"
+      xmlns:controls="clr-namespace:CauldronVisualizer.Controls"
+      mc:Ignorable="d" 
+      HorizontalAlignment="Stretch"
+      >
+
+    <Grid
+        HorizontalAlignment="Stretch"
+        >
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Style="{StaticResource TinyText}"
+            HorizontalAlignment="Right">
+            <TextBlock.Text>
+                <MultiBinding StringFormat="{}Season {0}, Day {1}">
+                    <Binding Path="Update.season"/>
+                    <Binding Path="Update.day"/>
+                </MultiBinding>
+            </TextBlock.Text>
+        </TextBlock>
+
+        <TextBlock 
+            Grid.Row="2"
+            Style="{StaticResource TinyText}"
+            HorizontalAlignment="Right"
+            Text="{Binding Update.playCount}">
+        </TextBlock>
+
+        <controls:MatchupAndScore
+            HomeTeamName="{Binding Update.homeTeamName}"
+            HomeTeamScore="{Binding Update.homeScore}"
+            HomeColorBrush="{Binding HomeTeamColor}"
+            AwayTeamName="{Binding Update.awayTeamName}"
+            AwayTeamScore="{Binding Update.awayScore}"
+            AwayColorBrush="{Binding AwayTeamColor}"
+            />
+
+        <Grid
+            Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="{Binding InningDescription}">
+            </TextBlock>
+            
+            <TextBlock
+                Grid.Column="1">
+                <TextBlock.Text>
+                    <MultiBinding StringFormat="{}{0}-{1}">
+                        <Binding Path="Update.atBatBalls"/>
+                        <Binding Path="Update.atBatStrikes"/>
+                    </MultiBinding>
+                </TextBlock.Text>
+            </TextBlock>
+
+            <TextBlock 
+                Grid.Column="2"
+                Text="NULL BATTER"
+                Foreground="PaleVioletRed">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Update.topOfInning}" Value="true"/>
+                                    <Condition Binding="{Binding Update.awayBatter}" Value=""/>
+                                </MultiDataTrigger.Conditions>
+                                <MultiDataTrigger.Setters>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger.Setters>
+                            </MultiDataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Update.topOfInning}" Value="false"/>
+                                    <Condition Binding="{Binding Update.homeBatter}" Value=""/>
+                                </MultiDataTrigger.Conditions>
+                                <MultiDataTrigger.Setters>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger.Setters>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            
+        </Grid>
+        <TextBlock 
+            Grid.Row="2" 
+            Margin="20 5 0 5"
+            Style="{StaticResource SmallText}"
+            Foreground="{StaticResource Bright}"
+            Text="{Binding Update.lastUpdate}"/>
+    </Grid>
+</UserControl>

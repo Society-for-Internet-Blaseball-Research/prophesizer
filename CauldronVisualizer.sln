@@ -1,0 +1,35 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30320.27
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cauldron", "Cauldron\Cauldron.csproj", "{C2E81832-67B1-471C-AEF0-8C5092DC3224}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CauldronVisualizer", "CauldronVisualizer\CauldronVisualizer.csproj", "{8BE727E8-2DFC-49B4-84E9-F82F1857534B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C2E81832-67B1-471C-AEF0-8C5092DC3224}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2E81832-67B1-471C-AEF0-8C5092DC3224}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2E81832-67B1-471C-AEF0-8C5092DC3224}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2E81832-67B1-471C-AEF0-8C5092DC3224}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3653058B-04DE-493A-816E-BCCA21DAFA62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3653058B-04DE-493A-816E-BCCA21DAFA62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3653058B-04DE-493A-816E-BCCA21DAFA62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3653058B-04DE-493A-816E-BCCA21DAFA62}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8BE727E8-2DFC-49B4-84E9-F82F1857534B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8BE727E8-2DFC-49B4-84E9-F82F1857534B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8BE727E8-2DFC-49B4-84E9-F82F1857534B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8BE727E8-2DFC-49B4-84E9-F82F1857534B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9FC70955-D044-478D-898E-BDB813323CEF}
+	EndGlobalSection
+EndGlobal

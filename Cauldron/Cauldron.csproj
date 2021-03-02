@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <PackageId>SIBR.Cauldron</PackageId>
+    <Version>1.26.2</Version>
+    <Authors>lilserf</Authors>
+    <Company>Society for Internet Blaseball Research</Company>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="data\simple-outcomes.cfg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="data\simple-outcomes.cfg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+
+</Project>

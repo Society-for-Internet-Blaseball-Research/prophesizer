@@ -1,0 +1,50 @@
+﻿<Window x:Class="CauldronVisualizer.LogWindowView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CauldronVisualizer"
+        Style="{StaticResource BaseStyle}"
+        mc:Ignorable="d"
+        Title="Load Logs from S3 Bucket" Height="450" Width="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <StackPanel
+            Orientation="Horizontal">
+            <Button
+            IsEnabled="{Binding RootVm.LoadSaveEnabled}"
+            Style="{StaticResource BaseStyle}"
+            Width="80"
+            Margin="5"
+            Content="Load Selected"
+            Command="{Binding LoadLogCommand}"
+            />
+            <Button
+            IsEnabled="{Binding RootVm.LoadSaveEnabled}"
+            Style="{StaticResource BaseStyle}"
+            Width="80"
+            Margin="5"
+            Content="Add Selected"
+            Command="{Binding AddLogCommand}"
+            />
+            <TextBlock
+                VerticalAlignment="Center"
+                Text="Unlike the main view, Season and Day are 1-indexed"/>
+        </StackPanel>
+
+        <TextBlock
+            Grid.Row="0"
+            HorizontalAlignment="Right"
+            Text="{Binding LoadingMessage}"
+            Visibility="{Binding Loading, Converter={StaticResource BoolToVisibilityConverter}}"
+            />
+        <ListBox
+            Grid.Row="1"
+            Style="{StaticResource BaseStyle}"
+            ItemsSource="{Binding LogRecords}"
+            SelectedItem="{Binding SelectedLog}"/>
+    </Grid>
+</Window>

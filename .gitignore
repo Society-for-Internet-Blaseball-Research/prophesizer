@@ -4,3 +4,4 @@ obj/
 .vs/prophesizer/v16/.suo
 db/data.sql
 *.suo
+.vs/
