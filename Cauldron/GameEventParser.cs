@@ -58,6 +58,9 @@ namespace Cauldron
 	/// </summary>
 	public class GameEventParser
 	{
+		// Store states that we shouldn't process yet because there's a data gap
+		List<Game> m_pendingStates;
+
 		// Last state we saw, for comparison
 		Game m_oldState;
 
@@ -68,10 +71,6 @@ namespace Cauldron
 		int m_batterCount = 0;
 		// Map of pitcher IDs indexed by batter ID; used in attributing baserunners to pitchers
 		Dictionary<string, string> m_responsiblePitchers;
-
-		// Reconstruct the team linup from game data, used in identifying unknown batters
-		//string[] m_homePlayerLineup;
-		//string[] m_awayPlayerLineup;
 
 		// Keep of track of whether we've had a valid batter for this inning
 		HashSet<string> m_startedInnings;
@@ -119,6 +118,8 @@ namespace Cauldron
 
 		public bool StartNewGame(Game initState, DateTime timeStamp)
 		{
+			m_pendingStates = new List<Game>();
+
 			m_seenUpdates = new HashSet<string>();
 			if(initState.chroniclerHash != null)
 				m_seenUpdates.Add(initState.chroniclerHash);
@@ -187,9 +188,6 @@ namespace Cauldron
 				}
 			}
 
-			//m_playerNameToId = new Dictionary<string, string>();
-			//m_homePlayerLineup = new string[10];
-			//m_awayPlayerLineup = new string[10];
 			m_oldState = initState;
 			m_eventIndex = 0;
 			m_batterCount = 0;
@@ -1028,20 +1026,20 @@ namespace Cauldron
 				}
 				else if(diff < 0)
 				{
-					if (m_currEvent != null)
-					{
-						m_currEvent.parsingError = true;
-						m_currEvent.parsingErrorList.Add($"Out of order! playCount went from {m_oldState.playCount.Value} to {newState.playCount.Value}");
-					}
+					//if (m_currEvent != null)
+					//{
+					//	m_currEvent.parsingError = true;
+					//	m_currEvent.parsingErrorList.Add($"Out of order! playCount went from {m_oldState.playCount.Value} to {newState.playCount.Value}");
+					//}
 					return PlayCountStatus.Decrease;
 				}
 				else
 				{
-					if (m_currEvent != null)
-					{
-						m_currEvent.parsingError = true;
-						m_currEvent.parsingErrorList.Add($"Data gap! playCount went from {m_oldState.playCount.Value} to {newState.playCount.Value}");
-					}
+					//if (m_currEvent != null)
+					//{
+					//	m_currEvent.parsingError = true;
+					//	m_currEvent.parsingErrorList.Add($"Data gap! playCount went from {m_oldState.playCount.Value} to {newState.playCount.Value}");
+					//}
 					return PlayCountStatus.Gap;
 				}
 			}
@@ -1230,7 +1228,7 @@ namespace Cauldron
 		/// <param name="newState"></param>
 		/// <param name="timeStamp"></param>
 		/// <returns></returns>
-		public async Task ParseGameUpdate(Game newState, DateTime timeStamp)
+		public async Task ParseGameUpdate(Game newState, DateTime timeStamp, bool ignoreGaps = false)
 		{
 			// Remove any leading/trailing whitespace and newlines inside the update string
 			newState.lastUpdate = newState.lastUpdate.Trim();
@@ -1260,20 +1258,56 @@ namespace Cauldron
 				m_processed++;
 			}
 
-			bool validInningState = CheckInningState(newState);
+			Debugger.Log(0, "Reorder", $"## ParseGameUpdate for state {newState.playCount} ##\n");
 			PlayCountStatus playCountState = CheckPlayCount(newState);
-			if(playCountState == PlayCountStatus.Decrease)
+
+			if(ignoreGaps && playCountState == PlayCountStatus.Gap)
 			{
-				string s = $"# Game {newState.gameId} : out of order playCount : {m_oldState.playCount} -> {newState.playCount}\n";
-				Debugger.Log(0, "OutOfOrder", s);
-				Console.Write(s);
+				if (m_currEvent != null)
+				{
+					m_currEvent.parsingError = true;
+					m_currEvent.parsingErrorList.Add($"Data gap! playCount went from {m_oldState.playCount.Value} to {newState.playCount.Value} despite reorder attempt");
+				}
 			}
-			else if(playCountState == PlayCountStatus.Gap)
+			else
 			{
-				string s = $"# Game {newState.gameId} : gap in playCount : {m_oldState.playCount} -> {newState.playCount}\n";
-				Debugger.Log(0, "Gap", s);
-				Console.Write(s);
+				// This gap is probably unfixable
+				if (m_pendingStates.Count > 5)
+				{
+					Debugger.Log(0, "Reorder", $"Gave up waiting for pending state {m_oldState.playCount + 1}!\n");
+					var ordered = m_pendingStates.OrderBy(x => x.playCount).ToList();
+					m_pendingStates.Clear();
+					foreach (var state in ordered)
+					{
+						Debugger.Log(0, "Reorder", $"Parsing pending state {state.playCount}...\n");
+						// Recurse, yikes
+						await ParseGameUpdate(state, state.timestamp, true);
+					}
+				}
+				else if (playCountState == PlayCountStatus.Gap && m_oldState.playCount.HasValue)
+				{
+					// Process this later!
+					Debugger.Log(0, "Reorder", $"Found a gap from {m_oldState.playCount} to {newState.playCount}! Shelving {newState.playCount}\n");
+					m_seenUpdates.Remove(newState.chroniclerHash);
+					m_pendingStates.Add(newState);
+					return;
+				}
+
+				//if (playCountState == PlayCountStatus.Decrease)
+				//{
+				//	string s = $"# Game {newState.gameId} : out of order playCount : {m_oldState.playCount} -> {newState.playCount}\n";
+				//	Debugger.Log(0, "OutOfOrder", s);
+				//	Console.Write(s);
+				//}
+				//else if (playCountState == PlayCountStatus.Gap)
+				//{
+				//	string s = $"# Game {newState.gameId} : gap in playCount : {m_oldState.playCount} -> {newState.playCount}\n";
+				//	Debugger.Log(0, "Gap", s);
+				//	Console.Write(s);
+				//}
 			}
+
+			bool validInningState = CheckInningState(newState);
 
 			if(m_currEvent != null && m_inningState == InningState.HalfInningStart)
 			{
@@ -1455,6 +1489,17 @@ namespace Cauldron
 				|| m_inningState == InningState.PlayEnded)
 			{
 				EmitEvent(newState, timeStamp);
+			}
+
+			if(m_pendingStates.Count > 0)
+			{
+				var firstPending = m_pendingStates.OrderBy(x => x.playCount).First();
+				if(firstPending.playCount == m_oldState.playCount+1)
+				{
+					Debugger.Log(0, "Reorder", $"First pending state is the next one, {firstPending.playCount}!\n");
+					m_pendingStates.Remove(firstPending);
+					await ParseGameUpdate(firstPending, firstPending.timestamp);
+				}
 			}
 
 			if (IsGameComplete && !m_sentGameComplete)
