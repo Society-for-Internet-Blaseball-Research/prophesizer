@@ -3,3 +3,4 @@ obj/
 .vs/prophesizer/DesignTimeBuild/.dtbcache.v2
 .vs/prophesizer/v16/.suo
 db/data.sql
+*.suo

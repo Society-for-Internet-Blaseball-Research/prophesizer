@@ -1,0 +1,211 @@
+﻿<UserControl x:Class="CauldronVisualizer.GameEvents.GameEventView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:caul="clr-namespace:Cauldron;assembly=Cauldron"
+      xmlns:local="clr-namespace:CauldronVisualizer.GameEvents"
+      xmlns:controls="clr-namespace:CauldronVisualizer.Controls"
+      mc:Ignorable="d" 
+>
+
+    <Grid
+        HorizontalAlignment="Stretch"
+        >
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border
+            Grid.Column="0"
+            Grid.RowSpan="2"
+            Background="{Binding BattingColor}"
+            Width="10"
+            HorizontalAlignment="Left"
+            />
+
+        <Border
+            Margin="10 0 0 0"
+            HorizontalAlignment="Stretch"
+            Grid.Column="0"
+            Grid.ColumnSpan="3"
+            Grid.RowSpan="2"
+            >
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Event.fixedError}" Value="true">
+                            <Setter Property="Background" Value="#99333399"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+        </Border>
+        <Border
+            Margin="10 0 0 0"
+            HorizontalAlignment="Stretch"
+            Grid.Column="0"
+            Grid.ColumnSpan="3"
+            Grid.RowSpan="2"
+            >
+            <Border.ToolTip>
+                <ItemsControl ItemsSource="{Binding Event.parsingErrorList}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="string">
+                            <TextBlock
+                                Text="{Binding}"
+                                />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border.ToolTip>
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Event.parsingError}" Value="true">
+                            <Setter Property="Background" Value="#99993333"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+        </Border>
+        <Grid
+            Grid.Row="0"
+            Grid.Column="1"
+            Grid.ColumnSpan="2"
+            >
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock
+                Style="{StaticResource SmallText}"
+                HorizontalAlignment="Right"
+                Grid.Column="3"
+                >
+                <TextBlock.Text>
+                    <Binding StringFormat="{}{0}" Path="Event.gameId"/>
+                </TextBlock.Text>
+            </TextBlock>
+            <controls:MatchupAndScore
+                AwayTeamName="{Binding AwayTeamName}"
+                AwayTeamScore="{Binding Event.awayScore}"
+                AwayColorBrush="{Binding AwayTeamColor}"
+                HomeTeamName="{Binding HomeTeamName}"
+                HomeTeamScore="{Binding Event.homeScore}"
+                HomeColorBrush="{Binding HomeTeamColor}"
+                Grid.ColumnSpan="4"/>
+
+            <TextBlock
+                Grid.Row="1"
+                Text="{Binding InningDescription}"/>
+
+            <TextBlock
+                Grid.Row="2"
+            >
+                <TextBlock.Text>
+                    <MultiBinding StringFormat="{}{0}: {1}">
+                        <Binding Path="Event.lineupPosition"/>
+                        <Binding Path="Event.eventType"/>
+                    </MultiBinding>
+                </TextBlock.Text>
+            </TextBlock>
+
+            <TextBlock
+                Grid.Row="2"
+                Grid.Column="1"
+                Text="{Binding PitchesList}"/>
+
+            <TextBlock
+                Grid.Row="2"
+                Grid.Column="2"
+                >
+                <TextBlock.Text>
+                    <MultiBinding StringFormat="{}{0}-{1}">
+                        <Binding Path="Event.totalBalls"/>
+                        <Binding Path="Event.totalStrikes"/>
+                    </MultiBinding>
+                </TextBlock.Text>
+            </TextBlock>
+        </Grid>
+        <StackPanel
+            Orientation="Vertical"
+            Grid.Row="1"
+            Grid.Column="1"
+            Margin="0 10 0 0">
+            <TextBlock
+                FontFamily="Segoe UI Emoji"
+                Text="&#x0001F525;"
+                Foreground="OrangeRed"
+                Visibility="{Binding HasIncineration, Converter={StaticResource BoolToVisibilityConverter}}"
+                >
+            </TextBlock>
+            <TextBlock
+                FontFamily="Segoe UI Emoji"
+                Text="&#x0001F95C;"
+                Foreground="#CC9900"
+                Visibility="{Binding HasPeanut, Converter={StaticResource BoolToVisibilityConverter}}"
+                >
+            </TextBlock>
+        </StackPanel>
+
+        <ItemsControl
+            Margin="20 10 0 10"
+            Grid.Row="1"
+            Grid.Column="1"
+            Grid.ColumnSpan="2"
+            ItemsSource="{Binding Event.eventText}"
+            >
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="string">
+                    <TextBlock
+                        Text="{Binding}"
+                        Style="{StaticResource SmallText}"
+                        Foreground="{StaticResource Bright}"
+                        />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ItemsControl
+            Margin="0 10 0 10"
+            Grid.Row="1"
+            Grid.Column="2"
+            Grid.ColumnSpan="2"
+            ItemsSource="{Binding Event.baseRunners}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type caul:GameEventBaseRunner}">
+                    <TextBlock
+                        >
+                        <TextBlock.Style>
+                            <Style TargetType="{x:Type TextBlock}">
+                                <Setter Property="Text">
+                                    <Setter.Value>
+                                        <MultiBinding StringFormat="{}{0} -> {1}">
+                                            <Binding Path="baseBeforePlay"/>
+                                            <Binding Path="baseAfterPlay"/>
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>
