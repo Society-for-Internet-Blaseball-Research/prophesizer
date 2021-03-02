@@ -18,7 +18,7 @@ jobs:
         uses: salsify/action-detect-and-tag-new-version@v2
         with:
           version-command: |
-            grep "<Version>" prophesizer.csproj | sed 's/ *<\/*Version>//g'
+            grep "<Version>" prophesizer/prophesizer.csproj | sed 's/ *<\/*Version>//g'
       - name: Get version
         run: ./get_version.sh
       - name: Push to Docker Hub
