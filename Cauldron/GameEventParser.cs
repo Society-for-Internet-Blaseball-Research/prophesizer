@@ -1222,6 +1222,20 @@ namespace Cauldron
 			return outsBetween;
 		}
 
+		// Set the inning state for the current event to match the new Game state
+		public void SetInningState(Game newState)
+		{
+			if (m_currEvent != null)
+			{
+				m_currEvent.inning = newState.inning;
+				m_currEvent.topOfInning = newState.topOfInning;
+				m_currEvent.batterTeamId = newState.topOfInning ? newState.awayTeam : newState.homeTeam;
+				m_currEvent.batterId = newState.topOfInning ? newState.awayBatter : newState.homeBatter;
+				m_currEvent.pitcherTeamId = newState.topOfInning ? newState.homeTeam : newState.awayTeam;
+				m_currEvent.pitcherId = newState.topOfInning ? newState.homePitcher : newState.awayPitcher;
+			}
+		}
+
 		/// <summary>
 		/// Call this with every game update for the game this parser is handling
 		/// </summary>f
@@ -1311,7 +1325,7 @@ namespace Cauldron
 
 			if(m_currEvent != null && m_inningState == InningState.HalfInningStart)
 			{
-				m_currEvent.inning = newState.inning;
+				SetInningState(newState);
 			}
 
 			// DATA GAP DETECTION
