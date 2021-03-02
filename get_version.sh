@@ -10,7 +10,7 @@ verlt() {
 
 docker_version=$(curl -L --fail "https://hub.docker.com/v2/repositories/blaseballsibr/prophesizer/tags/?page_size=1000" | jq '.results | .[] | .name' -r | sed 's/latest//' | sort --version-sort | tail -n 1)
 
-cs_version=$(cat prophesizer.csproj | grep "<Version>" | sed 's/ *<\/*Version>//g')
+cs_version=$(cat prophesizer/prophesizer.csproj | grep "<Version>" | sed 's/ *<\/*Version>//g')
 
 echo "Docker is at version $docker_version. Project is at version $cs_version."
 
