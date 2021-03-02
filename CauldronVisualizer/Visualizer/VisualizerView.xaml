@@ -1,0 +1,267 @@
+﻿<UserControl x:Class="CauldronVisualizer.VisualizerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:CauldronVisualizer"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+    </UserControl.Resources>
+    <Grid
+        HorizontalAlignment="Stretch"
+        VerticalAlignment="Stretch"
+        >
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel
+            Grid.Row="0"
+            Grid.ColumnSpan="3"
+            Margin="0 20 0 20"
+            Orientation="Horizontal">
+            <TextBox
+                Style="{StaticResource BaseStyle}"
+                x:Name="m_filter"
+                Width="500"
+                Margin="5"
+                Text="{Binding FilterText, Mode=TwoWay}"
+                IsEnabled="{Binding LoadSaveEnabled}"
+            >
+                <TextBox.InputBindings>
+                    <KeyBinding 
+                        Command="{Binding FilterCommand}" 
+                        Key="Return"
+                        />
+                    <KeyBinding
+                        Command="{Binding ClearFilterCommand}"
+                        Key="Esc"
+                        />
+                </TextBox.InputBindings>
+            </TextBox>
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Style="{StaticResource BaseStyle}"
+                Width="80"
+                Margin="5"
+                Content="Filter"
+                Command="{Binding FilterCommand}"
+                />
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Style="{StaticResource BaseStyle}"
+                Width="80"
+                Margin="5"
+                Content="Clear"
+                Command="{Binding ClearFilterCommand}"
+                />
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Style="{StaticResource BaseStyle}"
+                BorderBrush="Coral"
+                Width="120"
+                Margin="5"
+                Content="Load From Reblase"
+                Command="{Binding LoadFromReblaseCommand}"
+                />
+        </StackPanel>
+
+        <TextBlock
+            Grid.Row="2"
+            Grid.Column="0">
+            <TextBlock.Text>
+                <Binding StringFormat="{}{0:d} updates" Path="FilteredUpdates"/>
+            </TextBlock.Text>
+        </TextBlock>
+
+        <TextBlock
+            Grid.Row="2"
+            Grid.Column="2">
+            <TextBlock.Text>
+                <Binding StringFormat="{}{0:d} events" Path="FilteredEvents"/>
+            </TextBlock.Text>
+        </TextBlock>
+
+        <StackPanel
+            HorizontalAlignment="Center"
+            Orientation="Horizontal"
+            Grid.Row="1"
+            Grid.Column="0"
+            >
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Content="Load Updates from file..."
+                Height="30"
+                Width="140"
+                Style="{StaticResource BaseStyle}"
+                Command="{Binding LoadUpdatesCommand}"
+                />
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Margin="10 0 0 0"
+                Content="Load Updates from S3..."
+                Height="30"
+                Width="140"
+                Style="{StaticResource BaseStyle}"
+                Command="{Binding LoadUpdatesFromS3Command}"
+                />
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Margin="10 0 0 0"
+                Content="Save Updates..."
+                Height="30"
+                Width="120"
+                Style="{StaticResource BaseStyle}"
+                Command="{Binding SaveUpdatesCommand}"
+                />
+        </StackPanel>
+
+        <Button
+            HorizontalAlignment="Center"
+            Grid.Row="1"
+            Grid.Column="0"
+            Grid.ColumnSpan="3"
+            Content=">>> CONVERT >>>"
+            Style="{StaticResource BaseStyle}"
+            Padding="10 0"
+            FontSize="16"
+            Command="{Binding ConvertCommand}"
+            >
+            
+        </Button>
+        <StackPanel
+            HorizontalAlignment="Center"
+            Orientation="Horizontal"
+            Grid.Row="1"
+            Grid.Column="2"
+            >
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Content="Load Events..."
+                Height="30"
+                Width="160"
+                Style="{StaticResource BaseStyle}"
+                Command="{Binding LoadEventsCommand}"
+                />
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Margin="10 0 0 0"
+                Content="Save Events..."
+                Height="30"
+                Width="160"
+                Style="{StaticResource BaseStyle}"
+                Command="{Binding SaveEventsCommand}"
+                />
+            <!--<Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Margin="10 0 0 0"
+                Content="Export to CSV..."
+                ToolTip="For use in Fourth Strike rescoring"
+                Height="30"
+                Width="160"
+                Style="{StaticResource BaseStyle}"
+                Command="{Binding ExportToCsvCommand}"
+                />-->
+        </StackPanel>
+
+        <ListBox
+            BorderThickness="0"
+            Name="m_updates"
+            Grid.Row="3"
+            AlternationCount="2"
+            Style="{StaticResource BaseStyle}"
+            ItemContainerStyle="{StaticResource ListBoxItemAlternating}"
+            HorizontalAlignment="Stretch"
+            Grid.Column="0"
+            ItemsSource="{Binding GameUpdates}"
+            SelectedItem="{Binding SelectedGameUpdate}"
+            HorizontalContentAlignment="Stretch"
+            >
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Filter to this game" Command="{Binding FilterToGameCommand}" CommandParameter="{Binding SelectedGameUpdate.Update._id}"/>
+                    <MenuItem Header="View JSON" Command="{Binding ShowJsonCommand}" CommandParameter="{Binding SelectedGameUpdate.Update}"/>
+                </ContextMenu>
+            </ListBox.ContextMenu>
+        </ListBox>
+        <ListBox
+            BorderThickness="0"
+            Name="m_events"
+            Grid.Row="3"
+            AlternationCount="2"
+            Style="{StaticResource BaseStyle}"
+            ItemContainerStyle="{StaticResource ListBoxItemAlternating}"
+            HorizontalAlignment="Stretch"
+            Grid.Column="2"
+            ItemsSource="{Binding GameEvents}"
+            SelectedItem="{Binding SelectedGameEvent}"
+            HorizontalContentAlignment="Stretch"
+            >
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Filter to this game" Command="{Binding FilterToGameCommand}" CommandParameter="{Binding SelectedGameEvent.Event.gameId}"/>
+                    <MenuItem Header="View JSON" Command="{Binding ShowJsonCommand}" CommandParameter="{Binding SelectedGameEvent.Event}"/>
+                </ContextMenu>
+            </ListBox.ContextMenu>
+        </ListBox>
+        <Border
+            Grid.Row="3"
+            Background="#99222222"
+            Visibility="{Binding UpdatesDisabled, Converter={StaticResource BoolToVisibilityConverter}}"
+            >
+            <StackPanel
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Orientation="Vertical">
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    Text="Please Wait..."
+                    FontSize="48"
+                    />
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    FontSize="24"
+                    >
+                    <TextBlock.Text>
+                        <Binding StringFormat="Loading {0:#,0} records" Path="GameUpdatesDelayedCount"/>
+                    </TextBlock.Text>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+        <Border
+            Grid.Row="3"
+            Grid.Column="2"
+            Background="#99222222"
+            Visibility="{Binding EventsDisabled, Converter={StaticResource BoolToVisibilityConverter}}"
+            >
+            <StackPanel
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Orientation="Vertical">
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    Text="Please Wait..."
+                    FontSize="48"
+                    />
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    FontSize="24"
+                    >
+                    <TextBlock.Text>
+                        <Binding StringFormat="Loading {0:#,0} records" Path="GameEventsDelayedCount"/>
+                    </TextBlock.Text>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</UserControl>

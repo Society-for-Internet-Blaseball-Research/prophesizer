@@ -12,7 +12,6 @@
   <ItemGroup>
     <PackageReference Include="Evolve" Version="2.4.0" />
     <PackageReference Include="npgsql" Version="4.1.4" />
-    <PackageReference Include="SIBR.Cauldron" Version="1.26.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +29,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <None Remove="migrations\V2_9_6__Games_Outcomes.pgsql" />
+    <ProjectReference Include="..\Cauldron\Cauldron.csproj" />
     <None Update="patch\crabs_to_fridays.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
