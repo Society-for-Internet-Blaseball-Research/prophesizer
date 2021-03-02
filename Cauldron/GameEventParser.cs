@@ -153,7 +153,7 @@ namespace Cauldron
 			{
 				try
 				{
-					string file = client.DownloadString("https://raw.githubusercontent.com/Society-for-Internet-Blaseball-Research/Cauldron/master/Cauldron/data/simple-outcomes.cfg");
+					string file = client.DownloadString("https://raw.githubusercontent.com/Society-for-Internet-Blaseball-Research/prophesizer/future-perfect/Cauldron/data/simple-outcomes.cfg");
 					networkOutcomeVersion = int.Parse(file.Substring(0, file.IndexOf("\n")));
 					networkOutcomeString = file.Substring(file.IndexOf("\n")+1);
 					//Console.WriteLine($"Network simple-outcomes.cfg is version {networkOutcomeVersion}");
