@@ -292,7 +292,7 @@ namespace SIBR
 
 			if (DO_REFRESH_MATVIEWS)
 			{
-				await RefreshMaterializedViews(psqlConnection);
+				RefreshMaterializedViews(psqlConnection);
 			}
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
@@ -364,7 +364,7 @@ namespace SIBR
 			return new FileInfo(location.AbsolutePath).Directory.FullName;
 		}
 
-		private async Task RefreshMaterializedViews(NpgsqlConnection psqlConnection)
+		private void RefreshMaterializedViews(NpgsqlConnection psqlConnection)
 		{
 			bool printMatviewTime = false;
 			Stopwatch matviewTimer = new Stopwatch();
@@ -400,7 +400,7 @@ namespace SIBR
 						printMatviewTime = true;
 						ConsoleOrWebhook($"All games complete for {m_dbSeasonDay.HumanReadable}, refreshing materialized views!");
 						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
-						await refreshCmd.ExecuteNonQueryAsync();
+						refreshCmd.ExecuteNonQuery();
 
 						m_lastMaterializedRefresh = m_dbSeasonDay;
 					}
