@@ -39,7 +39,7 @@
             >
                 <TextBox.InputBindings>
                     <KeyBinding 
-                        Command="{Binding FilterCommand}" 
+                        Command="{Binding LoadFromReblaseCommand}" 
                         Key="Return"
                         />
                     <KeyBinding
@@ -48,13 +48,22 @@
                         />
                 </TextBox.InputBindings>
             </TextBox>
-            <Button
+            <!--<Button
                 IsEnabled="{Binding LoadSaveEnabled}"
                 Style="{StaticResource BaseStyle}"
                 Width="80"
                 Margin="5"
                 Content="Filter"
                 Command="{Binding FilterCommand}"
+                />-->
+            <Button
+                IsEnabled="{Binding LoadSaveEnabled}"
+                Style="{StaticResource BaseStyle}"
+                BorderBrush="Coral"
+                Width="120"
+                Margin="5"
+                Content="Load From Chronicler"
+                Command="{Binding LoadFromReblaseCommand}"
                 />
             <Button
                 IsEnabled="{Binding LoadSaveEnabled}"
@@ -63,15 +72,6 @@
                 Margin="5"
                 Content="Clear"
                 Command="{Binding ClearFilterCommand}"
-                />
-            <Button
-                IsEnabled="{Binding LoadSaveEnabled}"
-                Style="{StaticResource BaseStyle}"
-                BorderBrush="Coral"
-                Width="120"
-                Margin="5"
-                Content="Load From Reblase"
-                Command="{Binding LoadFromReblaseCommand}"
                 />
         </StackPanel>
 
@@ -91,7 +91,7 @@
             </TextBlock.Text>
         </TextBlock>
 
-        <StackPanel
+        <!--<StackPanel
             HorizontalAlignment="Center"
             Orientation="Horizontal"
             Grid.Row="1"
@@ -123,7 +123,7 @@
                 Style="{StaticResource BaseStyle}"
                 Command="{Binding SaveUpdatesCommand}"
                 />
-        </StackPanel>
+        </StackPanel>-->
 
         <Button
             HorizontalAlignment="Center"
@@ -138,7 +138,8 @@
             >
             
         </Button>
-        <StackPanel
+        
+        <!--<StackPanel
             HorizontalAlignment="Center"
             Orientation="Horizontal"
             Grid.Row="1"
@@ -161,7 +162,7 @@
                 Style="{StaticResource BaseStyle}"
                 Command="{Binding SaveEventsCommand}"
                 />
-            <!--<Button
+            --><!--<Button
                 IsEnabled="{Binding LoadSaveEnabled}"
                 Margin="10 0 0 0"
                 Content="Export to CSV..."
@@ -170,8 +171,8 @@
                 Width="160"
                 Style="{StaticResource BaseStyle}"
                 Command="{Binding ExportToCsvCommand}"
-                />-->
-        </StackPanel>
+                />--><!--
+        </StackPanel>-->
 
         <ListBox
             BorderThickness="0"

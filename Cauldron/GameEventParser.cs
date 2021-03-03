@@ -1286,7 +1286,7 @@ namespace Cauldron
 			else
 			{
 				// This gap is probably unfixable
-				if (m_pendingStates.Count > 5)
+				if (m_pendingStates.Count > 5 || newState.gameComplete == true)
 				{
 					Debugger.Log(0, "Reorder", $"Gave up waiting for pending state {m_oldState.playCount + 1}!\n");
 					var ordered = m_pendingStates.OrderBy(x => x.playCount).ToList();
