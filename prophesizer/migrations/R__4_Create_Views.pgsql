@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 2/21/2021
+﻿-- LAST UPDATE: 3/3/2021 
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
@@ -47,6 +47,9 @@ DROP VIEW IF EXISTS data.batting_records_combined_teams_single_game CASCADE;
 DROP VIEW IF EXISTS data.batting_records_combined_teams_playoffs_single_game CASCADE;
 DROP INDEX IF EXISTS data.batting_stats_all_events_indx_season CASCADE;
 DROP INDEX IF EXISTS data.batting_stats_all_events_indx_player_id CASCADE;
+DROP INDEX IF EXISTS data.running_stats_all_events_indx_player_id CASCADE;
+DROP INDEX IF EXISTS data.fielder_stats_all_events_player_id CASCADE;
+DROP INDEX IF EXISTS data.pitching_stats_all_appearances_indx_player_id CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_tournament_lifetime CASCADE;
 DROP VIEW IF EXISTS data.fielder_stats_tournament CASCADE;
 DROP VIEW IF EXISTS data.batting_stats_player_tournament_lifetime CASCADE;
@@ -55,6 +58,110 @@ DROP VIEW IF EXISTS data.batting_records_team_tournmament CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_tournament_single_game CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_tournament CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_tournament CASCADE;
+DROP SEQUENCE IF EXISTS data.player_debuts_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.players_info_expanded_all_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.players_info_expanded_tourney_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.batting_stats_all_events_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.batting_stats_player_single_game_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.fielder_stats_all_events_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.pitching_stats_all_appearances_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.running_stats_all_events_id_seq CASCADE;
+
+--
+-- Name: player_debuts_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.player_debuts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+	
+--
+-- Name: players_info_expanded_all_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.players_info_expanded_all_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+	
+--
+-- Name: players_info_expanded_tourney_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.players_info_expanded_tourney_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+	
+--
+-- Name: batting_stats_all_events_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.batting_stats_all_events_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+	
+--
+-- Name: batting_stats_player_single_game_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.batting_stats_player_single_game_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+	
+--
+-- Name: fielder_stats_all_events_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.fielder_stats_all_events_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+	
+--
+-- Name: pitching_stats_all_appearances_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.pitching_stats_all_appearances_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+	
+--
+-- Name: running_stats_all_events_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.running_stats_all_events_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 --
 -- Name: player_debuts; Type: MATERIALIZED VIEW; Schema: data; Owner: -
@@ -64,7 +171,8 @@ DROP MATERIALIZED VIEW IF EXISTS data.player_debuts CASCADE;
 
 CREATE MATERIALIZED VIEW data.player_debuts
 AS
-SELECT DISTINCT game_id AS debut_game_id, player_id, season AS debut_season, DAY AS debut_gameday, tournament AS debut_tournament
+SELECT DISTINCT NEXTVAL('DATA.player_debuts_id_seq') as player_debuts_id, 
+game_id AS debut_game_id, player_id, season AS debut_season, DAY AS debut_gameday, tournament AS debut_tournament
 FROM DATA.game_events ge
 JOIN
 (
@@ -524,7 +632,9 @@ AS
 --
 
 CREATE MATERIALIZED VIEW data.players_info_expanded_all AS
-SELECT p.player_id,
+SELECT 
+NEXTVAL('DATA.players_info_expanded_all_id_seq') as players_info_expanded_all_id,
+p.player_id,
 p.player_name,
 ps.current_state,
 ps.current_location,
@@ -669,7 +779,9 @@ WITH NO DATA;
 --
 
 CREATE MATERIALIZED VIEW data.players_info_expanded_tourney AS
-SELECT p.player_id,
+SELECT 
+NEXTVAL('DATA.players_info_expanded_tourney_id_seq') as players_info_expanded_tourney_id,
+p.player_id,
 p.player_name,
 ps.current_state,
 ps.current_location,
@@ -1012,7 +1124,9 @@ CREATE VIEW data.batting_records_player_season AS
 -- Name: batting_stats_all_events; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
-	SELECT ge.batter_team_id,
+	SELECT 
+	NEXTVAL('DATA.batting_stats_all_events_id_seq') as batting_stats_all_events_id,
+	ge.batter_team_id,
 	ge.batter_id AS player_id,
 	ge.pitcher_team_id,
 	ge.pitcher_id,
@@ -1148,7 +1262,9 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
 -- Name: batting_stats_player_single_game; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.batting_stats_player_single_game AS
-	SELECT p.player_name,
+	SELECT 
+	NEXTVAL('DATA.batting_stats_player_single_game_id_seq') as batting_stats_player_single_game_id,
+	p.player_name,
 	a.player_id,
 	t.team_id,
 	t.nickname AS team,
@@ -2052,7 +2168,9 @@ CREATE VIEW data.charm_counts AS
 -- Name: fielder_stats_all_events; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.fielder_stats_all_events AS
- SELECT d.batter,
+ SELECT 
+	NEXTVAL('DATA.fielder_stats_all_events_id_seq') as fielder_stats_all_events_id, 
+	d.batter,
     d.batter_id,
     d.season,
     d.day,
@@ -2140,7 +2258,9 @@ CREATE VIEW data.fielder_stats_tournament AS
 -- Name: pitching_stats_all_appearances; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.pitching_stats_all_appearances AS
- SELECT ge.game_id,
+ SELECT 
+	NEXTVAL('DATA.pitching_stats_all_appearances_id_seq') as pitching_stats_all_appearances_id,
+	ge.game_id,
     ge.pitcher_id AS player_id,
     ge.pitcher_team_id AS team_id,
     ge.season,
@@ -2580,7 +2700,9 @@ CREATE VIEW data.rosters_extended_current AS
 -- Name: running_stats_all_events; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.running_stats_all_events AS
- SELECT geb.runner_id AS player_id,
+ SELECT 
+	NEXTVAL('DATA.running_stats_all_events_id_seq') as running_stats_all_events_id,	
+	geb.runner_id AS player_id,
     ge.batter_team_id AS team_id,
     geb.responsible_pitcher_id,
     ge.pitcher_team_id AS responsible_team_id,
@@ -2700,6 +2822,7 @@ CREATE VIEW data.stars_team_all_current AS
 -- Name: batting_stats_all_events_indx_player_id; Type: INDEX; Schema: data; Owner: -
 --
 CREATE INDEX batting_stats_all_events_indx_player_id ON data.batting_stats_all_events USING btree (player_id);
+
 --
 -- Name: batting_stats_all_events_indx_season; Type: INDEX; Schema: data; Owner: -
 --
@@ -2709,6 +2832,16 @@ CREATE INDEX batting_stats_all_events_indx_season ON data.batting_stats_all_even
 -- Name: running_stats_all_events_indx_player_id; Type: INDEX; Schema: data; Owner: -
 --
 CREATE INDEX running_stats_all_events_indx_player_id ON data.running_stats_all_events USING btree (player_id);
+
+--
+-- Name: pitching_stats_all_appearances_indx_player_id; Type: INDEX; Schema: data; Owner: -
+--
+CREATE INDEX pitching_stats_all_appearances_player_id ON data.pitching_stats_all_appearances USING btree (player_id);
+
+--
+-- Name: fielder_stats_all_events_indx_player_id; Type: INDEX; Schema: data; Owner: -
+--
+CREATE INDEX fielder_stats_all_events_player_id ON data.fielder_stats_all_events USING btree (player_id);
 
 --
 -- Name: ref_leaderboard_lifetime_batting; Type: VIEW; Schema: data; Owner: -
@@ -2940,3 +3073,11 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 	WHERE c.rank <= 10 
 	ORDER BY c.stat, c.rank, p.player_name;	
 
+CREATE UNIQUE INDEX ON data.player_debuts (player_debuts_id);
+CREATE UNIQUE INDEX ON data.players_info_expanded_all (players_info_expanded_all_id);
+CREATE UNIQUE INDEX ON data.players_info_expanded_tourney (players_info_expanded_tourney_id);
+CREATE UNIQUE INDEX ON data.batting_stats_all_events (batting_stats_all_events_id);
+CREATE UNIQUE INDEX ON data.batting_stats_player_single_game (batting_stats_player_single_game_id);
+CREATE UNIQUE INDEX ON data.fielder_stats_all_events (fielder_stats_all_events_id);
+CREATE UNIQUE INDEX ON data.pitching_stats_all_appearances (pitching_stats_all_appearances_id);
+CREATE UNIQUE INDEX ON data.running_stats_all_events (running_stats_all_events_id);
