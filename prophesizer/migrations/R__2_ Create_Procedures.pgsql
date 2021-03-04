@@ -1,9 +1,10 @@
-﻿-- LAST UPDATE: 3/3/2021  
+﻿-- LAST UPDATE: 3/3/2021   
 
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();
 DROP PROCEDURE IF EXISTS data.wipe_all();
 DROP PROCEDURE IF EXISTS data.refresh_materialized_views();
+DROP PROCEDURE IF EXISTS data.refresh_materialized_views_concurrently();
 
 --
 -- Name: refresh_materialized_views(); Type: PROCEDURE; Schema: data; Owner: -
@@ -15,6 +16,18 @@ begin
 perform data.refresh_matviews();
 end;
 $$;
+
+--
+-- Name: refresh_materialized_views_concurrently(); Type: PROCEDURE; Schema: data; Owner: -
+--
+CREATE PROCEDURE data.refresh_materialized_views_concurrently()
+    LANGUAGE plpgsql
+    AS $$
+begin
+perform data.refresh_matviews_concurrently();
+end;
+$$;
+
 
 --
 -- Name: wipe_all(); Type: PROCEDURE; Schema: data; Owner: -

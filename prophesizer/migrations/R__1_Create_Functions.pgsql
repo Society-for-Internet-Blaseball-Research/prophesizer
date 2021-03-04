@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/3/2021 
+﻿-- LAST UPDATE: 2/17/2021
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -10,6 +10,7 @@ DROP FUNCTION IF EXISTS data.season_timespan(in_season integer) CASCADE;
 DROP FUNCTION IF EXISTS data.round_half_even(val numeric, prec integer) CASCADE;
 DROP FUNCTION IF EXISTS data.rosters_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
 DROP FUNCTION IF EXISTS data.refresh_matviews() CASCADE;
+DROP FUNCTION IF EXISTS data.refresh_matviews_concurrently() CASCADE;
 DROP FUNCTION IF EXISTS data.ref_leaderboard_season_pitching(in_season integer) CASCADE;
 DROP FUNCTION IF EXISTS data.ref_leaderboard_season_batting(in_season integer) CASCADE;
 DROP FUNCTION IF EXISTS data.reblase_gameid(in_game_id character varying) CASCADE;
@@ -765,18 +766,34 @@ $$;
 -- Name: refresh_matviews(); Type: FUNCTION; Schema: data; Owner: -
 --
 CREATE FUNCTION data.refresh_matviews() RETURNS void
-    LANGUAGE plpgsql
+    LANGUAGE sql SECURITY DEFINER
     AS $$
-begin 
-		REFRESH MATERIALIZED VIEW data.player_debuts;
-		REFRESH MATERIALIZED VIEW data.players_info_expanded_tourney;
-		REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
-		REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
-		REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
-		REFRESH MATERIALIZED VIEW data.running_stats_all_events;
-		REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
-end;
+REFRESH MATERIALIZED VIEW data.player_debuts;
+REFRESH MATERIALIZED VIEW data.players_info_expanded_all;
+REFRESH MATERIALIZED VIEW data.players_info_expanded_tourney;
+REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
+REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
+REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
+REFRESH MATERIALIZED VIEW data.running_stats_all_events;
+REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
 $$;
+
+--
+-- Name: refresh_matviews_concurrently(); Type: FUNCTION; Schema: data; Owner: -
+--
+CREATE FUNCTION data.refresh_matviews_concurrently() RETURNS void
+    LANGUAGE sql SECURITY DEFINER
+    AS $$
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.player_debuts;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.players_info_expanded_all;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.players_info_expanded_tourney;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_all_events;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_single_game;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.fielder_stats_all_events;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_all_events;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_all_appearances;
+$$;
+
 --
 -- Name: rosters_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
@@ -863,3 +880,4 @@ CREATE TRIGGER player_insert BEFORE INSERT ON data.players FOR EACH ROW EXECUTE 
 -- Name: teams team_insert; Type: TRIGGER; Schema: data; Owner: -
 --
 CREATE TRIGGER team_insert BEFORE INSERT ON data.teams FOR EACH ROW EXECUTE FUNCTION data.team_slug_creation();
+

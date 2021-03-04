@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/3/2021 
+﻿-- LAST UPDATE: 3/3/2021  
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;

@@ -295,7 +295,7 @@ namespace SIBR
 
 			if (DO_REFRESH_MATVIEWS)
 			{
-				RefreshMaterializedViews(psqlConnection);
+				await RefreshMaterializedViews(psqlConnection);
 			}
 
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
@@ -367,7 +367,7 @@ namespace SIBR
 			return new FileInfo(location.AbsolutePath).Directory.FullName;
 		}
 
-		private void RefreshMaterializedViews(NpgsqlConnection psqlConnection)
+		private async Task RefreshMaterializedViews(NpgsqlConnection psqlConnection)
 		{
 			bool printMatviewTime = false;
 			Stopwatch matviewTimer = new Stopwatch();
@@ -398,12 +398,18 @@ namespace SIBR
 					Console.WriteLine($"{numFinishedGames} of {numGames} games complete for {m_dbSeasonDay.HumanReadable}...");
 					// If all games are done, refresh our materialized views
 					if ((numGames > 0 && numFinishedGames >= numGames) || 
-						(numGames == 0 && m_dbSeasonDay.Season > m_lastMaterializedRefresh.Season))
+						(numGames == 0 && m_dbSeasonDay.Season > m_lastMaterializedRefresh.Season) ||
+						(m_lastMaterializedRefresh.Season == 0 && m_lastMaterializedRefresh.Day == 0))
 					{
+						var checkCmd = new NpgsqlCommand("SELECT relispopulated FROM pg_class WHERE relname = 'players_info_expanded_all'", psqlConnection);
+						var isPopulated = (bool)(checkCmd.ExecuteScalar() ?? false);
+
 						printMatviewTime = true;
-						ConsoleOrWebhook($"All games complete for {m_dbSeasonDay.HumanReadable}, refreshing materialized views!");
-						var refreshCmd = new NpgsqlCommand("CALL data.refresh_materialized_views()", psqlConnection);
-						refreshCmd.ExecuteNonQuery();
+
+						ConsoleOrWebhook($"All games complete for {m_dbSeasonDay.HumanReadable}, refreshing materialized views{(isPopulated?" concurrently":"")}!");
+						string query = isPopulated ? "CALL data.refresh_materialized_views_concurrently()" : "CALL data.refresh_materialized_views()";
+						var refreshCmd = new NpgsqlCommand(query, psqlConnection);
+						await refreshCmd.ExecuteNonQueryAsync();
 
 						m_lastMaterializedRefresh = m_dbSeasonDay;
 					}
