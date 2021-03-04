@@ -18,7 +18,7 @@ namespace SIBR
 				{
 					Locations = new[] { "migrations" },
 					SqlMigrationSuffix = ".pgsql",
-					CommandTimeout = 60,
+					CommandTimeout = 600,
 					//IsEraseDisabled = true, //< Recommended in production
 				};
 

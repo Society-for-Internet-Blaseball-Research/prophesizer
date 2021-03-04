@@ -1388,7 +1388,7 @@ namespace SIBR
 			}
 
 			s.Stop();
-			if (TIMING) Console.WriteLine($"Processed rosters in {s.ElapsedMilliseconds} ms");
+			// if (TIMING) Console.WriteLine($"Processed rosters in {s.ElapsedMilliseconds} ms");
 		}
 
 		// Hash just the basic attributes of a team, not including their player roster
