@@ -1249,6 +1249,10 @@ namespace Cauldron
 			newState.lastUpdate = newState.lastUpdate.Trim();
 			newState.lastUpdate = newState.lastUpdate.Replace("\n", " ");
 
+			// Replace the built-in timestamp with the one provided
+			if(newState.timestamp.Year < 2020)
+				newState.timestamp = timeStamp;
+
 			bool dupe = CheckForDuplicateUpdate(newState.chroniclerHash);
 
 			if (IsGameComplete)
