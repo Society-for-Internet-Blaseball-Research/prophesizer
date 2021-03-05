@@ -448,7 +448,8 @@ namespace Cauldron
 			}
 			else if (newStrikes == 1)
 			{
-				if (newState.lastUpdate.Contains("looking") || newState.lastUpdate.Contains("flinched. Strike."))
+				if (newState.lastUpdate.Contains("looking") || newState.lastUpdate.Contains("flinched. Strike.")
+					|| newState.lastUpdate.Contains("flinching"))
 				{
 					m_currEvent.pitchesList.Add('C');
 				}
