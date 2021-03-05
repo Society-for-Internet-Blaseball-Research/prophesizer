@@ -102,6 +102,16 @@
                     <Binding StringFormat="{}{0}" Path="Event.gameId"/>
                 </TextBlock.Text>
             </TextBlock>
+            <TextBlock
+                Style="{StaticResource SmallText}"
+                HorizontalAlignment="Right"
+                Grid.Column="3"
+                Grid.Row="2"
+                >
+                <TextBlock.Text>
+                    <Binding StringFormat="{}{0}" Path="Event.eventIndex"/>
+                </TextBlock.Text>
+            </TextBlock>
             <controls:MatchupAndScore
                 AwayTeamName="{Binding AwayTeamName}"
                 AwayTeamScore="{Binding Event.awayScore}"
