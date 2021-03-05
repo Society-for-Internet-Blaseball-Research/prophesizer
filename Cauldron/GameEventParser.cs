@@ -1014,7 +1014,7 @@ namespace Cauldron
 		}
 
 		// Checks whether the playCount increased correctly
-		// Returns TRUE on a valid playCount and FALSE on an invalid one (meaning a data gap or misorder)
+		// Returns a descriptor for the current playCount state
 		public PlayCountStatus CheckPlayCount(Game newState)
 		{
 			if(m_oldState.playCount.HasValue && newState.playCount.HasValue)
@@ -1305,6 +1305,12 @@ namespace Cauldron
 					Debugger.Log(0, "Reorder", $"Found a gap from {m_oldState.playCount} to {newState.playCount}! Shelving {newState.playCount}\n");
 					m_seenUpdates.Remove(newState.chroniclerHash);
 					m_pendingStates.Add(newState);
+					return;
+				}
+				else if (playCountState == PlayCountStatus.Decrease)
+				{
+					Debugger.Log(0, "Reorder", $"Got a decreasing play count! Probably means we got the first few events out of order. Dropping the decreasing one...\n");
+					// Discard this event, we're past it and committed already
 					return;
 				}
 

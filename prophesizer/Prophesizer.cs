@@ -904,6 +904,11 @@ namespace SIBR
 
 		private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent, int gameEventId)
 		{
+			if(gameEvent.firstPerceivedAt.Year < 2020)
+			{
+				Console.WriteLine($"Warning! Found a game event with bogus timestamp - event {gameEventId} from game {gameEvent.gameId}, eventIndex {gameEvent.eventIndex}.");
+			}
+
 			using (var gameEventStatement = PrepareGameEventStatement(psqlConnection, gameEvent, gameEventId))
 			{
 				int id = -1;

@@ -134,7 +134,7 @@ namespace Cauldron
 		public int tournament { get; set; }
 		public override string ToString()
 		{
-			return $"[{eventIndex}] OB: {outsBeforePlay}\tO: {outsOnPlay}\tCount {totalBalls}-{totalStrikes}\tFouls: {totalFouls}\tBases: {basesHit}\tRBIs: {runsBattedIn}\t\"{additionalContext}\": {pitcherId} pitching to {batterId}";
+			return $"Game {gameId}, [{eventIndex}] {(topOfInning?"Top ":"Bot ")} {inning}, {outsBeforePlay} outs";
 		}
 
 		// TODO: consider adding the error flags to the DB
