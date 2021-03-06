@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/3/2021  
+﻿-- LAST UPDATE: 3/5/2021  
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
@@ -607,9 +607,11 @@ AS
 	(
 		SELECT season, DAY, tournament, phase_type,
 		CASE
-			WHEN POSITION('hitter' IN outcome) > 0 
+			WHEN season < 11 AND POSITION('hitter' IN outcome) > 0 
 			THEN right(left(outcome, POSITION('!' IN outcome) - 1),length(left(outcome, POSITION('!' IN outcome) - 1)) - POSITION('hitter' IN outcome) - 6)
-			ELSE right(left(outcome, POSITION('!' IN outcome) - 1),length(left(outcome, POSITION('!' IN outcome) - 1)) - POSITION('pitcher' IN outcome) - 7)
+			WHEN season < 11 AND POSITION('hitter' IN outcome) = 0
+			THEN right(left(outcome, POSITION('!' IN outcome) - 1),length(left(outcome, POSITION('!' IN outcome) - 1)) - POSITION('pitcher' IN outcome) - 7)
+			ELSE replace(REPLACE(outcome, 'Rogue Umpire incinerated ',''),'!','')
 		END AS player_name
 		FROM
 		(
@@ -620,12 +622,8 @@ AS
 		--Needs 'Umpire ' to exclude Iffey Jr scenario
 		POSITION('Umpire incinerated' IN outcome) > 0
 	) b
-	JOIN DATA.players p
-	ON (b.player_name = p.player_name AND p.valid_until IS NULL)
-	--Manually include S2 and Election Result Incinerations
-	UNION
-	SELECT * FROM  taxa.player_incinerations_unrecorded
-	ORDER BY season, DAY, player_name;
+	JOIN DATA.players p	ON (b.player_name = p.player_name AND p.valid_until IS NULL)
+	ORDER BY season DESC, DAY DESC;
 
 --
 -- Name: players_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
