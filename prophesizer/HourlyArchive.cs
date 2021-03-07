@@ -125,6 +125,7 @@ public class Team
 	public string Slogan { get; set; }
 	public string Emoji { get; set; }
 	[DbAlias("stadium_id")]
+	[DbNullValue("")]
 	public string Stadium { get; set; }
 
 
