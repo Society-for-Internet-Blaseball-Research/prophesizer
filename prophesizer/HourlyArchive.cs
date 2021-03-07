@@ -118,9 +118,20 @@ public class Team
 	public string Nickname { get; set; }
 	public string FullName { get; set; }
 
-	// Tarot card index from S11 election
-	// DbIgnore this entry because it might not exist
-	[DbIgnore]
+	public string MainColor { get; set; }
+	public string SecondaryColor { get; set; }
+	[DbAlias("abbreviation")]
+	public string Shorthand { get; set; }
+	public string Slogan { get; set; }
+	public string Emoji { get; set; }
+	[DbAlias("stadium_id")]
+	[DbNullValue("")]
+	public string Stadium { get; set; }
+
+
+// Tarot card index from S11 election
+// DbIgnore this entry because it might not exist
+[DbIgnore]
 	public int? Card { get; set; }
 
 	// Insert this property into the DB as 'card'

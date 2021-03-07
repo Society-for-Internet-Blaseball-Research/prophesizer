@@ -28,6 +28,7 @@
     <Content Include="patch\*.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <None Remove="migrations\V2_11_7__More_Team_Info.pgsql" />
     <None Remove="migrations\V2_9_6__Games_Outcomes.pgsql" />
     <ProjectReference Include="..\Cauldron\Cauldron.csproj" />
     <None Update="patch\crabs_to_fridays.sql">
