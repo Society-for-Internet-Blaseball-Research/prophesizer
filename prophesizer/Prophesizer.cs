@@ -1699,15 +1699,18 @@ namespace SIBR
 
 				// Talk to the blaseball API
 
+				const int REASONABLE_MAX_DAY = 125;
+
 				Console.WriteLine($"Adding regular season game records...");
 				// Loop until we break out
 				while (true)
 				{
 					var gameList = await GetGames(season, day);
-					// If we got no response 
+					// If we got an empty response
 					if (gameList == null || gameList.Count() == 0)
 					{
-						if (day > 0)
+						// If we've exceeded a reasonable day size for the season
+						if (day > REASONABLE_MAX_DAY)
 						{
 							// Ran out of finished games this season, try the next
 							m_regularSeasonDay.Season = season;
@@ -1715,7 +1718,8 @@ namespace SIBR
 							day = 0;
 							continue;
 						}
-						else
+						// If we got no response on Day 0
+						else if (day == 0)
 						{
 							// season X day 0 had no complete games, stop looping
 							break;
