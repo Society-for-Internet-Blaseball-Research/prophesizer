@@ -1412,6 +1412,11 @@ namespace SIBR
 			sb.Append(obj.Nickname);
 			sb.Append(obj.FullName);
 			sb.Append(obj.CardIndex);
+			sb.Append(obj.Slogan);
+			sb.Append(obj.MainColor);
+			sb.Append(obj.SecondaryColor);
+			sb.Append(obj.Emoji);
+			sb.Append(obj.Shorthand);
 
 			// Convert the input string to a byte array and compute the hash.
 			byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));

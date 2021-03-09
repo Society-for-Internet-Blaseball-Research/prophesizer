@@ -118,11 +118,15 @@ public class Team
 	public string Nickname { get; set; }
 	public string FullName { get; set; }
 
+	[DbAlias("team_main_color")]
 	public string MainColor { get; set; }
+	[DbAlias("team_secondary_color")]
 	public string SecondaryColor { get; set; }
-	[DbAlias("abbreviation")]
+	[DbAlias("team_abbreviation")]
 	public string Shorthand { get; set; }
+	[DbAlias("team_slogan")]
 	public string Slogan { get; set; }
+	[DbAlias("team_emoji")]
 	public string Emoji { get; set; }
 	[DbAlias("stadium_id")]
 	[DbNullValue("")]
