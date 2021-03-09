@@ -421,7 +421,7 @@ CASE
 		WHERE xdt.team_id = ts.team_id AND xdt.division_id IS NOT NULL AND xdt.valid_until IS NULL
 	)
 	THEN 'active'
-    ELSE 'active
+    ELSE 'active'
 END AS current_team_status,
 ts.timestampd AS valid_from,
 lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
