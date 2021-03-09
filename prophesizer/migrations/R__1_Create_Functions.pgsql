@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/5/2021
+﻿-- LAST UPDATE: 3/9/2021
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -289,21 +289,31 @@ RETURNS TABLE(season integer, tournament integer, gameday integer, phase_type VA
     AS $$
 SELECT 
 CASE
-	WHEN phase_type NOT IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON')
-	THEN season
+	WHEN season = -1 AND day = 115 THEN 11 -- Thanks TGB!
+	WHEN phase_type NOT IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON') AND season < 11 THEN season
+	WHEN season <= 11 then season
 	ELSE NULL
 END AS season,
 CASE
-	WHEN phase_type IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON')
-	THEN 0
+	WHEN season = -1 AND day = 115 THEN NULL -- Thanks TGB!
+	WHEN phase_type IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON') THEN 0
 	ELSE NULL
 END AS tournament,
 CASE
-	WHEN phase_type IN ('GAMEDAY','TOURNAMENT_GAMEDAY','POSTSEASON','TOURNAMENT_POSTSEASON')
-	THEN day
+	WHEN phase_type IN ('GAMEDAY','TOURNAMENT_GAMEDAY','POSTSEASON','TOURNAMENT_POSTSEASON') AND season < 11 THEN day
+	WHEN season >= 11 and tm.phase_id in (2,4,6,7,9,11) THEN day
 	ELSE NULL
 END AS DAY,
-phase_type
+CASE	
+	when season = -1 AND day = 115 AND tm.phase_id = 13 then 'ELECTIONS' --Thanks TGB!
+	when season < 11 then phase_type
+	when season >= 11 and tm.phase_id = 1 THEN 'PRESEASON'
+	when season >= 11 and tm.phase_id = 3 THEN 'EARLY_SIESTA'
+	when season >= 11 and tm.phase_id = 5 THEN 'LATE_SIESTA'
+	when season >= 11 and tm.phase_id in (7,8) THEN 'END_REGULAR_SEASON'
+	when season >= 11 and tm.phase_id = 10 THEN 'END_POSTSEASON'
+	when season >= 11 and (tm.phase_id = 0 or tm.phase_id > 11) THEN 'ELECTIONS'
+END as phase_type
 FROM DATA.time_map tm
 JOIN taxa.phases xp
 ON (tm.phase_id = xp.phase_id)
@@ -584,7 +594,7 @@ begin
 			FROM DATA.batting_stats_player_season y
 			WHERE season = in_season
 			AND plate_appearances > (SELECT MAX(DAY)+1 FROM DATA.games WHERE season = in_season
-			AND NOT is_postseason)*2
+			AND NOT is_postseason AND (home_score + away_score > 0))*2
 		) ba
 		ON (b.player_id = ba.player_id)
 		LEFT JOIN
@@ -727,7 +737,7 @@ begin
 			
 			--at least 1 inning per team's regular season games for averaging stats
 			AND outs_recorded > (SELECT MAX(DAY)+1 FROM DATA.games WHERE season = in_season
-			AND NOT is_postseason)*3
+			AND NOT is_postseason AND (home_score + away_score > 0))*3
 		) pa
 		ON (p.player_id = pa.player_id)
 	) a
