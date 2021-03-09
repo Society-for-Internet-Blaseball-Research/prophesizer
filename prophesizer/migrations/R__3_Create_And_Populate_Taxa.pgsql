@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/5/2021   
+﻿-- LAST UPDATE: 3/9/2021   
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -679,10 +679,8 @@ VALUES
 (11, 'FIELDERS_CHOICE', 1, 1, 0, 0, 1),
 (12, 'GAME_OVER', 0, 0, 0, 0, 0),
 (13, 'UNKNOWN_OUT', 0, 0, 0, 0, 1),
-(14, 'UNKNOWN', 0, 0, 0, 0, 0),
-(15, 'DOUBLE WALK', 1, 0, 0, 2, 0),
+(14, 'UNKNOWN', 0, 0, 0, 0, 0),`
 (16, 'HIT_BY_PITCH', 1, 0, 0, 1, 0),
-(17, 'TRIPLE_WALK', 1, 0, 0, 3, 0),
 (18, 'WALK', 1, 0, 0, 0, 0),
 (19, 'WILD_PITCH', 0, 0, 0, 0, 0),
 (20, 'HOME_RUN_5', 1, 1, 1, 5, 0),

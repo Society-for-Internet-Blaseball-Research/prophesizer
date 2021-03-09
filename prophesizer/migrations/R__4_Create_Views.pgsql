@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/5/2021  
+﻿-- LAST UPDATE: 3/9/2021  
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
@@ -421,7 +421,6 @@ CASE
 		WHERE xdt.team_id = ts.team_id AND xdt.division_id IS NOT NULL AND xdt.valid_until IS NULL
 	)
 	THEN 'active'
-	ELSE 'ascended'
 END AS current_team_status,
 ts.timestampd AS valid_from,
 lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
