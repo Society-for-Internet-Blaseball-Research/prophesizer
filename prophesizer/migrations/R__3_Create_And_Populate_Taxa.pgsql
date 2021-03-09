@@ -679,7 +679,7 @@ VALUES
 (11, 'FIELDERS_CHOICE', 1, 1, 0, 0, 1),
 (12, 'GAME_OVER', 0, 0, 0, 0, 0),
 (13, 'UNKNOWN_OUT', 0, 0, 0, 0, 1),
-(14, 'UNKNOWN', 0, 0, 0, 0, 0),`
+(14, 'UNKNOWN', 0, 0, 0, 0, 0),
 (16, 'HIT_BY_PITCH', 1, 0, 0, 1, 0),
 (18, 'WALK', 1, 0, 0, 0, 0),
 (19, 'WILD_PITCH', 0, 0, 0, 0, 0),
