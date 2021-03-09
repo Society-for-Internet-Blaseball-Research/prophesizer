@@ -1280,7 +1280,7 @@ namespace Cauldron
 				m_processed++;
 			}
 
-			Debugger.Log(0, "Reorder", $"## ParseGameUpdate for state {newState.playCount} ##\n");
+			//Debugger.Log(0, "Reorder", $"## ParseGameUpdate for state {newState.playCount} ##\n");
 			PlayCountStatus playCountState = CheckPlayCount(newState);
 
 			if(ignoreGaps && playCountState == PlayCountStatus.Gap)
