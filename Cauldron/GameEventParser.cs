@@ -505,7 +505,10 @@ namespace Cauldron
 			}
 
 			// Types of outs
-			if (newState.lastUpdate.Contains("out") || newState.lastUpdate.Contains("sacrifice") || newState.lastUpdate.Contains("hit into a double play"))
+			if (newState.lastUpdate.Contains("out") || 
+				newState.lastUpdate.Contains("sacrifice") || 
+				newState.lastUpdate.Contains("hit into a double play") ||
+				newState.lastUpdate.Contains("tags up"))
 			{
 				if (newState.lastUpdate.Contains("strikes out") || newState.lastUpdate.Contains("struck out"))
 				{
@@ -520,7 +523,7 @@ namespace Cauldron
 					m_currEvent.eventType = GameEventType.CHARM_STRIKEOUT;
 					m_currEvent.totalStrikes = newState.topOfInning ? newState.awayStrikes.GetValueOrDefault() : newState.homeStrikes.GetValueOrDefault();
 				}
-				else if(newState.lastUpdate.Contains("sacrifice"))
+				else if(newState.lastUpdate.Contains("sacrifice") || newState.lastUpdate.Contains("tags up"))
 				{
 					m_currEvent.eventType = GameEventType.SACRIFICE;
 				}
