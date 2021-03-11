@@ -634,7 +634,27 @@ namespace Cauldron
 				m_currEvent.eventType = GameEventType.CAUGHT_STEALING;
 				m_currEvent.isLastEventForPlateAppearance = false;
 			}
+
+			if(newState.lastUpdate.Contains("Baserunners are swept from play"))
+			{
+				m_currEvent.eventType = GameEventType.IMMATERIA_SWEPT;
+				m_currEvent.isLastEventForPlateAppearance = false;
+			}
 		}
+
+		private void SetResponsiblePitcher(GameEventBaseRunner runner, string runnerId, string lastUpdate)
+		{
+			if (m_responsiblePitchers.ContainsKey(runnerId))
+			{
+				runner.responsiblePitcherId = m_responsiblePitchers[runnerId];
+			}
+			else
+			{
+				runner.responsiblePitcherId = "";
+				AddParsingError(m_currEvent, $"Couldn't find responsible pitcher for runner {runnerId} in update '{lastUpdate}'");
+			}
+		}
+
 
 
 		private const int BASE_RUNNER_OUT = 0;
@@ -759,15 +779,7 @@ namespace Cauldron
 					scoreDiff--;
 					GameEventBaseRunner runner = new GameEventBaseRunner();
 					runner.runnerId = runnerId;
-					if(m_responsiblePitchers.ContainsKey(runnerId))
-					{
-						runner.responsiblePitcherId = m_responsiblePitchers[runnerId];
-					}
-					else
-					{
-						runner.responsiblePitcherId = "";
-						AddParsingError(m_currEvent, $"Couldn't find responsible pitcher for runner {runnerId} in update '{newState.lastUpdate}'");
-					}
+					SetResponsiblePitcher(runner, runnerId, newState.lastUpdate);
 
 					runner.baseBeforePlay = baseIndex + 1;
 					runner.baseAfterPlay = newState.BatterTeamBases;
@@ -783,15 +795,7 @@ namespace Cauldron
 					// Fine, he was out
 					GameEventBaseRunner runner = new GameEventBaseRunner();
 					runner.runnerId = runnerId;
-					if (m_responsiblePitchers.ContainsKey(runnerId))
-					{
-						runner.responsiblePitcherId = m_responsiblePitchers[runnerId];
-					}
-					else
-					{
-						runner.responsiblePitcherId = "";
-						AddParsingError(m_currEvent, $"Couldn't find responsible pitcher for runner {runnerId} in update '{newState.lastUpdate}'");
-					}
+					SetResponsiblePitcher(runner, runnerId, newState.lastUpdate);
 
 					if (newState.lastUpdate.Contains("caught"))
 					{
@@ -812,15 +816,7 @@ namespace Cauldron
 					// For now, allow this in the 9th inning with 2 outs
 					GameEventBaseRunner runner = new GameEventBaseRunner();
 					runner.runnerId = runnerId;
-					if (m_responsiblePitchers.ContainsKey(runnerId))
-					{
-						runner.responsiblePitcherId = m_responsiblePitchers[runnerId];
-					}
-					else
-					{
-						runner.responsiblePitcherId = "";
-						AddParsingError(m_currEvent, $"Couldn't find responsible pitcher for runner {runnerId} in update '{newState.lastUpdate}'");
-					}
+					SetResponsiblePitcher(runner, runnerId, newState.lastUpdate);
 
 					runner.baseBeforePlay = baseIndex + 1;
 					runner.baseAfterPlay = baseIndex + 1;
@@ -828,8 +824,21 @@ namespace Cauldron
 				}
 				else
 				{
-					// What the hell else could have happened?
-					AddParsingError(m_currEvent, $"Baserunner {runnerId} missing from base {baseIndex + 1}, but there were no outs and score went from {oldScore} to {newScore}");
+					if (m_currEvent.eventType == GameEventType.IMMATERIA_SWEPT)
+					{
+						GameEventBaseRunner runner = new GameEventBaseRunner();
+						runner.runnerId = runnerId;
+						SetResponsiblePitcher(runner, runnerId, newState.lastUpdate);
+
+						runner.baseBeforePlay = baseIndex + 1;
+						runner.baseAfterPlay = BASE_RUNNER_OUT;
+						m_currEvent.baseRunners.Add(runner);
+					}
+					else
+					{
+						// What the hell else could have happened?
+						AddParsingError(m_currEvent, $"Baserunner {runnerId} missing from base {baseIndex + 1}, but there were no outs and score went from {oldScore} to {newScore}");
+					}
 				}
 			}
 
@@ -887,6 +896,12 @@ namespace Cauldron
 			if(newState.lastUpdate.Contains("Sun 2 smiles."))
 			{
 				m_currEvent.eventType = GameEventType.SUN_2;
+				return true;
+			}
+
+			if(newState.lastUpdate.Contains("is Elsewhere"))
+			{
+				m_currEvent.eventType = GameEventType.ELSEWHERE_ATBAT;
 				return true;
 			}
 
@@ -991,7 +1006,10 @@ namespace Cauldron
 			m_eventIndex++;
 
 			// If this was a steal or caught stealing, OR the caller want to start from this current state
-			if (startFromCurrent || m_currEvent.isSteal || m_currEvent.eventType == GameEventType.CAUGHT_STEALING)
+			if (startFromCurrent || 
+				m_currEvent.isSteal || 
+				m_currEvent.eventType == GameEventType.CAUGHT_STEALING ||
+				m_currEvent.eventType == GameEventType.IMMATERIA_SWEPT)
 			{
 				// Start the next event in this state
 				m_currEvent = CreateNewGameEvent(newState, timestamp);
@@ -1514,6 +1532,7 @@ namespace Cauldron
 				|| m_currEvent.eventType == GameEventType.WILD_PITCH
 				|| m_currEvent.eventType == GameEventType.BLACK_HOLE
 				|| m_currEvent.eventType == GameEventType.SUN_2
+				|| m_currEvent.eventType == GameEventType.IMMATERIA_SWEPT
 				|| m_inningState == InningState.PlayEnded)
 			{
 				EmitEvent(newState, timeStamp);

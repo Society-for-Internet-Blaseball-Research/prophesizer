@@ -44,6 +44,8 @@ namespace Cauldron
 		public static string CHARM_STRIKEOUT = "CHARM_STRIKEOUT";
 		public static string BLACK_HOLE = "BLACK_HOLE";
 		public static string SUN_2 = "SUN_2";
+		public static string IMMATERIA_SWEPT = "IMMATERIA_SWEPT";
+		public static string ELSEWHERE_ATBAT = "ELSEWHERE_ATBAT";
 	}
 
 
