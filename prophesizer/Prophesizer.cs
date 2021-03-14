@@ -327,13 +327,24 @@ namespace SIBR
 			meta.LastGameEvent = m_gameEventId;
 			meta.RunFinished = DateTime.UtcNow;
 
-			var cmd = new NpgsqlCommand("UPDATE data.prophesizer_meta SET (first_game_event, last_game_event, run_finished) = (@first, @last, @runFinished) WHERE prophesizer_meta_id = @record", psqlConnection);
-			cmd.Parameters.AddWithValue("first", meta.FirstGameEvent);
-			cmd.Parameters.AddWithValue("last", meta.LastGameEvent);
-			cmd.Parameters.AddWithValue("runFinished", meta.RunFinished);
-			cmd.Parameters.AddWithValue("record", record);
+			if (meta.FirstGameEvent != meta.LastGameEvent)
+			{
+				// Update our record to show when the run finished etc
+				var cmd = new NpgsqlCommand("UPDATE data.prophesizer_meta SET (first_game_event, last_game_event, run_finished) = (@first, @last, @runFinished) WHERE prophesizer_meta_id = @record", psqlConnection);
+				cmd.Parameters.AddWithValue("first", meta.FirstGameEvent);
+				cmd.Parameters.AddWithValue("last", meta.LastGameEvent);
+				cmd.Parameters.AddWithValue("runFinished", meta.RunFinished);
+				cmd.Parameters.AddWithValue("record", record);
 
-			cmd.ExecuteNonQuery();
+				cmd.ExecuteNonQuery();
+			}
+			else
+			{
+				// Delete our record since no game events were added anyway
+				var cmd = new NpgsqlCommand("DELETE FROM data.prophesizer_meta WHERE prophesizer_meta_id=@record", psqlConnection);
+				cmd.Parameters.AddWithValue("record", record);
+				cmd.ExecuteNonQuery();
+			}
 		}
 
 
