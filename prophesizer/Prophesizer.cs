@@ -219,12 +219,16 @@ namespace SIBR
 
 		public async Task<PollResult> Poll()
 		{
+			Metadata meta = new Metadata();
+
 			PollResult result = new PollResult(); 
 
 			Console.WriteLine($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
 
 			await using var psqlConnection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PSQL_CONNECTION_STRING"));
 			await psqlConnection.OpenAsync();
+
+			var recordId = OpenMetadata(meta, psqlConnection);
 
 			// Talk to the /games endpoint to find all the games we can into the DB
 			await PopulateGameTable(psqlConnection);
@@ -282,11 +286,11 @@ namespace SIBR
 				if (missingGames.Any())
 				{
 					// Batch load all missing games
-					await BatchLoadGameUpdates(psqlConnection, missingGames);
+					await BatchLoadGameUpdates(psqlConnection, missingGames, meta);
 				}
 
 				Console.WriteLine($"Starting incremental update from {simSeasonDay.HumanReadable} at time {m_dbGameTimestamp}");
-				result = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp);
+				result = await IncrementalUpdate(psqlConnection, simSeasonDay, m_dbGameTimestamp, meta);
 			}
 
 			ApplyDbPatches(psqlConnection);
@@ -298,11 +302,40 @@ namespace SIBR
 				await RefreshMaterializedViews(psqlConnection);
 			}
 
+			CloseMetadata(meta, recordId, psqlConnection);
+
 			var msg = $"Finished poll at {DateTime.UtcNow.ToString()} UTC.";
 			Console.WriteLine(msg);
 
 			return result;
 		}
+
+		private int OpenMetadata(Metadata meta, NpgsqlConnection psqlConnection)
+		{
+			var cmd = new NpgsqlCommand("INSERT INTO data.prophesizer_meta (major_version, minor_version, patch_version, run_started) VALUES (@major, @minor, @patch, @runStarted) RETURNING prophesizer_meta_id", psqlConnection);
+			cmd.Parameters.AddWithValue("major", meta.MajorVersion);
+			cmd.Parameters.AddWithValue("minor", meta.MinorVersion);
+			cmd.Parameters.AddWithValue("patch", meta.PatchVersion);
+			cmd.Parameters.AddWithValue("runStarted", meta.RunStarted);
+
+			int record = (int)(cmd.ExecuteScalar());
+			return record;
+		}
+
+		private void CloseMetadata(Metadata meta, int record, NpgsqlConnection psqlConnection)
+		{
+			meta.LastGameEvent = m_gameEventId;
+			meta.RunFinished = DateTime.UtcNow;
+
+			var cmd = new NpgsqlCommand("UPDATE data.prophesizer_meta SET (first_game_event, last_game_event, run_finished) = (@first, @last, @runFinished) WHERE prophesizer_meta_id = @record", psqlConnection);
+			cmd.Parameters.AddWithValue("first", meta.FirstGameEvent);
+			cmd.Parameters.AddWithValue("last", meta.LastGameEvent);
+			cmd.Parameters.AddWithValue("runFinished", meta.RunFinished);
+			cmd.Parameters.AddWithValue("record", record);
+
+			cmd.ExecuteNonQuery();
+		}
+
 
 		// Run any unapplied DB patches
 		private void ApplyDbPatches(NpgsqlConnection psqlConnection)
@@ -481,10 +514,14 @@ namespace SIBR
 			return days;
 		}
 
-		private async Task<PollResult> IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt, DateTime? afterTime)
+		private async Task<PollResult> IncrementalUpdate(NpgsqlConnection psqlConnection, SeasonDay startAt, DateTime? afterTime, Metadata meta)
 		{
 			PollResult pollResult = new PollResult();
 			m_gameEventId = GetMaxGameEventId(psqlConnection);
+			if (!meta.FirstGameEvent.HasValue)
+			{
+				meta.FirstGameEvent = m_gameEventId;
+			}
 
 			bool morePages = true;
 			string nextPage = null;
@@ -669,11 +706,15 @@ namespace SIBR
 		/// <summary>
 		/// Load updates from Chronicler by going wide
 		/// </summary>
-		private async Task BatchLoadGameUpdates(NpgsqlConnection psqlConnection, IEnumerable<SeasonDay> games)
+		private async Task BatchLoadGameUpdates(NpgsqlConnection psqlConnection, IEnumerable<SeasonDay> games, Metadata meta)
 		{
 			const int NUM_TASKS = 10;
 
 			m_gameEventId = GetMaxGameEventId(psqlConnection);
+			if (!meta.FirstGameEvent.HasValue)
+			{
+				meta.FirstGameEvent = m_gameEventId;
+			}
 
 			Queue<SeasonDay> gameQueue = new Queue<SeasonDay>(games);
 

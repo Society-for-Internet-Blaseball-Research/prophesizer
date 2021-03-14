@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <PackageId>SIBR.Prophesizer</PackageId>
-    <Version>2.11.14</Version>
+    <Version>2.11.15</Version>
     <Authors>lilserf</Authors>
     <Company>Society for Internet Blaseball Research</Company>
   </PropertyGroup>
@@ -28,6 +28,7 @@
     <Content Include="patch\*.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <None Remove="migrations\V2_11_15__Version_Tracking.pgsql" />
     <None Remove="migrations\V2_11_7__More_Team_Info.pgsql" />
     <None Remove="migrations\V2_11_8__Team_Info_Name_Changes.pgsql" />
     <None Remove="migrations\V2_9_6__Games_Outcomes.pgsql" />
