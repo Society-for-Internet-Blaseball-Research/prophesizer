@@ -1,9 +1,12 @@
-﻿-- LAST UPDATE: 3/9/2021  
+﻿-- LAST UPDATE: 3/14/2021
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
+DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
+DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_pitching CASCADE;
 DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_season CASCADE;
+DROP VIEW IF EXISTS data.running_stats_team_season CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_lifetime CASCADE;
 DROP VIEW IF EXISTS data.running_stats_player_playoffs_lifetime CASCADE;
@@ -12,6 +15,7 @@ DROP VIEW IF EXISTS data.rosters_extended_current CASCADE;
 DROP VIEW IF EXISTS data.rosters_current CASCADE;
 DROP VIEW IF EXISTS data.players_extended_current CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_season CASCADE;
+DROP VIEW IF EXISTS data.pitching_stats_team_season CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_lifetime CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_playoffs_lifetime CASCADE;
@@ -24,6 +28,7 @@ DROP VIEW IF EXISTS data.fielder_stats_lifetime CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.fielder_stats_all_events CASCADE;
 DROP VIEW IF EXISTS data.charm_counts CASCADE;
 DROP VIEW IF EXISTS data.batting_stats_player_season CASCADE;
+DROP VIEW IF EXISTS data.batting_stats_team_season CASCADE;
 DROP VIEW IF EXISTS data.batting_stats_player_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.batting_stats_player_lifetime CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_single_game CASCADE;
@@ -407,21 +412,9 @@ CASE
 		WHERE xtt.team_id = ts.team_id
 	) 
 	THEN 'tournament'
-	WHEN NOT EXISTS 
-	(
-		SELECT 1
-		FROM taxa.division_teams xdt
-		WHERE xdt.team_id = ts.team_id
-	)
+	WHEN t.nickname IN ('PODS','Hall Stars')
 	THEN 'disbanded'
-	WHEN EXISTS 
-	(
-		SELECT 1
-		FROM taxa.division_teams xdt
-		WHERE xdt.team_id = ts.team_id AND xdt.division_id IS NOT NULL AND xdt.valid_until IS NULL
-	)
-	THEN 'active'
-    ELSE 'active'
+   ELSE 'active'
 END AS current_team_status,
 ts.timestampd AS valid_from,
 lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
@@ -498,22 +491,6 @@ SELECT DISTINCT p.player_id, p.player_name,
 CASE
 	WHEN p.player_id = 'bc4187fa-459a-4c06-bbf2-4e0e013d27ce' 
 	THEN 'deprecated'
-	WHEN EXISTS 
-	( 
-		SELECT 1
-		FROM data.team_roster rc
-		JOIN data.teams_info_expanded_all t ON (rc.team_id = t.team_id)
-              WHERE (((rc.player_id)::text = (p.player_id)::text) AND (rc.valid_until IS NULL) AND (t.current_team_status IN  ('active','tournament')))
-	) 
-	THEN 'active'
-	WHEN EXISTS 
-	( 
-		SELECT 1
-		FROM data.team_roster rc
-		JOIN data.teams_info_expanded_all t ON (rc.team_id = t.team_id)
-		WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND t.current_team_status = 'ascended'
-	) 
-	THEN 'ascended'
 	WHEN 
 	( 
 		SELECT ip.deceased
@@ -528,10 +505,30 @@ CASE
 		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification in ('COFFEE_EXIT','RETIRED')
 	) 
 	THEN 'retired'
-	ELSE NULL::text
+	WHEN EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification in ('REDACTED')
+	) 
+	THEN 'redacted'
+	ELSE 'active'
 END AS current_state,
 CASE
 	WHEN player_id = '555b0a07-a3e0-41bc-b3db-ca8f520857bc' THEN 'outer_space'
+	WHEN 
+	( 
+		SELECT ip.deceased
+		FROM data.players ip
+		WHERE ip.player_id = p.player_id AND ip.valid_until IS NULL
+	) 
+	AND NOT EXISTS
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = 'COFFEE_EXIT'
+	)	
+	THEN NULL
 	WHEN EXISTS 
 	( 
 		SELECT 1
@@ -543,7 +540,7 @@ CASE
 	( 
 		SELECT 1
 		FROM data.player_modifications pm
-		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = 'RETIRED'
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification in ('REDACTED','RETIRED')
 	)
 	THEN NULL	
 	WHEN EXISTS 
@@ -571,27 +568,8 @@ CASE
 		SELECT 1
 		FROM data.team_roster rc
 		WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND rc.position_type_id > 1
-		AND NOT EXISTS 
-		(
-			SELECT 1
-			FROM data.team_roster rc
-			WHERE rc.player_id = p.player_id AND rc.position_type_id < 2
-		) 
 	)
-	THEN 'shadow_fk'
-	WHEN EXISTS 
-	(
-		SELECT 1
-		FROM data.team_roster rc
-		WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND rc.position_type_id > 1
-		AND EXISTS 
-		(
-			SELECT 1
-			FROM data.team_roster rc
-			WHERE rc.player_id = p.player_id AND rc.position_type_id < 2
-		)
-	) 
-	THEN 'shadow_known'
+	THEN 'shadows'
 	ELSE NULL::text
 END AS current_location
 FROM data.players p
@@ -2026,6 +2004,63 @@ CREATE VIEW data.batting_stats_player_season AS
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((NOT a.is_postseason) AND (a.season > 0))
   GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id, t.valid_from, t.valid_until;
+  
+--
+-- Name: batting_stats_team_season; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW data.batting_stats_team_season AS
+ SELECT 
+    t.team_id,
+    t.nickname AS team,
+	t.valid_from as team_valid_from,
+	t.valid_until as team_valid_until,
+    a.season,
+	count(distinct a.game_id) as appearances,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
+        END AS batting_average,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
+        END AS on_base_percentage,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE data.slugging(sum(a.total_bases), sum(a.at_bat))
+        END AS slugging,
+    sum(a.plate_appearance) AS plate_appearances,
+    sum(a.at_bat) AS at_bats,
+    sum(a.hit) AS hits,
+    sum(a.walk) AS walks,
+    sum(a.single) AS singles,
+    sum(a.double) AS doubles,
+    sum(a.triple) AS triples,
+	sum(a.quadruple) as quadruples,
+    sum(a.home_run) AS home_runs,
+    sum(a.runs_batted_in) AS runs_batted_in,
+    sum(a.strikeout) AS strikeouts,
+    sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
+    sum(a.at_bat_risp) AS at_bats_risp,
+    sum(a.hits_risp) AS hits_risp,
+        CASE
+            WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
+            ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
+        END AS batting_average_risp,
+        CASE
+            WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+            ELSE (data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat)))
+        END AS on_base_slugging,
+    sum(a.total_bases) AS total_bases,
+    sum(a.hbp) AS hit_by_pitches,
+    sum(a.ground_out) AS ground_outs,
+    sum(a.flyout) AS flyouts,
+    sum(a.gidp) AS gidp
+   FROM ((data.batting_stats_all_events a
+     JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+  WHERE ((NOT a.is_postseason) AND (a.season > 0))
+  GROUP BY a.season, t.nickname, t.team_id, t.valid_from, t.valid_until;
 
 --
 -- Name: batting_stats_player_tournament; Type: VIEW; Schema: data; Owner: -
@@ -2595,6 +2630,55 @@ CREATE VIEW data.pitching_stats_player_season AS
   GROUP BY a.player_name, p.player_id, p.season, p.team_id, t.nickname, t.valid_from, t.valid_until;
 
 --
+-- Name: pitching_stats_team_season; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW data.pitching_stats_team_season AS
+ SELECT 
+    p.season,
+    p.team_id,
+	t.nickname as team,
+	t.valid_from as team_valid_from,
+	t.valid_until as team_valid_until,
+    count(distinct game_id) AS games,
+    sum(p.win) AS wins,
+    sum(p.loss) AS losses,
+	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+    sum(p.pitches_thrown) AS pitches_thrown,
+    sum(p.batters_faced) AS batters_faced,
+    sum(p.outs_recorded) AS outs_recorded,
+    round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
+    sum(p.runs_allowed) AS runs_allowed,
+    sum(
+        CASE
+            WHEN (p.runs_allowed = (0)::numeric) THEN 1
+            ELSE 0
+        END) AS shutouts,
+    sum(
+        CASE
+            WHEN ((p.runs_allowed < (4)::numeric) AND (p.outs_recorded > 18)) THEN 1
+            ELSE 0
+        END) AS quality_starts,
+    sum(p.strikeouts) AS strikeouts,
+    sum(p.walks) AS walks,
+    sum(p.home_runs_allowed) AS home_runs_allowed,
+    sum(p.hits_allowed) AS hits_allowed,
+    sum(p.hit_by_pitches) AS hit_by_pitches,
+    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
+    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
+    round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
+    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
+	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	case
+		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
+	end AS strikeouts_per_walk
+   FROM (data.pitching_stats_all_appearances p
+     JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL)))
+	 JOIN data.teams_info_expanded_all t on (p.team_id = t.team_id and t.valid_until is null))
+  WHERE ((NOT p.is_postseason) AND (p.season > 0))
+  GROUP BY p.season, p.team_id, t.nickname, t.valid_from, t.valid_until;
+
+--
 -- Name: pitching_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
 --
 CREATE VIEW data.pitching_stats_player_playoffs_season AS
@@ -2762,6 +2846,21 @@ CREATE VIEW data.running_stats_player_season AS
   GROUP BY rs.player_id, rs.season, p.player_name;
 
 --
+-- Name: running_stats_team_season; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW data.running_stats_team_season AS
+ SELECT p.team,
+	p.team_id,
+    rs.season,
+    sum(rs.was_base_stolen) AS stolen_bases,
+    sum(rs.was_caught_stealing) AS caught_stealing,
+    sum(rs.runner_scored) AS runs
+   FROM (data.running_stats_all_events rs
+     JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+  WHERE ((rs.day < 99) AND (rs.season > 0))
+  GROUP BY p.team, p.team_id, rs.season;
+
+--
 -- Name: running_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
 --
 CREATE VIEW data.running_stats_player_playoffs_season AS
@@ -2841,6 +2940,255 @@ CREATE INDEX pitching_stats_all_appearances_player_id ON data.pitching_stats_all
 --
 CREATE INDEX fielder_stats_all_events_player_id ON data.fielder_stats_all_events USING btree (player_id);
 
+--
+-- Name: ref_recordboard_player_season_pitching; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW DATA.ref_recordboard_player_season_pitching AS
+	SELECT 
+	a.season,
+	a.player_id, 
+	a.player_name, 
+	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
+	a.team_id,
+	tt.nickname AS team,
+	tt.valid_from AS team_valid_from,
+	tt.valid_until AS team_valid_until,
+	c.*
+	FROM 
+	(
+		SELECT p.*,
+		pa.earned_run_average,
+		pa.walks_per_9,
+		pa.hits_per_9,
+		pa.home_runs_per_9,
+		pa.strikeouts_per_9,
+		pa.era_rank,
+		pa.bb9_rank,
+		pa.hits9_rank,
+		pa.hr9_rank,
+		pa.k9_rank
+		from
+		(
+			SELECT x.player_id,
+			x.player_name,
+			x.team_id,
+			season,
+			walks,
+			ROUND(walks/batters_faced,3) AS walk_percentage,
+			strikeouts,
+			case
+				WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2)
+			end AS strikeouts_per_walk,
+			ROUND(strikeouts/batters_faced,3) AS strikeout_percentage,
+			runs_allowed,
+			hits_allowed,
+			home_runs_allowed,
+			innings,
+			pitches_thrown,
+			hit_by_pitches,
+			wins,
+			losses,
+			shutouts,
+			quality_starts,
+			ROUND((walks+hits_allowed)/innings,3) AS whip,
+			round(wins::DECIMAL/(wins::DECIMAL+losses::DECIMAL),3) AS win_pct,
+			rank() OVER (ORDER BY walks DESC) AS bb_rank,
+			rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank,		
+			rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
+			rank() OVER (ORDER BY CASE WHEN walks = 0 THEN strikeouts ELSE round(strikeouts/walks,2) END DESC) AS kbb_rank,
+			rank() OVER (ORDER BY round(strikeouts/batters_faced,3) DESC) AS kpct_rank,		
+			rank() OVER (ORDER BY runs_allowed DESC) AS runs_rank,
+			rank() OVER (ORDER BY hits_allowed DESC) AS hits_rank,
+			rank() OVER (ORDER BY home_runs_allowed DESC) AS hrs_rank,
+			rank() OVER (ORDER BY innings DESC) AS inn_rank,
+			rank() OVER (ORDER BY pitches_thrown DESC) AS ptch_rank,
+			rank() OVER (ORDER BY hit_by_pitches DESC) AS hbp_rank,
+			rank() OVER (ORDER BY wins DESC) AS win_rank,
+			rank() OVER (ORDER BY losses DESC) AS loss_rank,
+			rank() OVER (ORDER BY shutouts DESC) AS shut_rank,
+			rank() OVER (ORDER BY quality_starts DESC) AS qual_rank,
+			rank() OVER (ORDER BY ROUND((walks+hits_allowed)/innings,3)) AS whip_rank
+			FROM DATA.pitching_stats_player_season x
+		) p
+		LEFT JOIN
+		(
+			SELECT x.player_id,
+			season,
+			earned_run_average,
+			walks_per_9,
+			hits_per_9,
+			home_runs_per_9,
+			strikeouts_per_9,
+			rank() OVER (ORDER BY earned_run_average) AS era_rank,
+			rank() OVER (ORDER BY walks_per_9) AS bb9_rank,
+			rank() OVER (ORDER BY hits_per_9) AS hits9_rank,
+			rank() OVER (ORDER BY home_runs_per_9) AS hr9_rank,
+			rank() OVER (ORDER BY strikeouts_per_9 DESC) AS k9_rank
+			FROM DATA.pitching_stats_player_season x
+			
+			--at least 1 inning per team's regular season games for averaging stats
+			WHERE batters_faced > 299
+		) pa
+		ON (p.player_id = pa.player_id AND p.season = pa.season)
+	) a
+	JOIN DATA.teams tt 
+	ON (tt.team_id = a.team_id AND tt.valid_until IS null)
+	CROSS JOIN LATERAL 
+	(
+		VALUES 
+		(a.walks, a.bb_rank, 'walks'),
+		(a.walk_percentage, a.bbpct_rank, 'walk_percentage'),
+		(a.strikeouts, a.k_rank, 'strikeouts'),
+		(a.strikeouts_per_walk, a.kbb_rank, 'strikeouts_per_walk'),
+		(a.strikeout_percentage, a.kpct_rank, 'strikeout_percentage'),
+		(a.runs_allowed, a.runs_rank, 'runs_allowed'),
+		(a.hits_allowed, a.hits_rank, 'hits_allowed'),
+		(a.home_runs_allowed, a.hrs_rank, 'home_runs_allowed'),
+		(a.innings, a.inn_rank, 'innings'),
+		(a.pitches_thrown, a.ptch_rank, 'pitches_thrown'),
+		(a.hit_by_pitches, a.hbp_rank, 'hit_by_pitches'),
+		(a.wins, a.win_rank, 'wins'),
+		(a.losses, a.loss_rank, 'losses'),
+		(a.shutouts, a.shut_rank, 'shutouts'),
+		(a.quality_starts, a.qual_rank, 'quality_starts'),
+		(a.earned_run_average, a.era_rank, 'earned_run_average'),
+		(a.walks_per_9, a.bb9_rank, 'walks_per_9'),
+		(a.hits_per_9, a.hits9_rank, 'hits_per_9'),
+		(a.home_runs_per_9, a.hr9_rank, 'home_runs_per_9'),
+		(a.strikeouts_per_9, a.k9_rank, 'strikeouts_per_9')
+	) AS c(value, rank, stat)
+	WHERE c.rank = 1
+	ORDER BY c.stat, a.season, a.player_name;	
+
+--
+-- Name: ref_recordboard_player_season_batting; Type: VIEW; Schema: data; Owner: -
+--
+
+CREATE VIEW DATA.ref_recordboard_player_season_batting AS
+	SELECT 
+	a.season,
+	a.player_id, 
+	a.player_name, 
+	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE a.player_id = u.player_id AND a.player_name = u.player_name) AS url_slug,
+	a.team_id,
+	tt.nickname AS team,
+	tt.valid_from AS team_valid_from,
+	tt.valid_until AS team_valid_until,
+	c.*
+	FROM 
+	(
+		SELECT b.*, 
+		ba.on_base_percentage, 
+		ba.slugging, 
+		ba.batting_average, 
+		ba.on_base_slugging,
+		ba.obp_rank, 
+		ba.slugging_rank, 
+		ba.ba_rank, 
+		ba.ops_rank,
+		r.runs,
+		r.stolen_bases,
+		r.caught_stealing,
+		r.runs_rank,
+		r.sb_rank,
+		r.cs_rank
+		from
+		(
+			SELECT x.player_id,
+			x.player_name,
+			x.team_id,
+			season,
+			hits_risp,
+			walks,
+			doubles,
+			triples,
+			quadruples,
+			home_runs,
+			total_bases,
+			hits,
+			runs_batted_in,
+			sacrifice_bunts,
+			sacrifice_flies,
+			strikeouts,
+			hit_by_pitches,
+			gidp,
+			rank() OVER (ORDER BY hits_risp DESC) AS hits_risp_rank,
+			rank() OVER (ORDER BY walks DESC) AS bb_rank,
+			rank() OVER (ORDER BY doubles DESC) AS dbl_rank,
+			rank() OVER (ORDER BY triples DESC) AS trp_rank,
+			rank() OVER (ORDER BY home_runs DESC) AS hr_rank,
+			rank() OVER (ORDER BY total_bases DESC) AS tb_rank,
+			rank() OVER (ORDER BY quadruples DESC) AS qd_rank,
+			rank() OVER (ORDER BY hits DESC) AS hits_rank,
+			rank() OVER (ORDER BY runs_batted_in DESC) AS rbi_rank,
+			rank() OVER (ORDER BY x.sacrifice_bunts DESC) AS sacbunts_rank,
+	      rank() OVER (ORDER BY x.sacrifice_flies DESC) AS sacflies_rank,
+			rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
+			rank() OVER (ORDER BY hit_by_pitches DESC) AS hbp_rank,
+			rank() OVER (ORDER BY gidp DESC) AS gidp_rank
+			FROM DATA.batting_stats_player_season x
+		) b
+		LEFT JOIN
+		(
+			SELECT y.player_id,
+			season,
+			on_base_percentage,
+			slugging,
+			batting_average,
+			on_base_slugging,
+			rank() OVER (ORDER BY on_base_percentage DESC) AS obp_rank,
+			rank() OVER (ORDER BY slugging DESC) AS slugging_rank,
+			rank() OVER (ORDER BY batting_average DESC) AS ba_rank,           
+			rank() OVER (ORDER BY on_base_slugging DESC) AS ops_rank
+			FROM DATA.batting_stats_player_season y
+			WHERE plate_appearances > 399
+		) ba
+		ON (b.player_id = ba.player_id AND b.season = ba.season)
+		LEFT JOIN
+		(
+			SELECT z.player_id,
+			season,
+			runs,
+			stolen_bases,
+			caught_stealing,
+			rank() OVER (ORDER BY runs DESC) AS runs_rank,
+			rank() OVER (ORDER BY stolen_bases DESC) AS sb_rank,
+			rank() OVER (ORDER BY caught_stealing DESC) AS cs_rank
+			FROM DATA.running_stats_player_season z
+		) r
+		ON (b.player_id = r.player_id AND b.season = r.season)
+	) a
+	JOIN DATA.teams tt 
+	ON (tt.team_id = a.team_id AND tt.valid_until IS null)
+	CROSS JOIN LATERAL 
+	(
+		VALUES 
+		(a.on_base_percentage, a.obp_rank, 'on_base_percentage'),
+		(a.slugging, a.slugging_rank, 'slugging'),
+		(a.batting_average,a.ba_rank,'batting_average'), 
+		(a.on_base_slugging,a.ops_rank,'on_base_slugging'),
+		(a.hits_risp,a.hits_risp_rank,'hits_risp'), 
+		(a.walks,a.bb_rank,'walks'), 
+		(a.doubles,a.dbl_rank,'doubles'), 
+		(a.triples,a.trp_rank,'triples'), 
+		(a.quadruples,a.qd_rank,'quadruples'),
+		(a.home_runs,a.hr_rank,'home_runs'), 
+		(a.total_bases,a.tb_rank,'total_bases'), 
+		(a.hits,a.hits_rank,'hits'), 
+		(a.runs_batted_in,a.rbi_rank,'runs_batted_in'), 
+		(a.sacrifice_bunts,a.sacbunts_rank,'sacrifice_bunts'), 
+		(a.sacrifice_flies,a.sacflies_rank,'sacrifice_flies'),  
+		(a.strikeouts,a.k_rank,'strikeouts'),
+		(a.hit_by_pitches,a.hbp_rank,'hit_by_pitches'),
+		(a.gidp,a.gidp_rank,'gidp'),
+		(a.runs,a.runs_rank,'runs_scored'),
+		(a.stolen_bases,a.sb_rank,'stolen_bases'),
+		(a.caught_stealing,a.cs_rank,'caught_stealing')
+	) AS c(value, rank, stat)
+	WHERE c.rank = 1
+	ORDER BY c.stat, a.season, a.player_name;	
+	
 --
 -- Name: ref_leaderboard_lifetime_batting; Type: VIEW; Schema: data; Owner: -
 --
