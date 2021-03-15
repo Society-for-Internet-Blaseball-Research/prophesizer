@@ -14,7 +14,7 @@ namespace SIBR
 		public DateTime? RunFinished { get; set; }
 		public int? FirstGameEvent { get; set; }
 		public int? LastGameEvent { get; set; }
-
+		public bool RefreshedMatviews { get; set; }
 		public Metadata()
 		{
 			var versionInfo = typeof(Prophesizer).Assembly.GetName().Version;
@@ -23,6 +23,7 @@ namespace SIBR
 			MinorVersion = versionInfo.Minor;
 			PatchVersion = versionInfo.Build;
 			RunStarted = DateTime.UtcNow;
+			RefreshedMatviews = false;
 		}
 	}
 }

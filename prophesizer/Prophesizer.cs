@@ -299,7 +299,7 @@ namespace SIBR
 
 			if (DO_REFRESH_MATVIEWS)
 			{
-				await RefreshMaterializedViews(psqlConnection);
+				meta.RefreshedMatviews = await RefreshMaterializedViews(psqlConnection);
 			}
 
 			CloseMetadata(meta, recordId, psqlConnection);
@@ -327,13 +327,14 @@ namespace SIBR
 			meta.LastGameEvent = m_gameEventId;
 			meta.RunFinished = DateTime.UtcNow;
 
-			if (meta.FirstGameEvent != meta.LastGameEvent)
+			if (meta.FirstGameEvent != meta.LastGameEvent || meta.RefreshedMatviews)
 			{
 				// Update our record to show when the run finished etc
-				var cmd = new NpgsqlCommand("UPDATE data.prophesizer_meta SET (first_game_event, last_game_event, run_finished) = (@first, @last, @runFinished) WHERE prophesizer_meta_id = @record", psqlConnection);
+				var cmd = new NpgsqlCommand("UPDATE data.prophesizer_meta SET (first_game_event, last_game_event, run_finished, refreshed_matviews) = (@first, @last, @runFinished, @refreshed) WHERE prophesizer_meta_id = @record", psqlConnection);
 				cmd.Parameters.AddWithValue("first", meta.FirstGameEvent);
 				cmd.Parameters.AddWithValue("last", meta.LastGameEvent);
 				cmd.Parameters.AddWithValue("runFinished", meta.RunFinished);
+				cmd.Parameters.AddWithValue("refreshed", meta.RefreshedMatviews);
 				cmd.Parameters.AddWithValue("record", record);
 
 				cmd.ExecuteNonQuery();
@@ -411,11 +412,12 @@ namespace SIBR
 			return new FileInfo(location.AbsolutePath).Directory.FullName;
 		}
 
-		private async Task RefreshMaterializedViews(NpgsqlConnection psqlConnection)
+		private async Task<bool> RefreshMaterializedViews(NpgsqlConnection psqlConnection)
 		{
 			bool printMatviewTime = false;
 			Stopwatch matviewTimer = new Stopwatch();
 			matviewTimer.Start();
+			bool refreshed = false;
 			// If it's been at least one day since the last refresh
 			if (m_dbSeasonDay > m_lastMaterializedRefresh)
 			{
@@ -433,7 +435,7 @@ namespace SIBR
 
 				if (response is DBNull)
 				{
-					return;
+					return false;
 				}
 				else
 				{
@@ -456,6 +458,7 @@ namespace SIBR
 						await refreshCmd.ExecuteNonQueryAsync();
 
 						m_lastMaterializedRefresh = m_dbSeasonDay;
+						refreshed = true;
 					}
 				}
 			}
@@ -465,6 +468,7 @@ namespace SIBR
 				ConsoleOrWebhook($"Matview refresh took {matviewTimer.Elapsed}. Last day refreshed is now {m_lastMaterializedRefresh.HumanReadable}");
 			}
 
+			return refreshed;
 		}
 
 		private int GetMaxGameEventId(NpgsqlConnection psqlConnection)
