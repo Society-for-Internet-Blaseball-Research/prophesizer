@@ -1725,6 +1725,21 @@ namespace SIBR
 			return null;
 		}
 
+		private async Task<int> GetMaxDayForSeason(int season)
+		{
+			// Talk to the blaseball API
+			var response = await m_blaseballClient.GetAsync($"seasondaycount?season={season}");
+			if (response.IsSuccessStatusCode)
+			{
+				string strResponse = await response.Content.ReadAsStringAsync();
+				var data = JsonSerializer.Deserialize<Dictionary<string, int>>(strResponse);
+				if(data.ContainsKey("dayCount"))
+					return data["dayCount"]+1;
+			}
+
+			return 125;
+		}
+
 		/// <summary>
 		/// Get any completed games from the Blaseball API and insert them in the `game` table
 		/// </summary>
@@ -1758,9 +1773,7 @@ namespace SIBR
 				// Start on the next day
 				day++;
 
-				// Talk to the blaseball API
-
-				const int REASONABLE_MAX_DAY = 125;
+				int maxDay = await GetMaxDayForSeason(season);
 
 				Console.WriteLine($"Adding regular season game records...");
 				// Loop until we break out
@@ -1771,12 +1784,13 @@ namespace SIBR
 					if (gameList == null || gameList.Count() == 0)
 					{
 						// If we've exceeded a reasonable day size for the season
-						if (day > REASONABLE_MAX_DAY)
+						if (day > maxDay)
 						{
 							// Ran out of finished games this season, try the next
 							m_regularSeasonDay.Season = season;
 							season++;
 							day = 0;
+							maxDay = await GetMaxDayForSeason(season);
 							continue;
 						}
 						// If we got no response on Day 0
