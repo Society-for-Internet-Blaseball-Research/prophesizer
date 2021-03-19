@@ -1515,6 +1515,14 @@ namespace Cauldron
 
 			// Store original update text for reference
 			m_currEvent.eventText.Add(newState.lastUpdate);
+			if(!String.IsNullOrWhiteSpace(newState.scoreUpdate))
+			{
+				m_currEvent.eventText.Add(newState.scoreUpdate);
+			}
+			if(!String.IsNullOrWhiteSpace(newState.scoreLedger))
+			{
+				m_currEvent.eventText.Add(newState.scoreLedger);
+			}
 
 			// Cycle state
 			m_oldState = newState;

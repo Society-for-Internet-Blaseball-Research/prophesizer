@@ -85,6 +85,9 @@ namespace Cauldron
 		public int? awayOuts { get; set; }
 
 		public int? playCount { get; set; }
+
+		public string? scoreLedger { get; set; }
+		public string? scoreUpdate { get; set; }
 		public string chroniclerHash { get; set; }
 
 		[JsonConverter(typeof(TimestampConverter))]
