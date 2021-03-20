@@ -1210,6 +1210,15 @@ namespace SIBR
 			{
 				foreach (var p in players)
 				{
+					if(p.Data.State.Count > 0)
+					{
+						if(p.Data.State.ContainsKey("unscatteredName"))
+						{
+							// Override the scattered name we're getting
+							p.Data.Name = ((JsonElement)p.Data.State["unscatteredName"]).GetString();
+						}
+					}
+
 					// TODO move hashing into Player
 					var hash = HashObject(md5, p.Data);
 

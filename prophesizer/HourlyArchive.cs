@@ -33,6 +33,9 @@ public class Player
 
 	[DbAlias("player_name")]
 	public string Name { get; set; }
+
+	[DbIgnore]
+	public Dictionary<string,object> State { get; set; }
 	public bool Deceased { get; set; }
 
 	// Attributes
