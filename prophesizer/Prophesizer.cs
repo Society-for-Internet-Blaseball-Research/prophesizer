@@ -1210,7 +1210,7 @@ namespace SIBR
 			{
 				foreach (var p in players)
 				{
-					if(p.Data.State.Count > 0)
+					if(p.Data.State != null && p.Data.State.Count > 0)
 					{
 						if(p.Data.State.ContainsKey("unscatteredName"))
 						{
