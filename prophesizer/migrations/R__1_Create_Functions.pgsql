@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/14/2021
+﻿-- LAST UPDATE: 3/25/2021
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -290,12 +290,13 @@ RETURNS TABLE(season integer, tournament integer, gameday integer, phase_type VA
 SELECT 
 CASE
 	WHEN season = -1 AND day = 115 THEN 11 -- Thanks TGB!
+	WHEN season = -1 AND day = 116 THEN 13
 	WHEN phase_type NOT IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON') AND season < 11 THEN season
-	WHEN season <= 11 then season
-	ELSE NULL
+	WHEN season = -1 AND day < 115 then null
+	ELSE season
 END AS season,
 CASE
-	WHEN season = -1 AND day = 115 THEN NULL -- Thanks TGB!
+	WHEN season = -1 AND day in (115,116) THEN NULL -- Thanks TGB!
 	WHEN phase_type IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON') THEN 0
 	ELSE NULL
 END AS tournament,
@@ -305,7 +306,7 @@ CASE
 	ELSE NULL
 END AS DAY,
 CASE	
-	when season = -1 AND day = 115 AND tm.phase_id = 13 then 'ELECTIONS' --Thanks TGB!
+	when season = -1 AND first_time > '2021-03-01' then 'ELECTIONS' --Thanks TGB!
 	when season < 11 then phase_type
 	when season >= 11 and tm.phase_id = 1 THEN 'PRESEASON'
 	when season >= 11 and tm.phase_id = 3 THEN 'EARLY_SIESTA'
@@ -698,7 +699,7 @@ begin
 			losses,
 			shutouts,
 			quality_starts,
-			ROUND((walks+hits_allowed)/innings,3) AS whip,
+			whip,
 			round(wins::DECIMAL/(wins::DECIMAL+losses::DECIMAL),3) AS win_pct,
 			rank() OVER (ORDER BY walks DESC) AS bb_rank,
 			rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank,		
@@ -715,7 +716,7 @@ begin
 			rank() OVER (ORDER BY losses DESC) AS loss_rank,
 			rank() OVER (ORDER BY shutouts DESC) AS shut_rank,
 			rank() OVER (ORDER BY quality_starts DESC) AS qual_rank,
-			rank() OVER (ORDER BY ROUND((walks+hits_allowed)/innings,3)) AS whip_rank
+			rank() OVER (ORDER BY whip) AS whip_rank
 			FROM DATA.pitching_stats_player_season x
 			WHERE season = in_season
 		) p

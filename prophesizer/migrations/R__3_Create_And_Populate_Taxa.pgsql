@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/14/2021
+﻿-- LAST UPDATE: 3/25/2021
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -279,7 +279,9 @@ ALTER SEQUENCE taxa.modifications_modification_db_id_seq OWNED BY taxa.modificat
 CREATE TABLE taxa.phases (
     phase_id integer,
     phase_type character varying,
-    phase_type_id integer
+    phase_type_id integer,
+	valid_from timestamp without time zone,
+	valid_until timestamp without time zone
 );
 --
 -- Name: pitch_types; Type: TABLE; Schema: taxa; Owner: -
@@ -797,24 +799,24 @@ VALUES
 
 INSERT INTO taxa.phases 
 VALUES 
-(1, 'PRESEASON', 0),
-(2, 'GAMEDAY', 1),
-(3, 'END_REGULAR_SEASON', 2),
-(7, 'END_REGULAR_SEASON', 2),
-(4, 'POSTSEASON', 3),
-(10, 'POSTSEASON', 3),
-(11, 'POSTSEASON', 3),
-(9, 'BOSS_FIGHT', 4),
-(0, 'ELECTION_RESULTS', 5),
-(5, 'END_POSTSEASON', 5),
-(6, 'END_POSTSEASON', 5),
-(8, 'UNKNOWN_THE_OCHO', 99),
-(99, 'SIESTA', 99),
-(12, 'TOURNAMENT_PRESEASON', 6),
-(13, 'TOURNAMENT_GAMEDAY', 7),
-(14, 'TOURNAMENT_GAMEDAY', 7),
-(15, 'TOURNAMENT_POSTSEASON', 8),
-(16, 'END_TOURNAMENT', 9);
+(1, 'PRESEASON', 0,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(2, 'GAMEDAY', 1,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(3, 'END_REGULAR_SEASON', 2,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(7, 'END_REGULAR_SEASON', 2,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(4, 'POSTSEASON', 3,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(10, 'POSTSEASON', 3,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(11, 'POSTSEASON', 3,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(9, 'BOSS_FIGHT', 4,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(0, 'ELECTION_RESULTS', 5,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(5, 'END_POSTSEASON', 5,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(6, 'END_POSTSEASON', 5,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(8, 'UNKNOWN_THE_OCHO', 99,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(99, 'SIESTA', 99,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(12, 'TOURNAMENT_PRESEASON', 6,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(13, 'TOURNAMENT_GAMEDAY', 7,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(14, 'TOURNAMENT_GAMEDAY', 7,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(15, 'TOURNAMENT_POSTSEASON', 8,'2020-07-06 12:00:01','2021-03-01 04:06:04'),
+(16, 'END_TOURNAMENT', 9,'2020-07-06 12:00:01','2021-03-01 04:06:04');
 
 --
 -- Data for Name: pitch_types; Type: TABLE DATA; Schema: taxa; Owner: -
@@ -1044,7 +1046,8 @@ VALUES
 (14, 'Black Hole'),
 (15, 'Coffee'),
 (16, 'Coffee 2'),
-(17, 'Coffee 3s');
+(17, 'Coffee 3s'),
+(18, 'Flooding');
 
 --
 -- Name: attributes attributes_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -
