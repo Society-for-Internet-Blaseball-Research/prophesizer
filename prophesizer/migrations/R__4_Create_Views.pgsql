@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/14/2021
+﻿-- LAST UPDATE: 3/25/2021
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -2382,7 +2382,7 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
     round(9::numeric * sum(p.hits_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS hits_per_9,
     round(9::numeric * sum(p.strikeouts) / (sum(p.outs_recorded) / 3::numeric), 2) AS strikeouts_per_9,
     round(9::numeric * sum(p.home_runs_allowed) / (sum(p.outs_recorded) / 3::numeric), 2) AS home_runs_per_9,
-	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	round(((sum(p.walks)+sum(p.hits_allowed))/(sum(p.outs_recorded) / (3)::numeric)),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
 	end AS strikeouts_per_walk
@@ -2527,7 +2527,7 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
     round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
-	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	round(((sum(p.walks)+sum(p.hits_allowed))/(sum(p.outs_recorded) / (3)::numeric)),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
 	end AS strikeouts_per_walk
@@ -2546,7 +2546,8 @@ CREATE VIEW data.pitching_stats_player_playoffs_lifetime AS
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
 	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
-    sum(p.pitches_thrown) AS pitches_thrown,
+    sum(p.pitches_thrown) AS pitches_thrown,	
+    sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
     round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
     sum(p.runs_allowed) AS runs_allowed,
@@ -2570,7 +2571,7 @@ CREATE VIEW data.pitching_stats_player_playoffs_lifetime AS
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
     round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
-	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	round(((sum(p.walks)+sum(p.hits_allowed))/(sum(p.outs_recorded) / (3)::numeric)),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
 	end AS strikeouts_per_walk
@@ -2619,7 +2620,7 @@ CREATE VIEW data.pitching_stats_player_season AS
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
     round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
-	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	round(((sum(p.walks)+sum(p.hits_allowed))/(sum(p.outs_recorded) / (3)::numeric)),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
 	end AS strikeouts_per_walk
@@ -2668,7 +2669,7 @@ CREATE VIEW data.pitching_stats_team_season AS
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
     round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
-	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	round(((sum(p.walks)+sum(p.hits_allowed))/(sum(p.outs_recorded) / (3)::numeric)),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
 	end AS strikeouts_per_walk
@@ -2718,7 +2719,7 @@ CREATE VIEW data.pitching_stats_player_playoffs_season AS
     round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
     round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
     round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
-	round(((sum(p.walks)+sum(p.hits_allowed))/sum(p.outs_recorded) / (.3)::numeric),3) AS whip,
+	round(((sum(p.walks)+sum(p.hits_allowed))/(sum(p.outs_recorded) / (3)::numeric)),3) AS whip,
 	case
 		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
 	end AS strikeouts_per_walk
@@ -2835,15 +2836,21 @@ CREATE VIEW data.running_stats_player_playoffs_lifetime AS
 --
 CREATE VIEW data.running_stats_player_season AS
  SELECT rs.player_id,
-    p.player_name,
+	p.player_name, 
+	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE rs.player_id = u.player_id AND p.player_name = u.player_name) AS url_slug,
+	rs.team_id,
+	t.nickname AS team,
+	t.valid_from AS team_valid_from,
+	t.valid_until AS team_valid_until,
     rs.season,
     sum(rs.was_base_stolen) AS stolen_bases,
     sum(rs.was_caught_stealing) AS caught_stealing,
     sum(rs.runner_scored) AS runs
-   FROM (data.running_stats_all_events rs
+   FROM ((data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.teams_info_expanded_all t ON ((((p.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((rs.day < 99) AND (rs.season > 0))
-  GROUP BY rs.player_id, rs.season, p.player_name;
+  GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name;
 
 --
 -- Name: running_stats_team_season; Type: VIEW; Schema: data; Owner: -
@@ -2865,15 +2872,21 @@ CREATE VIEW data.running_stats_team_season AS
 --
 CREATE VIEW data.running_stats_player_playoffs_season AS
  SELECT rs.player_id,
-    p.player_name,
+	p.player_name, 
+	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE rs.player_id = u.player_id AND p.player_name = u.player_name) AS url_slug,
+	rs.team_id,
+	t.nickname AS team,
+	t.valid_from AS team_valid_from,
+	t.valid_until AS team_valid_until,
     rs.season,
     sum(rs.was_base_stolen) AS stolen_bases,
     sum(rs.was_caught_stealing) AS caught_stealing,
     sum(rs.runner_scored) AS runs
-   FROM (data.running_stats_all_events rs
+   FROM ((data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.teams_info_expanded_all t ON ((((p.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((rs.day > 98) AND (rs.season > 0))
-  GROUP BY rs.player_id, rs.season, p.player_name;
+  GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name;
   
 --
 -- Name: running_stats_player_tournament_lifetime; Type: VIEW; Schema: data; Owner: -
@@ -2991,7 +3004,7 @@ CREATE VIEW DATA.ref_recordboard_player_season_pitching AS
 			losses,
 			shutouts,
 			quality_starts,
-			ROUND((walks+hits_allowed)/innings,3) AS whip,
+			whip,
 			round(wins::DECIMAL/(wins::DECIMAL+losses::DECIMAL),3) AS win_pct,
 			rank() OVER (ORDER BY walks DESC) AS bb_rank,
 			rank() OVER (ORDER BY round(walks/batters_faced,3)) AS bbpct_rank,		
@@ -3008,7 +3021,7 @@ CREATE VIEW DATA.ref_recordboard_player_season_pitching AS
 			rank() OVER (ORDER BY losses DESC) AS loss_rank,
 			rank() OVER (ORDER BY shutouts DESC) AS shut_rank,
 			rank() OVER (ORDER BY quality_starts DESC) AS qual_rank,
-			rank() OVER (ORDER BY ROUND((walks+hits_allowed)/innings,3)) AS whip_rank
+			rank() OVER (ORDER BY whip) AS whip_rank
 			FROM DATA.pitching_stats_player_season x
 		) p
 		LEFT JOIN
@@ -3349,7 +3362,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			losses,
 			shutouts,
 			quality_starts,
-			ROUND((walks+hits_allowed)/innings,3) AS whip,
+			whip,
 			round(wins::DECIMAL/(wins::DECIMAL+losses::DECIMAL),3) AS win_pct,
 			rank() OVER (ORDER BY walks DESC) AS bb_rank,		
 			rank() OVER (ORDER BY strikeouts DESC) AS k_rank,
@@ -3364,7 +3377,7 @@ CREATE VIEW DATA.ref_leaderboard_lifetime_pitching AS
 			rank() OVER (ORDER BY losses DESC) AS loss_rank,
 			rank() OVER (ORDER BY shutouts DESC) AS shut_rank,
 			rank() OVER (ORDER BY quality_starts DESC) AS qual_rank,
-			rank() OVER (ORDER BY ROUND((walks+hits_allowed)/innings,3)) AS whip_rank
+			rank() OVER (ORDER BY whip) AS whip_rank
 			FROM DATA.pitching_stats_player_lifetime x
 		) p
 		LEFT JOIN
