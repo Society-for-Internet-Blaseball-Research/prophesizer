@@ -88,6 +88,8 @@ public class Player
 	[DbNullValue(-1)]
 	public int? Blood { get; set; }
 
+	public int Evolution { get; set; }
+
 	[DbIgnore]
 	public IEnumerable<string> PermAttr { get; set; }
 	[DbIgnore]
