@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 3/25/2021
+﻿-- LAST UPDATE: 4/4/2021
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -287,37 +287,30 @@ CREATE FUNCTION data.gamephase_from_timestamp(in_timestamp timestamp without tim
 RETURNS TABLE(season integer, tournament integer, gameday integer, phase_type VARCHAR)
     LANGUAGE sql
     AS $$
-SELECT 
+SELECT
 CASE
-	WHEN season = -1 AND day = 115 THEN 11 -- Thanks TGB!
-	WHEN season = -1 AND day = 116 THEN 13
-	WHEN phase_type NOT IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON') AND season < 11 THEN season
-	WHEN season = -1 AND day < 115 then null
+	WHEN season = -1 AND day = 115 and tm.phase_id = 13 THEN 11 -- Elections S12
+	WHEN season = -1 AND day = 116 and tm.phase_id = 13 THEN 13 -- Elections S14
+	WHEN season = 10 AND first_time > '2021-11-01' THEN NULL -- Time after Cup, before S12
+	WHEN phase_type_id IN ('6','7','8') then NULL -- Tourney phase types
 	ELSE season
 END AS season,
 CASE
-	WHEN season = -1 AND day in (115,116) THEN NULL -- Thanks TGB!
-	WHEN phase_type IN ('TOURNAMENT_PRESEASON','END_TOURNAMENT','TOURNAMENT_GAMEDAY','TOURNAMENT_POSTSEASON') THEN 0
+	WHEN phase_type_id IN ('6','7','8') THEN 0 -- Tourney phase types
 	ELSE NULL
 END AS tournament,
 CASE
-	WHEN phase_type IN ('GAMEDAY','TOURNAMENT_GAMEDAY','POSTSEASON','TOURNAMENT_POSTSEASON') AND season < 11 THEN day
-	WHEN season >= 11 and tm.phase_id in (2,4,6,7,9,11) THEN day
+	WHEN phase_type_id IN ('1','3','7') THEN DAY -- Gameday phase types
 	ELSE NULL
 END AS DAY,
 CASE	
-	when season = -1 AND first_time > '2021-03-01' then 'ELECTIONS' --Thanks TGB!
-	when season < 11 then phase_type
-	when season >= 11 and tm.phase_id = 1 THEN 'PRESEASON'
-	when season >= 11 and tm.phase_id = 3 THEN 'EARLY_SIESTA'
-	when season >= 11 and tm.phase_id = 5 THEN 'LATE_SIESTA'
-	when season >= 11 and tm.phase_id in (7,8) THEN 'END_REGULAR_SEASON'
-	when season >= 11 and tm.phase_id = 10 THEN 'END_POSTSEASON'
-	when season >= 11 and (tm.phase_id = 0 or tm.phase_id > 11) THEN 'ELECTIONS'
+	when season = -1 AND first_time > '2021-03-01' then 'ELECTIONS' --Election S12 & S14
+	WHEN season = 10 AND first_time > '2021-11-01' THEN 'SIESTA' -- Time after Cup, before S12
+	ELSE phase_type
 END as phase_type
 FROM DATA.time_map tm
 JOIN taxa.phases xp
-ON (tm.phase_id = xp.phase_id)
+ON (tm.phase_id = xp.phase_id AND tm.first_time BETWEEN xp.valid_from AND COALESCE(xp.valid_until,NOW()))
 LEFT JOIN taxa.tournaments xt
 ON (tm.season = xt.tournament_id)
 WHERE first_time = 
