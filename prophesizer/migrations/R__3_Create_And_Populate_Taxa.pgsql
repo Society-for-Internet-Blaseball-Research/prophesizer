@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/42021 
+﻿-- LAST UPDATE: 4/5/2021 
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -1062,7 +1062,8 @@ VALUES
 (15, 'Coffee'),
 (16, 'Coffee 2'),
 (17, 'Coffee 3s'),
-(18, 'Flooding');
+(18, 'Flooding'),
+(19, 'Salmon');
 
 --
 -- Name: attributes attributes_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -
