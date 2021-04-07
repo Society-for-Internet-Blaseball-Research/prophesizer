@@ -377,7 +377,7 @@ namespace Cauldron
 					m_currEvent.totalStrikes = m_oldState.topOfInning ? m_oldState.awayStrikes.GetValueOrDefault() : m_oldState.homeStrikes.GetValueOrDefault();
 					newStrikes = m_currEvent.totalStrikes - m_oldState.atBatStrikes;
 				}
-				else if (newState.lastUpdate.Contains("walk"))
+				else if (newState.lastUpdate.Contains("draws a walk") || newState.lastUpdate.Contains("walks to first"))
 				{
 					m_currEvent.totalBalls = newState.BatterTeamBalls;
 
