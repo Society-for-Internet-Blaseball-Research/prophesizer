@@ -13,6 +13,22 @@ namespace prophesizer
 		public IEnumerable<T> Data { get; set; }
 	}
 
+	class ChroniclerV2Page<T>
+	{
+		public string NextPage { get; set; }
+
+		public IEnumerable<ChroniclerEntityWrapper<T>> Items { get; set; }
+	}
+
+	class ChroniclerEntityWrapper<T>
+	{
+		public string EntityId { get; set; }
+		public string Hash { get; set; }
+		public DateTime? ValidFrom { get; set; }
+		public DateTime? ValidTo { get; set; }
+		public T Data { get; set; }
+	}
+
 	class ChroniclerUpdate
 	{
 		public string GameId { get; set; }
@@ -21,26 +37,6 @@ namespace prophesizer
 		public Game Data { get; set; }
 	}
 
-	class ChroniclerTeam
-	{
-		public string UpdateId { get; set; }
-		public string TeamId { get; set; }
-		public DateTime FirstSeen { get; set; }
-		public DateTime LastSeen { get; set; }
-
-		public string Hash { get; set; }
-		public Team Data { get; set; }
-	}
-
-	class ChroniclerPlayer
-	{
-		public string UpdateId { get; set; }
-		public string PlayerId { get; set; }
-		public DateTime FirstSeen { get; set; }
-		public DateTime LastSeen { get; set; }
-		public string Hash { get; set; }
-		public Player Data { get; set; }
-	}
 
 	class SimData
 	{
@@ -51,10 +47,5 @@ namespace prophesizer
 		public int TournamentRound { get; set; }
 	}
 
-	class ChroniclerSimData
-	{
-		public SimData Data { get; set; }
-		public DateTime FirstSeen { get; set; }
-		public DateTime LastSeen { get; set; }
-	}
+
 }

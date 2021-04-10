@@ -58,6 +58,7 @@ namespace SIBR
 		private bool DO_REFRESH_MATVIEWS = true;
 
 		private HttpClient m_chroniclerClient;
+		private HttpClient m_chroniclerV2Client;
 		private HttpClient m_blaseballClient;
 
 		private JsonSerializerOptions m_options;
@@ -89,6 +90,12 @@ namespace SIBR
 			m_chroniclerClient.BaseAddress = new Uri("https://api.sibr.dev/chronicler/v1/");
 			m_chroniclerClient.DefaultRequestHeaders.Accept.Clear();
 			m_chroniclerClient.DefaultRequestHeaders.Accept.Add(
+				new MediaTypeWithQualityHeaderValue("application/json"));
+
+			m_chroniclerV2Client = new HttpClient();
+			m_chroniclerV2Client.BaseAddress = new Uri("https://api.sibr.dev/chronicler/v2/");
+			m_chroniclerV2Client.DefaultRequestHeaders.Accept.Clear();
+			m_chroniclerV2Client.DefaultRequestHeaders.Accept.Add(
 				new MediaTypeWithQualityHeaderValue("application/json"));
 
 			m_blaseballClient = new HttpClient();
@@ -671,15 +678,15 @@ namespace SIBR
 
 			while (true)
 			{
-				string query = $"sim/updates?count=1000";
+				string query = $"versions?type=sim&count=1000";
 				if (nextPage != null)
 				{
 					query += $"&page={nextPage}";
 				}
 
-				ChroniclerPage<ChroniclerSimData> page = await ChroniclerQuery<ChroniclerSimData>(query);
+				ChroniclerV2Page<SimData> page = await ChroniclerV2Query<SimData>(query);
 
-				if (page == null || page.Data.Count() == 0)
+				if (page == null || page.Items.Count() == 0)
 				{
 					break;
 				}
@@ -687,10 +694,10 @@ namespace SIBR
 				{
 					nextPage = page.NextPage;
 
-					foreach(var chronData in page.Data)
+					foreach(var chronData in page.Items)
 					{
 						SimData simData = chronData.Data;
-						StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.FirstSeen, simData.Phase);
+						StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.ValidFrom.Value, simData.Phase);
 					}
 				}
 			}
@@ -1058,6 +1065,25 @@ namespace SIBR
 			}
 		}
 
+		/// <summary>
+		/// Helper function to do a query to Chronicler and return a page with generic data
+		/// </summary>
+		private async Task<ChroniclerV2Page<T>> ChroniclerV2Query<T>(string query)
+		{
+			HttpResponseMessage response = await m_chroniclerV2Client.GetAsync(query);
+
+			if (response.IsSuccessStatusCode)
+			{
+				string strResponse = await response.Content.ReadAsStringAsync();
+				return JsonSerializer.Deserialize<ChroniclerV2Page<T>>(strResponse, serializerOptions);
+			}
+			else
+			{
+				Console.WriteLine($"Query [{query}] failed: {response.ReasonPhrase}");
+				return null;
+			}
+		}
+
 		static string TimestampQueryValue(DateTime dt)
 		{
 			return dt.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ");
@@ -1071,7 +1097,7 @@ namespace SIBR
 
 			while (true)
 			{
-				string query = $"teams/updates?count={NUM_REQUESTED}";
+				string query = $"versions?type=team&count={NUM_REQUESTED}";
 				if(m_dbTeamTimestamp.HasValue)
 				{
 					query += $"&after={TimestampQueryValue(m_dbTeamTimestamp.Value)}";
@@ -1081,9 +1107,9 @@ namespace SIBR
 					query += $"&page={nextPage}";
 				}
 
-				ChroniclerPage<ChroniclerTeam> page = await ChroniclerQuery<ChroniclerTeam>(query);
+				ChroniclerV2Page<Team> page = await ChroniclerV2Query<Team>(query);
 
-				if (page == null || page.Data.Count() == 0)
+				if (page == null || page.Items.Count() == 0)
 				{
 					break;
 				}
@@ -1091,12 +1117,12 @@ namespace SIBR
 				{
 					nextPage = page.NextPage;
 
-					Console.WriteLine($"  Processing {page.Data.Count()} team updates (through {page.Data.Last().FirstSeen}).");
-					lastSeenTeamTime = page.Data.Last().LastSeen;
-					await ProcessTeams(psqlConnection, page.Data);
+					Console.WriteLine($"  Processing {page.Items.Count()} team updates (through {page.Items.Last().ValidTo}).");
+					lastSeenTeamTime = page.Items.Last().ValidTo;
+					await ProcessTeams(psqlConnection, page.Items);
 
 					// We're done!
-					if(page.Data.Count() != NUM_REQUESTED)
+					if(page.Items.Count() != NUM_REQUESTED)
 					{
 						break;
 					}
@@ -1111,13 +1137,13 @@ namespace SIBR
 			}
 		}
 
-		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerTeam> teams)
+		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerEntityWrapper<Team>> teams)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
 				foreach (var t in teams)
 				{
-					await ProcessRoster(t.Data, t.FirstSeen, psqlConnection);
+					await ProcessRoster(t.Data, t.ValidTo, psqlConnection);
 
 					var hash = HashTeamAttrs(md5, t.Data);
 					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.teams where hash=@hash and valid_until is null", psqlConnection);
@@ -1135,14 +1161,14 @@ namespace SIBR
 
 						// Update the old record
 						NpgsqlCommand update = new NpgsqlCommand(@"update data.teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
-						update.Parameters.AddWithValue("timestamp", t.FirstSeen);
-						update.Parameters.AddWithValue("team_id", t.TeamId);
+						update.Parameters.AddWithValue("timestamp", t.ValidTo);
+						update.Parameters.AddWithValue("team_id", t.Data.Id);
 						//update.Prepare();
 						int rows = await update.ExecuteNonQueryAsync();
 						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
 						var extra = new Dictionary<string, object>();
-						extra["valid_from"] = t.FirstSeen;
+						extra["valid_from"] = t.ValidFrom;
 						extra["hash"] = hash;
 						// Try to insert our current data
 						InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.teams", t.Data, extra);
@@ -1150,7 +1176,7 @@ namespace SIBR
 
 					}
 
-					await ProcessTeamModAttrs(t.Data, t.FirstSeen, psqlConnection);
+					await ProcessTeamModAttrs(t.Data, t.ValidFrom, psqlConnection);
 
 				}
 			}
@@ -1164,7 +1190,7 @@ namespace SIBR
 
 			while (true)
 			{
-				string query = $"players/updates?count={NUM_REQUESTED}";
+				string query = $"versions?type=player&count={NUM_REQUESTED}";
 				if (m_dbPlayerTimestamp.HasValue)
 				{
 					query += $"&after={TimestampQueryValue(m_dbPlayerTimestamp.Value)}";
@@ -1174,21 +1200,21 @@ namespace SIBR
 					query += $"&page={nextPage}";
 				}
 
-				ChroniclerPage<ChroniclerPlayer> page = await ChroniclerQuery<ChroniclerPlayer>(query);
+				ChroniclerV2Page<Player> page = await ChroniclerV2Query<Player>(query);
 
-				if (page == null || page.Data.Count() == 0)
+				if (page == null || page.Items.Count() == 0)
 				{
 					break;
 				}
 				else
 				{
 					nextPage = page.NextPage;
-					lastSeenPlayerTime = page.Data.Last().LastSeen;
-					Console.WriteLine($"  Processing {page.Data.Count()} player updates (through {page.Data.Last().FirstSeen}).");
-					await ProcessPlayers(psqlConnection, page.Data);
+					lastSeenPlayerTime = page.Items.Last().ValidTo;
+					Console.WriteLine($"  Processing {page.Items.Count()} player updates (through {page.Items.Last().ValidFrom}).");
+					await ProcessPlayers(psqlConnection, page.Items);
 
 					// We're done!
-					if (page.Data.Count() != NUM_REQUESTED)
+					if (page.Items.Count() != NUM_REQUESTED)
 					{
 						break;
 					}
@@ -1204,7 +1230,7 @@ namespace SIBR
 
 		}
 
-		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerPlayer> players)
+		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerEntityWrapper<Player>> players)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
@@ -1236,21 +1262,21 @@ namespace SIBR
 
 						// Update the old record
 						NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
-						update.Parameters.AddWithValue("timestamp", p.FirstSeen);
-						update.Parameters.AddWithValue("player_id", p.PlayerId);
+						update.Parameters.AddWithValue("timestamp", p.ValidFrom);
+						update.Parameters.AddWithValue("player_id", p.Data.Id);
 						int rows = await update.ExecuteNonQueryAsync();
 						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
 						var extra = new Dictionary<string, object>();
 						extra["hash"] = hash;
-						extra["valid_from"] = p.FirstSeen;
+						extra["valid_from"] = p.ValidFrom;
 						// Try to insert our current data
 						InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.players", p.Data, extra);
 						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
 
 					}
 
-					ProcessPlayerModAttrs(p.Data, p.FirstSeen, psqlConnection);
+					ProcessPlayerModAttrs(p.Data, p.ValidFrom, psqlConnection);
 				}
 			}
 		}
