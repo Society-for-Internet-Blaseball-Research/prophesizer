@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/5/2021 
+﻿-- LAST UPDATE: 4/10/2021 
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -577,6 +577,7 @@ begin
 		LEFT JOIN
 		(
 			SELECT y.player_id,
+			y.team_id,
 			on_base_percentage,
 			slugging,
 			batting_average,
@@ -590,10 +591,11 @@ begin
 			AND plate_appearances > (SELECT MAX(DAY)+1 FROM DATA.games WHERE season = in_season
 			AND NOT is_postseason AND (home_score + away_score > 0))*2
 		) ba
-		ON (b.player_id = ba.player_id)
+		ON (b.player_id = ba.player_id and b.team_id = ba.team_id)
 		LEFT JOIN
 		(
 			SELECT z.player_id,
+			z.team_id,
 			season,
 			runs,
 			stolen_bases,
@@ -604,7 +606,7 @@ begin
 			FROM DATA.running_stats_player_season z
 			WHERE season = in_season
 		) r
-		ON (b.player_id = r.player_id)
+		ON (b.player_id = r.player_id and b.team_id = r.team_id)
 	) a
 	JOIN DATA.teams_from_timestamp(DATA.timestamp_from_gameday(in_season,0)) tt 
 	ON (tt.team_id = a.team_id)
