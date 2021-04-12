@@ -138,9 +138,9 @@ public class Team
 	public string Stadium { get; set; }
 
 
-// Tarot card index from S11 election
-// DbIgnore this entry because it might not exist
-[DbIgnore]
+	// Tarot card index from S11 election
+	// DbIgnore this entry because it might not exist
+	[DbIgnore]
 	public int? Card { get; set; }
 
 	// Insert this property into the DB as 'card'
@@ -163,5 +163,48 @@ public class Team
 	public IEnumerable<string> GameAttr { get; set; }
 }
 
+public class League
+{
+	[DbIgnore]
+	public string _id { get; set; }
+	[DbIgnore]
+	public string id { get; set; }
+	[JsonIgnore]
+	[DbAlias("league_id")]
+	public string Id => _id ?? id;
 
+	[DbAlias("league_name")]
+	public string Name { get; set; }
+}
+
+public class Subleague
+{
+	[DbIgnore]
+	public string _id { get; set; }
+	[DbIgnore]
+	public string id { get; set; }
+	[JsonIgnore]
+	[DbAlias("subleague_id")]
+	public string Id => _id ?? id;
+
+	[DbAlias("subleague_name")]
+	public string Name { get; set; }
+}
+
+public class Division
+{
+	[DbIgnore]
+	public string _id { get; set; }
+	[DbIgnore]
+	public string id { get; set; }
+	[JsonIgnore]
+	[DbAlias("division_id")]
+	public string Id => _id ?? id;
+
+	[DbAlias("division_name")]
+	public string Name { get; set; }
+
+	[DbIgnore]
+	public IEnumerable<string> Teams { get; set; }
+}
 

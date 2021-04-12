@@ -19,10 +19,10 @@ internal class InsertCommand
 	/// <param name="connection">SQL connection</param>
 	/// <param name="tableName">Name of table to insert into</param>
 	/// <param name="obj">Object to insert</param>
-	public InsertCommand(NpgsqlConnection connection, string tableName, object obj, Dictionary<string, object> extraFields = null, string append = "")
+	public InsertCommand(NpgsqlConnection connection, string tableName, object obj, Dictionary<string, object> extraFields = null, string append = "", string returnColumn = "id")
 	{
 		m_command = new NpgsqlCommand();
-		Populate(tableName, obj, extraFields, "id", append);
+		Populate(tableName, obj, extraFields, returnColumn, append);
 		m_command.Connection = connection;
 		//m_command.Prepare();
 	}

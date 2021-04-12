@@ -33,6 +33,7 @@
     <None Remove="migrations\V2_11_20__Add_Evolution_To_Players.pgsql" />
     <None Remove="migrations\V2_11_7__More_Team_Info.pgsql" />
     <None Remove="migrations\V2_11_8__Team_Info_Name_Changes.pgsql" />
+    <None Remove="migrations\V2_12_0__New_Chronicler_Endpoints.pgsql" />
     <None Remove="migrations\V2_9_6__Games_Outcomes.pgsql" />
     <ProjectReference Include="..\Cauldron\Cauldron.csproj" />
     <None Update="patch\crabs_to_fridays.sql">
