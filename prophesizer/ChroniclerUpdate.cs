@@ -17,10 +17,10 @@ namespace prophesizer
 	{
 		public string NextPage { get; set; }
 
-		public IEnumerable<ChroniclerEntityWrapper<T>> Items { get; set; }
+		public IEnumerable<ChroniclerItem<T>> Items { get; set; }
 	}
 
-	class ChroniclerEntityWrapper<T>
+	class ChroniclerItem<T>
 	{
 		public string EntityId { get; set; }
 		public string Hash { get; set; }

@@ -175,6 +175,11 @@ public class League
 
 	[DbAlias("league_name")]
 	public string Name { get; set; }
+
+	[DbIgnore]
+	public IEnumerable<string> Subleagues { get; set; }
+
+	public override string ToString() { return Name; }
 }
 
 public class Subleague
@@ -189,6 +194,11 @@ public class Subleague
 
 	[DbAlias("subleague_name")]
 	public string Name { get; set; }
+
+	[DbIgnore]
+	public IEnumerable<string> Divisions { get; set; }
+
+	public override string ToString() { return Name; }
 }
 
 public class Division
@@ -206,5 +216,7 @@ public class Division
 
 	[DbIgnore]
 	public IEnumerable<string> Teams { get; set; }
+
+	public override string ToString() { return Name; }
 }
 

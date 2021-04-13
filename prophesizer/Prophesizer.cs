@@ -272,12 +272,14 @@ namespace SIBR
 
 			if (DO_HOURLY)
 			{
-				await LoadUpdates<Division>(psqlConnection, "division", m_dbDivisionTimestamp, ProcessDivisions);
+				var leagueDivTimestamp = m_dbDivisionTimestamp;
+
+				await LoadUpdates<Division>(psqlConnection, "division", leagueDivTimestamp, ProcessDivisions);
+				await LoadUpdates<Subleague>(psqlConnection, "subleague", leagueDivTimestamp, ProcessSubleagues, 100, false);
+				await LoadUpdates<League>(psqlConnection, "league", leagueDivTimestamp, ProcessLeagues, 100, false);
 				await LoadUpdates<Team>(psqlConnection, "team", m_dbTeamTimestamp, ProcessTeams, 250);
 				await LoadUpdates<Player>(psqlConnection, "player", m_dbPlayerTimestamp, ProcessPlayers, 250);
 
-				//await LoadTeamUpdates(psqlConnection);
-				//await LoadPlayerUpdates(psqlConnection);
 				await StoreTimeMapEvents(psqlConnection);
 			}
 
@@ -1105,16 +1107,26 @@ namespace SIBR
 			return dt.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ");
 		}
 
-		private delegate Task ProcessCallback<T>(NpgsqlConnection conn, IEnumerable<ChroniclerEntityWrapper<T>> items);
+		private delegate Task ProcessCallback<T>(NpgsqlConnection conn, IEnumerable<ChroniclerItem<T>> items);
 
-		private async Task LoadUpdates<T>(NpgsqlConnection psqlConnection, string type, DateTime? dbTimestamp, ProcessCallback<T> processFunc, int pageSize = 100)
+		/// <summary>
+		/// Generic function to handle making a Chronicler query and paging it up to the time provided
+		/// </summary>
+		/// <typeparam name="T">Type expected from Chronicler V2 endpoint</typeparam>
+		/// <param name="psqlConnection">SQL connection</param>
+		/// <param name="type">Type name to pass to Chronicler v2/versions?type= endpoint</param>
+		/// <param name="dbTimestamp">Timestamp to start from, or null</param>
+		/// <param name="processFunc">Function to process the returned objects</param>
+		/// <param name="count">Number of items to fetch per query</param>
+		/// <returns></returns>
+		private async Task LoadUpdates<T>(NpgsqlConnection psqlConnection, string type, DateTime? dbTimestamp, ProcessCallback<T> processFunc, int count = 100, bool updateChroniclerMeta = true)
 		{
 			string nextPage = null;
 			DateTime? lastSeenTime = null;
 
 			while (true)
 			{
-				string query = $"versions?type={type}&count={pageSize}";
+				string query = $"versions?type={type}&count={count}";
 				if (dbTimestamp.HasValue)
 				{
 					query += $"&after={TimestampQueryValue(dbTimestamp.Value)}";
@@ -1140,14 +1152,14 @@ namespace SIBR
 					await processFunc(psqlConnection, page.Items);
 
 					// We're done!
-					if (page.Items.Count() != pageSize)
+					if (page.Items.Count() != count)
 					{
 						break;
 					}
 				}
 			}
 
-			if (lastSeenTime.HasValue)
+			if (lastSeenTime.HasValue && updateChroniclerMeta)
 			{
 				NpgsqlCommand updateCmd = new NpgsqlCommand($"UPDATE data.chronicler_meta SET {type}_timestamp=@ts WHERE id=0", psqlConnection);
 				updateCmd.Parameters.AddWithValue("ts", lastSeenTime);
@@ -1155,8 +1167,60 @@ namespace SIBR
 			}
 		}
 
-	
+		/// <summary>
+		/// Generic function for processing entities and upserting them into a table
+		/// </summary>
+		/// <typeparam name="T">Type of entity</typeparam>
+		/// <param name="psqlConnection">SQL connection</param>
+		/// <param name="items">List of ChroniclerItems wrapping the entities</param>
+		/// <param name="table">Table name to use in SQL</param>
+		/// <param name="pkCol">Primary key column name</param>
+		/// <param name="ExistsFunc">Function that returns whether this item is already in the DB</param>
+		/// <param name="UncountedWorkFunc">Optional </param>
+		/// <returns></returns>
+		private async Task ProcessEntityList<T>(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<T>> items, string table, string pkCol,
+			Func<ChroniclerItem<T>, Task<bool>> ExistsFunc,
+			Func<ChroniclerItem<T>, Task> UncountedWorkFunc = null)
+		{
+			using (MD5 md5 = MD5.Create())
+			{
+				foreach (var t in items)
+				{
+					if (UncountedWorkFunc != null)
+					{
+						await UncountedWorkFunc(t);
+					}
 
+					var exists = await ExistsFunc(t);
+
+					if (exists)
+					{
+						// Record exists
+					}
+					else
+					{
+						Console.WriteLine($"    Found an update {t.Hash} for {t.Data}");
+
+						// Update the old record
+						NpgsqlCommand update = new NpgsqlCommand($"update {table} set valid_until=@timestamp where {pkCol} = @id and valid_until is null", psqlConnection);
+						// Old record is valid until new record starts
+						update.Parameters.AddWithValue("timestamp", t.ValidFrom.Value);
+						update.Parameters.AddWithValue("id", t.EntityId);
+						int rows = await update.ExecuteNonQueryAsync();
+						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+						var extra = new Dictionary<string, object>();
+						extra["valid_from"] = t.ValidFrom.Value;
+						// Try to insert our current data
+						InsertCommand insertCmd = new InsertCommand(psqlConnection, table, t.Data, extra, "", pkCol);
+						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
+					}
+
+				}
+			}
+		}
+
+		// Process the list of teams in the division
 		private async Task ProcessDivisionTeamList(Division d, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
 			foreach (var teamId in d.Teams)
@@ -1192,48 +1256,76 @@ namespace SIBR
 			}
 		}
 
-		private async Task ProcessDivisions(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerEntityWrapper<Division>> divs)
+		// TODO generalize this too?
+		private async Task ProcessLeagueSubList(ChroniclerItem<League> sub, NpgsqlConnection psqlConnection)
 		{
-			using (MD5 md5 = MD5.Create())
+			foreach (var div in sub.Data.Subleagues)
 			{
-				foreach (var t in divs)
-				{
-					await ProcessDivisionTeamList(t.Data, t.ValidFrom, t.ValidTo, psqlConnection);
-
-					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.divisions where division_name=@name and valid_until is null", psqlConnection);
-					cmd.Parameters.AddWithValue("name", t.Data.Name);
-					var count = (long)await cmd.ExecuteScalarAsync();
-
-					if (count == 1)
-					{
-						// Record exists
-					}
-					else
-					{
-						Console.WriteLine($"    Found an update {t.Hash} for {t.Data.Name} ({t.Data.Id})");
-
-						// Update the old record
-						NpgsqlCommand update = new NpgsqlCommand(@"update data.divisions set valid_until=@timestamp where division_id = @div_id and valid_until is null", psqlConnection);
-						// Old record is valid until new record starts
-						update.Parameters.AddWithValue("timestamp", t.ValidFrom.Value);
-						update.Parameters.AddWithValue("div_id", t.Data.Id);
-						int rows = await update.ExecuteNonQueryAsync();
-						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
-
-						var extra = new Dictionary<string, object>();
-						extra["valid_from"] = t.ValidFrom.Value;
-						// Try to insert our current data
-						InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.divisions", t.Data, extra, "", "division_id");
-						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
-					}
-
-				}
+				// TODO: update the list of subleagues per league
 			}
+		}
+
+
+		private async Task ProcessLeagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<League>> divs)
+		{
+			await ProcessEntityList<League>(psqlConnection, divs, "data.leagues", "league_id",
+				async x =>
+				{
+					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.leagues where league_id=@id and league_name=@name and valid_until is null", psqlConnection);
+					cmd.Parameters.AddWithValue("id", x.Data.Id);
+					cmd.Parameters.AddWithValue("name", x.Data.Name);
+					return (long)await cmd.ExecuteScalarAsync() > 0;
+				},
+				async x =>
+				{
+					await ProcessLeagueSubList(x, psqlConnection);
+				});
+		}
+
+		// TODO generalize this too?
+		private async Task ProcessSubleagueDivList(ChroniclerItem<Subleague> sub, NpgsqlConnection psqlConnection)
+		{
+			foreach(var div in sub.Data.Divisions)
+			{
+				// TODO: update the list of divisions per subleague
+			}
+		}
+
+		private async Task ProcessSubleagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Subleague>> divs)
+		{
+			await ProcessEntityList<Subleague>(psqlConnection, divs, "data.subleagues", "subleague_id",
+				async x =>
+				{
+					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.subleagues where subleague_id=@id and subleague_name=@name and valid_until is null", psqlConnection);
+					cmd.Parameters.AddWithValue("id", x.Data.Id);
+					cmd.Parameters.AddWithValue("name", x.Data.Name);
+					return (long)await cmd.ExecuteScalarAsync() > 0;
+				},
+				async x =>
+				{
+					await ProcessSubleagueDivList(x, psqlConnection);
+				});
+		}
+
+		private async Task ProcessDivisions(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Division>> divs)
+		{
+			await ProcessEntityList<Division>(psqlConnection, divs, "data.divisions", "division_id",
+				async x =>
+				{
+					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.divisions where division_id=@id and division_name=@name and valid_until is null", psqlConnection);
+					cmd.Parameters.AddWithValue("id", x.Data.Id);
+					cmd.Parameters.AddWithValue("name", x.Data.Name);
+					return (long)await cmd.ExecuteScalarAsync() > 0;
+				},
+				async x =>
+				{
+					await ProcessDivisionTeamList(x.Data, x.ValidFrom, x.ValidTo, psqlConnection);
+				});
 		}
 
 		
 
-		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerEntityWrapper<Team>> teams)
+		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Team>> teams)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
@@ -1279,7 +1371,7 @@ namespace SIBR
 			}
 		}
 
-		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerEntityWrapper<Player>> players)
+		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Player>> players)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
