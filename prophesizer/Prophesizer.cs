@@ -272,9 +272,12 @@ namespace SIBR
 
 			if (DO_HOURLY)
 			{
-				await LoadDivisionUpdates(psqlConnection);
-				await LoadTeamUpdates(psqlConnection);
-				await LoadPlayerUpdates(psqlConnection);
+				await LoadUpdates<Division>(psqlConnection, "division", m_dbDivisionTimestamp, ProcessDivisions);
+				await LoadUpdates<Team>(psqlConnection, "team", m_dbTeamTimestamp, ProcessTeams, 250);
+				await LoadUpdates<Player>(psqlConnection, "player", m_dbPlayerTimestamp, ProcessPlayers, 250);
+
+				//await LoadTeamUpdates(psqlConnection);
+				//await LoadPlayerUpdates(psqlConnection);
 				await StoreTimeMapEvents(psqlConnection);
 			}
 
@@ -1102,29 +1105,28 @@ namespace SIBR
 			return dt.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ");
 		}
 
-		private async Task LoadDivisionUpdates(NpgsqlConnection psqlConnection)
+		private delegate Task ProcessCallback<T>(NpgsqlConnection conn, IEnumerable<ChroniclerEntityWrapper<T>> items);
+
+		private async Task LoadUpdates<T>(NpgsqlConnection psqlConnection, string type, DateTime? dbTimestamp, ProcessCallback<T> processFunc, int pageSize = 100)
 		{
-			const int NUM_REQUESTED = 100;
 			string nextPage = null;
-			DateTime? lastSeenDivisionTime = null;
+			DateTime? lastSeenTime = null;
 
-			// TODO: Leagues and subleagues also
-
-			while(true)
+			while (true)
 			{
-				string query = $"versions?type=division&count={NUM_REQUESTED}";
-				if(m_dbDivisionTimestamp.HasValue)
+				string query = $"versions?type={type}&count={pageSize}";
+				if (dbTimestamp.HasValue)
 				{
-					query += $"&after={TimestampQueryValue(m_dbDivisionTimestamp.Value)}";
+					query += $"&after={TimestampQueryValue(dbTimestamp.Value)}";
 				}
-				if(nextPage != null)
+				if (nextPage != null)
 				{
 					query += $"&page={nextPage}";
 				}
 
-				ChroniclerV2Page<Division> page = await ChroniclerV2Query<Division>(query);
+				ChroniclerV2Page<T> page = await ChroniclerV2Query<T>(query);
 
-				if(page == null || page.Items.Count() == 0)
+				if (page == null || page.Items.Count() == 0)
 				{
 					break;
 				}
@@ -1132,27 +1134,28 @@ namespace SIBR
 				{
 					nextPage = page.NextPage;
 
-					Console.WriteLine($"  Processing {page.Items.Count()} division updates (through {page.Items.Last().ValidFrom}).");
-					lastSeenDivisionTime = page.Items.Last().ValidFrom;
-					
-					await ProcessDivisions(psqlConnection, page.Items);
+					Console.WriteLine($"  Processing {page.Items.Count()} {type} updates (through {page.Items.Last().ValidFrom}).");
+					lastSeenTime = page.Items.Last().ValidFrom;
+
+					await processFunc(psqlConnection, page.Items);
 
 					// We're done!
-					if (page.Items.Count() != NUM_REQUESTED)
+					if (page.Items.Count() != pageSize)
 					{
 						break;
 					}
 				}
 			}
 
-			if (lastSeenDivisionTime.HasValue)
+			if (lastSeenTime.HasValue)
 			{
-				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET division_timestamp=@ts WHERE id=0", psqlConnection);
-				updateCmd.Parameters.AddWithValue("ts", lastSeenDivisionTime);
+				NpgsqlCommand updateCmd = new NpgsqlCommand($"UPDATE data.chronicler_meta SET {type}_timestamp=@ts WHERE id=0", psqlConnection);
+				updateCmd.Parameters.AddWithValue("ts", lastSeenTime);
 				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 			}
-
 		}
+
+	
 
 		private async Task ProcessDivisionTeamList(Division d, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
@@ -1228,55 +1231,7 @@ namespace SIBR
 			}
 		}
 
-		private async Task LoadTeamUpdates(NpgsqlConnection psqlConnection)
-		{
-			const int NUM_REQUESTED = 250;
-			string nextPage = null;
-			DateTime? lastSeenTeamTime = null;
-
-			while (true)
-			{
-				string query = $"versions?type=team&count={NUM_REQUESTED}";
-				if(m_dbTeamTimestamp.HasValue)
-				{
-					query += $"&after={TimestampQueryValue(m_dbTeamTimestamp.Value)}";
-				}
-				if (nextPage != null)
-				{
-					query += $"&page={nextPage}";
-				}
-
-				ChroniclerV2Page<Team> page = await ChroniclerV2Query<Team>(query);
-
-				if (page == null || page.Items.Count() == 0)
-				{
-					break;
-				}
-				else
-				{
-					nextPage = page.NextPage;
-
-					Console.WriteLine($"  Processing {page.Items.Count()} team updates (through {page.Items.Last().ValidFrom}).");
-					lastSeenTeamTime = page.Items.Last().ValidFrom;
-					await ProcessTeams(psqlConnection, page.Items);
-
-					// We're done!
-					if(page.Items.Count() != NUM_REQUESTED)
-					{
-						break;
-					}
-				}
-			}
-
-			if (lastSeenTeamTime.HasValue)
-			{
-				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET team_timestamp=@ts WHERE id=0", psqlConnection);
-				updateCmd.Parameters.AddWithValue("ts", lastSeenTeamTime);
-				int updateResult = await updateCmd.ExecuteNonQueryAsync();
-			}
-		}
-
-
+		
 
 		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerEntityWrapper<Team>> teams)
 		{
@@ -1322,54 +1277,6 @@ namespace SIBR
 
 				}
 			}
-		}
-
-		private async Task LoadPlayerUpdates(NpgsqlConnection psqlConnection)
-		{
-			const int NUM_REQUESTED = 1000;
-			string nextPage = null;
-			DateTime? lastSeenPlayerTime = null;
-
-			while (true)
-			{
-				string query = $"versions?type=player&count={NUM_REQUESTED}";
-				if (m_dbPlayerTimestamp.HasValue)
-				{
-					query += $"&after={TimestampQueryValue(m_dbPlayerTimestamp.Value)}";
-				}
-				if (nextPage != null)
-				{
-					query += $"&page={nextPage}";
-				}
-
-				ChroniclerV2Page<Player> page = await ChroniclerV2Query<Player>(query);
-
-				if (page == null || page.Items.Count() == 0)
-				{
-					break;
-				}
-				else
-				{
-					nextPage = page.NextPage;
-					lastSeenPlayerTime = page.Items.Last().ValidFrom;
-					Console.WriteLine($"  Processing {page.Items.Count()} player updates (through {page.Items.Last().ValidFrom}).");
-					await ProcessPlayers(psqlConnection, page.Items);
-
-					// We're done!
-					if (page.Items.Count() != NUM_REQUESTED)
-					{
-						break;
-					}
-				}
-			}
-
-			if (lastSeenPlayerTime.HasValue)
-			{
-				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET player_timestamp=@ts WHERE id=0", psqlConnection);
-				updateCmd.Parameters.AddWithValue("ts", lastSeenPlayerTime);
-				int updateResult = await updateCmd.ExecuteNonQueryAsync();
-			}
-
 		}
 
 		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerEntityWrapper<Player>> players)
