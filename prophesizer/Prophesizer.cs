@@ -274,9 +274,9 @@ namespace SIBR
 			{
 				var leagueDivTimestamp = m_dbDivisionTimestamp;
 
-				await LoadUpdates<Division>(psqlConnection, "division", leagueDivTimestamp, ProcessDivisions);
-				await LoadUpdates<Subleague>(psqlConnection, "subleague", leagueDivTimestamp, ProcessSubleagues, 100, false);
 				await LoadUpdates<League>(psqlConnection, "league", leagueDivTimestamp, ProcessLeagues, 100, false);
+				await LoadUpdates<Subleague>(psqlConnection, "subleague", leagueDivTimestamp, ProcessSubleagues, 100, false);
+				await LoadUpdates<Division>(psqlConnection, "division", leagueDivTimestamp, ProcessDivisions);
 				await LoadUpdates<Team>(psqlConnection, "team", m_dbTeamTimestamp, ProcessTeams, 250);
 				await LoadUpdates<Player>(psqlConnection, "player", m_dbPlayerTimestamp, ProcessPlayers, 250);
 
@@ -1180,7 +1180,8 @@ namespace SIBR
 		/// <returns></returns>
 		private async Task ProcessEntityList<T>(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<T>> items, string table, string pkCol,
 			Func<ChroniclerItem<T>, Task<bool>> ExistsFunc,
-			Func<ChroniclerItem<T>, Task> UncountedWorkFunc = null)
+			Func<ChroniclerItem<T>, Task> UncountedWorkFunc = null,
+			Func<ChroniclerItem<T>, Task> PostWorkFunc = null)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
@@ -1214,10 +1215,29 @@ namespace SIBR
 						// Try to insert our current data
 						InsertCommand insertCmd = new InsertCommand(psqlConnection, table, t.Data, extra, "", pkCol);
 						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
+
+
 					}
 
+					if(PostWorkFunc != null)
+					{
+						await PostWorkFunc(t);
+					}
 				}
 			}
+		}
+
+		private async Task ProcessDivisionFinal(ChroniclerItem<Division> div, NpgsqlConnection psqlConnection)
+		{
+			var subleagueId = m_divisionToSubleagueMap[div.EntityId];
+			var leagueId = m_subleagueToLeagueMap[subleagueId];
+
+			NpgsqlCommand cmd = new NpgsqlCommand(@"update data.divisions set subleague_id=@sub, league_id=@league where division_id=@div and valid_until is null", psqlConnection);
+			cmd.Parameters.AddWithValue("sub", subleagueId);
+			cmd.Parameters.AddWithValue("league", leagueId);
+			cmd.Parameters.AddWithValue("div", div.EntityId);
+			await cmd.ExecuteNonQueryAsync();
+
 		}
 
 		// Process the list of teams in the division
@@ -1245,9 +1265,14 @@ namespace SIBR
 					int rows = await update.ExecuteNonQueryAsync();
 					if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
+					var subleagueId = m_divisionToSubleagueMap[d.Id];
+					var leagueId = m_subleagueToLeagueMap[subleagueId];
+
 					// Try to insert our current data
-					NpgsqlCommand insert = new NpgsqlCommand(@"insert into data.division_teams(division_id, team_id, valid_from, valid_until) values (@div, @team, @time, null)", psqlConnection);
+					NpgsqlCommand insert = new NpgsqlCommand(@"insert into data.division_teams(division_id, subleague_id, league_id, team_id, valid_from, valid_until) values (@div, @sub, @league, @team, @time, null)", psqlConnection);
 					insert.Parameters.AddWithValue("div", d.Id);
+					insert.Parameters.AddWithValue("sub", subleagueId);
+					insert.Parameters.AddWithValue("league", leagueId);
 					insert.Parameters.AddWithValue("team", teamId);
 					insert.Parameters.AddWithValue("time", validFrom.Value);
 
@@ -1256,12 +1281,12 @@ namespace SIBR
 			}
 		}
 
-		// TODO generalize this too?
-		private async Task ProcessLeagueSubList(ChroniclerItem<League> sub, NpgsqlConnection psqlConnection)
+		private Dictionary<string, string> m_subleagueToLeagueMap = new Dictionary<string, string>();
+		private async Task ProcessLeagueSubList(ChroniclerItem<League> league, NpgsqlConnection psqlConnection)
 		{
-			foreach (var div in sub.Data.Subleagues)
+			foreach (var sl in league.Data.Subleagues)
 			{
-				// TODO: update the list of subleagues per league
+				m_subleagueToLeagueMap[sl] = league.EntityId;
 			}
 		}
 
@@ -1276,19 +1301,26 @@ namespace SIBR
 					cmd.Parameters.AddWithValue("name", x.Data.Name);
 					return (long)await cmd.ExecuteScalarAsync() > 0;
 				},
+				null,
 				async x =>
 				{
 					await ProcessLeagueSubList(x, psqlConnection);
 				});
 		}
 
-		// TODO generalize this too?
+		private Dictionary<string, string> m_divisionToSubleagueMap = new Dictionary<string, string>();
 		private async Task ProcessSubleagueDivList(ChroniclerItem<Subleague> sub, NpgsqlConnection psqlConnection)
 		{
 			foreach(var div in sub.Data.Divisions)
 			{
-				// TODO: update the list of divisions per subleague
+				m_divisionToSubleagueMap[div] = sub.EntityId;
 			}
+
+			var leagueId = m_subleagueToLeagueMap[sub.EntityId];
+			NpgsqlCommand cmd = new NpgsqlCommand(@"update data.subleagues set league_id=@league where subleague_id=@sub and valid_until is null", psqlConnection);
+			cmd.Parameters.AddWithValue("sub", sub.EntityId);
+			cmd.Parameters.AddWithValue("league", leagueId);
+			await cmd.ExecuteNonQueryAsync();
 		}
 
 		private async Task ProcessSubleagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Subleague>> divs)
@@ -1301,6 +1333,7 @@ namespace SIBR
 					cmd.Parameters.AddWithValue("name", x.Data.Name);
 					return (long)await cmd.ExecuteScalarAsync() > 0;
 				},
+				null,
 				async x =>
 				{
 					await ProcessSubleagueDivList(x, psqlConnection);
@@ -1320,6 +1353,10 @@ namespace SIBR
 				async x =>
 				{
 					await ProcessDivisionTeamList(x.Data, x.ValidFrom, x.ValidTo, psqlConnection);
+				},
+				async x =>
+				{
+					await ProcessDivisionFinal(x, psqlConnection);
 				});
 		}
 
