@@ -58,6 +58,7 @@ namespace SIBR
 		private bool DO_REFRESH_MATVIEWS = true;
 
 		private HttpClient m_chroniclerClient;
+		private HttpClient m_chroniclerV2Client;
 		private HttpClient m_blaseballClient;
 
 		private JsonSerializerOptions m_options;
@@ -70,6 +71,8 @@ namespace SIBR
 		private DateTime? m_dbGameTimestamp;
 		private DateTime? m_dbTeamTimestamp;
 		private DateTime? m_dbPlayerTimestamp;
+		private DateTime? m_dbDivisionTimestamp;
+		private DateTime? m_dbStadiumTimestamp;
 
 		public int NumNetworkOutcomes => m_processor.NumNetworkOutcomes;
 		public int NumLocalOutcomes => m_processor.NumLocalOutcomes;
@@ -91,6 +94,12 @@ namespace SIBR
 			m_chroniclerClient.DefaultRequestHeaders.Accept.Add(
 				new MediaTypeWithQualityHeaderValue("application/json"));
 
+			m_chroniclerV2Client = new HttpClient();
+			m_chroniclerV2Client.BaseAddress = new Uri("https://api.sibr.dev/chronicler/v2/");
+			m_chroniclerV2Client.DefaultRequestHeaders.Accept.Clear();
+			m_chroniclerV2Client.DefaultRequestHeaders.Accept.Add(
+				new MediaTypeWithQualityHeaderValue("application/json"));
+
 			m_blaseballClient = new HttpClient();
 			m_blaseballClient.BaseAddress = new Uri("https://www.blaseball.com/database/");
 			m_blaseballClient.DefaultRequestHeaders.Accept.Clear();
@@ -108,15 +117,17 @@ namespace SIBR
 		/// <summary>
 		/// Get the last season & day that we've recorded in the DB
 		/// </summary>
-		private async Task<(SeasonDay, DateTime?, DateTime?, DateTime?)> GetChroniclerMeta(NpgsqlConnection psqlConnection)
+		private async Task<(SeasonDay, DateTime?, DateTime?, DateTime?, DateTime?, DateTime?)> GetChroniclerMeta(NpgsqlConnection psqlConnection)
 		{
 			int season = 0;
 			int day = 0;
 			DateTime? gameTime = null;
 			DateTime? teamTime = null;
 			DateTime? playerTime = null;
+			DateTime? divisionTime = null;
+			DateTime? stadiumTime = null;
 
-			NpgsqlCommand cmd = new NpgsqlCommand(@"select season, day, game_timestamp, team_timestamp, player_timestamp from data.chronicler_meta where id=0", psqlConnection);
+			NpgsqlCommand cmd = new NpgsqlCommand(@"select season, day, game_timestamp, team_timestamp, player_timestamp, division_timestamp, stadium_timestamp from data.chronicler_meta where id=0", psqlConnection);
 
 			bool foundRecord = false;
 			using (var reader = await cmd.ExecuteReaderAsync())
@@ -140,6 +151,14 @@ namespace SIBR
 					{
 						playerTime = reader.GetDateTime(4);
 					}
+					if(!reader.IsDBNull(5))
+					{
+						divisionTime = reader.GetDateTime(5);
+					}
+					if(!reader.IsDBNull(6))
+					{
+						stadiumTime = reader.GetDateTime(6);
+					}
 				}
 			}
 
@@ -149,7 +168,7 @@ namespace SIBR
 				insertCmd.ExecuteNonQuery();
 			}
 
-			return (new SeasonDay(season, day), gameTime, teamTime, playerTime);
+			return (new SeasonDay(season, day), gameTime, teamTime, playerTime, divisionTime, stadiumTime);
 		}
 
 		const int NUM_EVENTS_REQUESTED = 1000;
@@ -234,7 +253,7 @@ namespace SIBR
 			await PopulateGameTable(psqlConnection);
 
 			// Last day recorded in the DB
-			(m_dbSeasonDay, m_dbGameTimestamp, m_dbTeamTimestamp, m_dbPlayerTimestamp) = await GetChroniclerMeta(psqlConnection);
+			(m_dbSeasonDay, m_dbGameTimestamp, m_dbTeamTimestamp, m_dbPlayerTimestamp, m_dbDivisionTimestamp, m_dbStadiumTimestamp) = await GetChroniclerMeta(psqlConnection);
 			
 			// Current day according to blaseball.com
 			SeasonDay simSeasonDay;
@@ -253,8 +272,14 @@ namespace SIBR
 
 			if (DO_HOURLY)
 			{
-				await LoadTeamUpdates(psqlConnection);
-				await LoadPlayerUpdates(psqlConnection);
+				var leagueDivTimestamp = m_dbDivisionTimestamp;
+
+				await LoadUpdates<League>(psqlConnection, "league", leagueDivTimestamp, ProcessLeagues, 100, false);
+				await LoadUpdates<Subleague>(psqlConnection, "subleague", leagueDivTimestamp, ProcessSubleagues, 100, false);
+				await LoadUpdates<Division>(psqlConnection, "division", leagueDivTimestamp, ProcessDivisions);
+				await LoadUpdates<Team>(psqlConnection, "team", m_dbTeamTimestamp, ProcessTeams, 250);
+				await LoadUpdates<Player>(psqlConnection, "player", m_dbPlayerTimestamp, ProcessPlayers, 250);
+
 				await StoreTimeMapEvents(psqlConnection);
 			}
 
@@ -671,15 +696,15 @@ namespace SIBR
 
 			while (true)
 			{
-				string query = $"sim/updates?count=1000";
+				string query = $"versions?type=sim&count=1000";
 				if (nextPage != null)
 				{
 					query += $"&page={nextPage}";
 				}
 
-				ChroniclerPage<ChroniclerSimData> page = await ChroniclerQuery<ChroniclerSimData>(query);
+				ChroniclerV2Page<SimData> page = await ChroniclerV2Query<SimData>(query);
 
-				if (page == null || page.Data.Count() == 0)
+				if (page == null || page.Items.Count() == 0)
 				{
 					break;
 				}
@@ -687,10 +712,10 @@ namespace SIBR
 				{
 					nextPage = page.NextPage;
 
-					foreach(var chronData in page.Data)
+					foreach(var chronData in page.Items)
 					{
 						SimData simData = chronData.Data;
-						StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.FirstSeen, simData.Phase);
+						StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.ValidFrom.Value, simData.Phase);
 					}
 				}
 			}
@@ -1058,32 +1083,62 @@ namespace SIBR
 			}
 		}
 
+		/// <summary>
+		/// Helper function to do a query to Chronicler and return a page with generic data
+		/// </summary>
+		private async Task<ChroniclerV2Page<T>> ChroniclerV2Query<T>(string query)
+		{
+			HttpResponseMessage response = await m_chroniclerV2Client.GetAsync(query);
+
+			if (response.IsSuccessStatusCode)
+			{
+				string strResponse = await response.Content.ReadAsStringAsync();
+				return JsonSerializer.Deserialize<ChroniclerV2Page<T>>(strResponse, serializerOptions);
+			}
+			else
+			{
+				Console.WriteLine($"Query [{query}] failed: {response.ReasonPhrase}");
+				return null;
+			}
+		}
+
 		static string TimestampQueryValue(DateTime dt)
 		{
 			return dt.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ");
 		}
 
-		private async Task LoadTeamUpdates(NpgsqlConnection psqlConnection)
+		private delegate Task ProcessCallback<T>(NpgsqlConnection conn, IEnumerable<ChroniclerItem<T>> items);
+
+		/// <summary>
+		/// Generic function to handle making a Chronicler query and paging it up to the time provided
+		/// </summary>
+		/// <typeparam name="T">Type expected from Chronicler V2 endpoint</typeparam>
+		/// <param name="psqlConnection">SQL connection</param>
+		/// <param name="type">Type name to pass to Chronicler v2/versions?type= endpoint</param>
+		/// <param name="dbTimestamp">Timestamp to start from, or null</param>
+		/// <param name="processFunc">Function to process the returned objects</param>
+		/// <param name="count">Number of items to fetch per query</param>
+		/// <returns></returns>
+		private async Task LoadUpdates<T>(NpgsqlConnection psqlConnection, string type, DateTime? dbTimestamp, ProcessCallback<T> processFunc, int count = 100, bool updateChroniclerMeta = true)
 		{
-			const int NUM_REQUESTED = 250;
 			string nextPage = null;
-			DateTime? lastSeenTeamTime = null;
+			DateTime? lastSeenTime = null;
 
 			while (true)
 			{
-				string query = $"teams/updates?count={NUM_REQUESTED}";
-				if(m_dbTeamTimestamp.HasValue)
+				string query = $"versions?type={type}&count={count}";
+				if (dbTimestamp.HasValue)
 				{
-					query += $"&after={TimestampQueryValue(m_dbTeamTimestamp.Value)}";
+					query += $"&after={TimestampQueryValue(dbTimestamp.Value)}";
 				}
 				if (nextPage != null)
 				{
 					query += $"&page={nextPage}";
 				}
 
-				ChroniclerPage<ChroniclerTeam> page = await ChroniclerQuery<ChroniclerTeam>(query);
+				ChroniclerV2Page<T> page = await ChroniclerV2Query<T>(query);
 
-				if (page == null || page.Data.Count() == 0)
+				if (page == null || page.Items.Count() == 0)
 				{
 					break;
 				}
@@ -1091,38 +1146,234 @@ namespace SIBR
 				{
 					nextPage = page.NextPage;
 
-					Console.WriteLine($"  Processing {page.Data.Count()} team updates (through {page.Data.Last().FirstSeen}).");
-					lastSeenTeamTime = page.Data.Last().LastSeen;
-					await ProcessTeams(psqlConnection, page.Data);
+					Console.WriteLine($"  Processing {page.Items.Count()} {type} updates (through {page.Items.Last().ValidFrom}).");
+					lastSeenTime = page.Items.Last().ValidFrom;
+
+					await processFunc(psqlConnection, page.Items);
 
 					// We're done!
-					if(page.Data.Count() != NUM_REQUESTED)
+					if (page.Items.Count() != count)
 					{
 						break;
 					}
 				}
 			}
 
-			if (lastSeenTeamTime.HasValue)
+			if (lastSeenTime.HasValue && updateChroniclerMeta)
 			{
-				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET team_timestamp=@ts WHERE id=0", psqlConnection);
-				updateCmd.Parameters.AddWithValue("ts", lastSeenTeamTime);
+				NpgsqlCommand updateCmd = new NpgsqlCommand($"UPDATE data.chronicler_meta SET {type}_timestamp=@ts WHERE id=0", psqlConnection);
+				updateCmd.Parameters.AddWithValue("ts", lastSeenTime);
 				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 			}
 		}
 
-		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerTeam> teams)
+		/// <summary>
+		/// Generic function for processing entities and upserting them into a table
+		/// </summary>
+		/// <typeparam name="T">Type of entity</typeparam>
+		/// <param name="psqlConnection">SQL connection</param>
+		/// <param name="items">List of ChroniclerItems wrapping the entities</param>
+		/// <param name="table">Table name to use in SQL</param>
+		/// <param name="pkCol">Primary key column name</param>
+		/// <param name="ExistsFunc">Function that returns whether this item is already in the DB</param>
+		/// <param name="UncountedWorkFunc">Optional </param>
+		/// <returns></returns>
+		private async Task ProcessEntityList<T>(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<T>> items, string table, string pkCol,
+			Func<ChroniclerItem<T>, Task<bool>> ExistsFunc,
+			Func<ChroniclerItem<T>, Task> UncountedWorkFunc = null,
+			Func<ChroniclerItem<T>, Task> PostWorkFunc = null)
+		{
+			using (MD5 md5 = MD5.Create())
+			{
+				foreach (var t in items)
+				{
+					if (UncountedWorkFunc != null)
+					{
+						await UncountedWorkFunc(t);
+					}
+
+					var exists = await ExistsFunc(t);
+
+					if (exists)
+					{
+						// Record exists
+					}
+					else
+					{
+						Console.WriteLine($"    Found an update {t.Hash} for {t.Data}");
+
+						// Update the old record
+						NpgsqlCommand update = new NpgsqlCommand($"update {table} set valid_until=@timestamp where {pkCol} = @id and valid_until is null", psqlConnection);
+						// Old record is valid until new record starts
+						update.Parameters.AddWithValue("timestamp", t.ValidFrom.Value);
+						update.Parameters.AddWithValue("id", t.EntityId);
+						int rows = await update.ExecuteNonQueryAsync();
+						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+						var extra = new Dictionary<string, object>();
+						extra["valid_from"] = t.ValidFrom.Value;
+						// Try to insert our current data
+						InsertCommand insertCmd = new InsertCommand(psqlConnection, table, t.Data, extra, "", pkCol);
+						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
+
+
+					}
+
+					if(PostWorkFunc != null)
+					{
+						await PostWorkFunc(t);
+					}
+				}
+			}
+		}
+
+		private async Task ProcessDivisionFinal(ChroniclerItem<Division> div, NpgsqlConnection psqlConnection)
+		{
+			var subleagueId = m_divisionToSubleagueMap[div.EntityId];
+			var leagueId = m_subleagueToLeagueMap[subleagueId];
+
+			NpgsqlCommand cmd = new NpgsqlCommand(@"update data.divisions set subleague_id=@sub, league_id=@league where division_id=@div and valid_until is null", psqlConnection);
+			cmd.Parameters.AddWithValue("sub", subleagueId);
+			cmd.Parameters.AddWithValue("league", leagueId);
+			cmd.Parameters.AddWithValue("div", div.EntityId);
+			await cmd.ExecuteNonQueryAsync();
+
+		}
+
+		// Process the list of teams in the division
+		private async Task ProcessDivisionTeamList(Division d, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
+		{
+			foreach (var teamId in d.Teams)
+			{
+
+				NpgsqlCommand cmd = new NpgsqlCommand(@"select division_id from data.division_teams where team_id=@team and valid_until is null", psqlConnection);
+				cmd.Parameters.AddWithValue("team", teamId);
+				var div = (string)await cmd.ExecuteScalarAsync();
+
+				if(div == d.Id)
+				{
+					// Team is already in that division
+				}
+				else
+				{
+					Console.WriteLine($"    Team {teamId} moved to {d.Name}...");
+
+					NpgsqlCommand update = new NpgsqlCommand(@"update data.division_teams set valid_until=@time where team_id=@team and valid_until is null", psqlConnection);
+					update.Parameters.AddWithValue("time", validFrom.Value);
+					update.Parameters.AddWithValue("team", teamId);
+
+					int rows = await update.ExecuteNonQueryAsync();
+					if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+					var subleagueId = m_divisionToSubleagueMap[d.Id];
+					var leagueId = m_subleagueToLeagueMap[subleagueId];
+
+					// Try to insert our current data
+					NpgsqlCommand insert = new NpgsqlCommand(@"insert into data.division_teams(division_id, subleague_id, league_id, team_id, valid_from, valid_until) values (@div, @sub, @league, @team, @time, null)", psqlConnection);
+					insert.Parameters.AddWithValue("div", d.Id);
+					insert.Parameters.AddWithValue("sub", subleagueId);
+					insert.Parameters.AddWithValue("league", leagueId);
+					insert.Parameters.AddWithValue("team", teamId);
+					insert.Parameters.AddWithValue("time", validFrom.Value);
+
+					int newId = await insert.ExecuteNonQueryAsync();
+				}
+			}
+		}
+
+		private Dictionary<string, string> m_subleagueToLeagueMap = new Dictionary<string, string>();
+		private async Task ProcessLeagueSubList(ChroniclerItem<League> league, NpgsqlConnection psqlConnection)
+		{
+			foreach (var sl in league.Data.Subleagues)
+			{
+				m_subleagueToLeagueMap[sl] = league.EntityId;
+			}
+		}
+
+
+		private async Task ProcessLeagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<League>> divs)
+		{
+			await ProcessEntityList<League>(psqlConnection, divs, "data.leagues", "league_id",
+				async x =>
+				{
+					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.leagues where league_id=@id and league_name=@name and valid_until is null", psqlConnection);
+					cmd.Parameters.AddWithValue("id", x.Data.Id);
+					cmd.Parameters.AddWithValue("name", x.Data.Name);
+					return (long)await cmd.ExecuteScalarAsync() > 0;
+				},
+				null,
+				async x =>
+				{
+					await ProcessLeagueSubList(x, psqlConnection);
+				});
+		}
+
+		private Dictionary<string, string> m_divisionToSubleagueMap = new Dictionary<string, string>();
+		private async Task ProcessSubleagueDivList(ChroniclerItem<Subleague> sub, NpgsqlConnection psqlConnection)
+		{
+			foreach(var div in sub.Data.Divisions)
+			{
+				m_divisionToSubleagueMap[div] = sub.EntityId;
+			}
+
+			var leagueId = m_subleagueToLeagueMap[sub.EntityId];
+			NpgsqlCommand cmd = new NpgsqlCommand(@"update data.subleagues set league_id=@league where subleague_id=@sub and valid_until is null", psqlConnection);
+			cmd.Parameters.AddWithValue("sub", sub.EntityId);
+			cmd.Parameters.AddWithValue("league", leagueId);
+			await cmd.ExecuteNonQueryAsync();
+		}
+
+		private async Task ProcessSubleagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Subleague>> divs)
+		{
+			await ProcessEntityList<Subleague>(psqlConnection, divs, "data.subleagues", "subleague_id",
+				async x =>
+				{
+					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.subleagues where subleague_id=@id and subleague_name=@name and valid_until is null", psqlConnection);
+					cmd.Parameters.AddWithValue("id", x.Data.Id);
+					cmd.Parameters.AddWithValue("name", x.Data.Name);
+					return (long)await cmd.ExecuteScalarAsync() > 0;
+				},
+				null,
+				async x =>
+				{
+					await ProcessSubleagueDivList(x, psqlConnection);
+				});
+		}
+
+		private async Task ProcessDivisions(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Division>> divs)
+		{
+			await ProcessEntityList<Division>(psqlConnection, divs, "data.divisions", "division_id",
+				async x =>
+				{
+					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.divisions where division_id=@id and division_name=@name and valid_until is null", psqlConnection);
+					cmd.Parameters.AddWithValue("id", x.Data.Id);
+					cmd.Parameters.AddWithValue("name", x.Data.Name);
+					return (long)await cmd.ExecuteScalarAsync() > 0;
+				},
+				async x =>
+				{
+					await ProcessDivisionTeamList(x.Data, x.ValidFrom, x.ValidTo, psqlConnection);
+				},
+				async x =>
+				{
+					await ProcessDivisionFinal(x, psqlConnection);
+				});
+		}
+
+		
+
+		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Team>> teams)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
 				foreach (var t in teams)
 				{
-					await ProcessRoster(t.Data, t.FirstSeen, psqlConnection);
+					await ProcessRoster(t.Data, t.ValidFrom, t.ValidTo, psqlConnection);
 
 					var hash = HashTeamAttrs(md5, t.Data);
 					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.teams where hash=@hash and valid_until is null", psqlConnection);
 					cmd.Parameters.AddWithValue("hash", hash);
-					//cmd.Prepare();
+					cmd.Prepare();
 					var count = (long)await cmd.ExecuteScalarAsync();
 
 					if (count == 1)
@@ -1135,14 +1386,15 @@ namespace SIBR
 
 						// Update the old record
 						NpgsqlCommand update = new NpgsqlCommand(@"update data.teams set valid_until=@timestamp where team_id = @team_id and valid_until is null", psqlConnection);
-						update.Parameters.AddWithValue("timestamp", t.FirstSeen);
-						update.Parameters.AddWithValue("team_id", t.TeamId);
+						// Old record is valid until new record starts
+						update.Parameters.AddWithValue("timestamp", t.ValidFrom);
+						update.Parameters.AddWithValue("team_id", t.Data.Id);
 						//update.Prepare();
 						int rows = await update.ExecuteNonQueryAsync();
 						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
 						var extra = new Dictionary<string, object>();
-						extra["valid_from"] = t.FirstSeen;
+						extra["valid_from"] = t.ValidFrom;
 						extra["hash"] = hash;
 						// Try to insert our current data
 						InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.teams", t.Data, extra);
@@ -1150,61 +1402,13 @@ namespace SIBR
 
 					}
 
-					await ProcessTeamModAttrs(t.Data, t.FirstSeen, psqlConnection);
+					await ProcessTeamModAttrs(t.Data, t.ValidFrom, t.ValidTo, psqlConnection);
 
 				}
 			}
 		}
 
-		private async Task LoadPlayerUpdates(NpgsqlConnection psqlConnection)
-		{
-			const int NUM_REQUESTED = 1000;
-			string nextPage = null;
-			DateTime? lastSeenPlayerTime = null;
-
-			while (true)
-			{
-				string query = $"players/updates?count={NUM_REQUESTED}";
-				if (m_dbPlayerTimestamp.HasValue)
-				{
-					query += $"&after={TimestampQueryValue(m_dbPlayerTimestamp.Value)}";
-				}
-				if (nextPage != null)
-				{
-					query += $"&page={nextPage}";
-				}
-
-				ChroniclerPage<ChroniclerPlayer> page = await ChroniclerQuery<ChroniclerPlayer>(query);
-
-				if (page == null || page.Data.Count() == 0)
-				{
-					break;
-				}
-				else
-				{
-					nextPage = page.NextPage;
-					lastSeenPlayerTime = page.Data.Last().LastSeen;
-					Console.WriteLine($"  Processing {page.Data.Count()} player updates (through {page.Data.Last().FirstSeen}).");
-					await ProcessPlayers(psqlConnection, page.Data);
-
-					// We're done!
-					if (page.Data.Count() != NUM_REQUESTED)
-					{
-						break;
-					}
-				}
-			}
-
-			if (lastSeenPlayerTime.HasValue)
-			{
-				NpgsqlCommand updateCmd = new NpgsqlCommand(@"UPDATE data.chronicler_meta SET player_timestamp=@ts WHERE id=0", psqlConnection);
-				updateCmd.Parameters.AddWithValue("ts", lastSeenPlayerTime);
-				int updateResult = await updateCmd.ExecuteNonQueryAsync();
-			}
-
-		}
-
-		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerPlayer> players)
+		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Player>> players)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
@@ -1236,21 +1440,21 @@ namespace SIBR
 
 						// Update the old record
 						NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
-						update.Parameters.AddWithValue("timestamp", p.FirstSeen);
-						update.Parameters.AddWithValue("player_id", p.PlayerId);
+						update.Parameters.AddWithValue("timestamp", p.ValidFrom);
+						update.Parameters.AddWithValue("player_id", p.Data.Id);
 						int rows = await update.ExecuteNonQueryAsync();
 						if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
 
 						var extra = new Dictionary<string, object>();
 						extra["hash"] = hash;
-						extra["valid_from"] = p.FirstSeen;
+						extra["valid_from"] = p.ValidFrom;
 						// Try to insert our current data
 						InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.players", p.Data, extra);
 						var newId = await insertCmd.Command.ExecuteNonQueryAsync();
 
 					}
 
-					ProcessPlayerModAttrs(p.Data, p.FirstSeen, psqlConnection);
+					ProcessPlayerModAttrs(p.Data, p.ValidFrom, p.ValidTo, psqlConnection);
 				}
 			}
 		}
@@ -1271,7 +1475,7 @@ namespace SIBR
 			return new Guid(data);
 		}
 
-		private void ProcessPlayerModAttrs(Player p, DateTime timestamp, NpgsqlConnection psqlConnection)
+		private void ProcessPlayerModAttrs(Player p, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
 
 			var countCmd = new NpgsqlCommand(@"select count(modification) from data.player_modifications where player_id=@player_id and valid_until is null", psqlConnection);
@@ -1316,7 +1520,7 @@ namespace SIBR
 				var insertCmd = new NpgsqlCommand(@"insert into data.player_modifications(player_id, modification, valid_from) values(@player_id, @modification, @valid_from)", psqlConnection);
 				insertCmd.Parameters.AddWithValue("player_id", p.Id);
 				insertCmd.Parameters.AddWithValue("modification", modification);
-				insertCmd.Parameters.AddWithValue("valid_from", timestamp);
+				insertCmd.Parameters.AddWithValue("valid_from", validFrom.Value);
 				//insertCmd.Prepare();
 				int rows = insertCmd.ExecuteNonQuery();
 				if (rows != 1) throw new InvalidOperationException($"Tried to insert but got {rows} rows affected!");
@@ -1326,7 +1530,7 @@ namespace SIBR
 			{
 				// Update the old record
 				NpgsqlCommand update = new NpgsqlCommand(@"update data.player_modifications set valid_until=@timestamp where player_id = @player_id and modification=@modification and valid_until is null", psqlConnection);
-				update.Parameters.AddWithValue("timestamp", timestamp);
+				update.Parameters.AddWithValue("timestamp", validFrom.Value);
 				update.Parameters.AddWithValue("modification", modification);
 				update.Parameters.AddWithValue("player_id", p.Id);
 				//update.Prepare();
@@ -1401,7 +1605,7 @@ namespace SIBR
 			return cmd;
 		}
 
-		private async Task ProcessRoster(Team t, DateTime timestamp, NpgsqlConnection psqlConnection)
+		private async Task ProcessRoster(Team t, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
 
 			Stopwatch s = new Stopwatch();
@@ -1418,7 +1622,7 @@ namespace SIBR
 				{
 					playerId = t.Lineup.ElementAt(i);
 				}
-				await ProcessRosterEntry(psqlConnection, timestamp, t, playerId, i, PositionType.Batter);
+				await ProcessRosterEntry(psqlConnection, validFrom.Value, t, playerId, i, PositionType.Batter);
 			}
 
 			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Pitcher);
@@ -1432,7 +1636,7 @@ namespace SIBR
 				{
 					playerId = t.Rotation.ElementAt(i);
 				}
-				await ProcessRosterEntry(psqlConnection, timestamp, t, playerId, i, PositionType.Pitcher);
+				await ProcessRosterEntry(psqlConnection, validFrom.Value, t, playerId, i, PositionType.Pitcher);
 			}
 
 			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Bullpen);
@@ -1446,7 +1650,7 @@ namespace SIBR
 				{
 					playerId = t.Bullpen.ElementAt(i);
 				}
-				await ProcessRosterEntry(psqlConnection, timestamp, t, playerId, i, PositionType.Bullpen);
+				await ProcessRosterEntry(psqlConnection, validFrom.Value, t, playerId, i, PositionType.Bullpen);
 			}
 
 			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Bench);
@@ -1460,7 +1664,7 @@ namespace SIBR
 				{
 					playerId = t.Bench.ElementAt(i);
 				}
-				await ProcessRosterEntry(psqlConnection, timestamp, t, playerId, i, PositionType.Bench);
+				await ProcessRosterEntry(psqlConnection, validFrom.Value, t, playerId, i, PositionType.Bench);
 			}
 
 			s.Stop();
@@ -1488,7 +1692,7 @@ namespace SIBR
 			return new Guid(data);
 		}
 
-		private async Task ProcessTeamModAttrs(Team p, DateTime timestamp, NpgsqlConnection psqlConnection)
+		private async Task ProcessTeamModAttrs(Team p, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
 
 			var countCmd = new NpgsqlCommand(@"select count(modification) from data.team_modifications where team_id=@team_id and valid_until is null", psqlConnection);
@@ -1533,7 +1737,7 @@ namespace SIBR
 				var insertCmd = new NpgsqlCommand(@"insert into data.team_modifications(team_id, modification, valid_from) values(@team_id, @modification, @valid_from)", psqlConnection);
 				insertCmd.Parameters.AddWithValue("team_id", p.Id);
 				insertCmd.Parameters.AddWithValue("modification", modification);
-				insertCmd.Parameters.AddWithValue("valid_from", timestamp);
+				insertCmd.Parameters.AddWithValue("valid_from", validFrom.Value);
 				//insertCmd.Prepare();
 				int rows = await insertCmd.ExecuteNonQueryAsync();
 				if (rows != 1) throw new InvalidOperationException($"Tried to insert but got {rows} rows affected!");
@@ -1543,7 +1747,7 @@ namespace SIBR
 			{
 				// Update the old record
 				NpgsqlCommand update = new NpgsqlCommand(@"update data.team_modifications set valid_until=@timestamp where team_id = @team_id and modification=@modification and valid_until is null", psqlConnection);
-				update.Parameters.AddWithValue("timestamp", timestamp);
+				update.Parameters.AddWithValue("timestamp", validFrom.Value);
 				update.Parameters.AddWithValue("modification", modification);
 				update.Parameters.AddWithValue("team_id", p.Id);
 				//update.Prepare();
