@@ -280,7 +280,7 @@ namespace SIBR
 				await LoadUpdates<ProphDivision>(psqlConnection, "division", leagueDivTimestamp, ProcessDivisions);
 				await LoadUpdates<ProphTeam>(psqlConnection, "team", m_dbTeamTimestamp, ProcessTeams, 250);
 				await LoadUpdates<ProphPlayer>(psqlConnection, "player", m_dbPlayerTimestamp, ProcessPlayers, 250);
-				await LoadUpdates<ProphStadium>(psqlConnection, "stadium", null, ProcessStadiums, 100, false);
+				await LoadUpdates<ProphStadium>(psqlConnection, "stadium", m_dbStadiumTimestamp, ProcessStadiums, 1000);
 
 				await StoreTimeMapEvents(psqlConnection);
 			}
@@ -1183,7 +1183,7 @@ namespace SIBR
 		private async Task ProcessEntityList<T>(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<T>> items, string table, string pkCol,
 			Func<ChroniclerItem<T>, Task<bool>> ExistsFunc,
 			Func<ChroniclerItem<T>, Task> UncountedWorkFunc = null,
-			Func<ChroniclerItem<T>, Task> PostWorkFunc = null)
+			Func<ChroniclerItem<T>, Task> PostWorkFunc = null) where T : ProphBase
 		{
 			using (MD5 md5 = MD5.Create())
 			{
@@ -1194,7 +1194,21 @@ namespace SIBR
 						await UncountedWorkFunc(t);
 					}
 
-					var exists = await ExistsFunc(t);
+					Guid hash = new Guid();
+					bool exists = false;
+
+					if (t.Data.UseHash)
+					{
+						hash = t.Data.Hash(md5);
+						NpgsqlCommand cmd = new NpgsqlCommand($"select count(hash) from {table} where hash=@hash and valid_until is null", psqlConnection);
+						cmd.Parameters.AddWithValue("hash", hash);
+						var count = (long)await cmd.ExecuteScalarAsync();
+						exists = (count == 1);
+					}
+					else
+					{
+						exists = await ExistsFunc(t);
+					}
 
 					if (exists)
 					{
@@ -1202,7 +1216,7 @@ namespace SIBR
 					}
 					else
 					{
-						Console.WriteLine($"    Found an update {t.Hash} for {t.Data}");
+						//Console.WriteLine($"    Found an update {t.Hash} for {t.Data}");
 
 						// Update the old record
 						NpgsqlCommand update = new NpgsqlCommand($"update {table} set valid_until=@timestamp where {pkCol} = @id and valid_until is null", psqlConnection);
@@ -1214,6 +1228,10 @@ namespace SIBR
 
 						var extra = new Dictionary<string, object>();
 						extra["valid_from"] = t.ValidFrom.Value;
+						if (t.Data.UseHash)
+						{
+							extra["hash"] = hash;
+						}
 						// Try to insert our current data
 						InsertCommand insertCmd = new InsertCommand(psqlConnection, table, t.Data, extra, "", pkCol);
 						var newId = await insertCmd.Command.ExecuteNonQueryAsync();

@@ -1,12 +1,14 @@
-﻿using System;
+﻿using Cauldron.Serializable;
+using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace prophesizer.Serializable
 {
-	class ProphStadium
+	class ProphStadium : ProphBase
 	{
+		[DbAlias("stadium_id")]
 		public string Id { get; set; }
 
 		public int Hype { get; set; }
@@ -22,6 +24,7 @@ namespace prophesizer.Serializable
 		public float Mysticism { get; set; }
 		public float Viscosity { get; set; }
 		public float Elongation { get; set; }
+		[DbIgnore]
 		public float Filthiness { get; set; }
 		public float Obtuseness { get; set; }
 		public float Forwardness { get; set; }
@@ -31,19 +34,10 @@ namespace prophesizer.Serializable
 		public float Inconvenience { get; set; }
 		public float Luxuriousness { get; set; }
 
-		public Guid Hash(HashAlgorithm hashAlgorithm)
+		public override string ToString()
 		{
-			StringBuilder sb = new StringBuilder();
-
-			foreach (var prop in this.GetType().GetProperties())
-			{
-				sb.Append(prop.GetValue(this)?.ToString());
-			}
-
-			// Convert the input string to a byte array and compute the hash.
-			byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
-
-			return new Guid(data);
+			return "Stadium";
 		}
+
 	}
 }

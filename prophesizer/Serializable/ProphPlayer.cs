@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 
 namespace prophesizer.Serializable
 {
-	public class ProphPlayer
+	public class ProphPlayer : ProphBase
 	{
 		[DbIgnore]
 		public string _id { get; set; }
@@ -86,7 +86,7 @@ namespace prophesizer.Serializable
 		[DbIgnore]
 		public IEnumerable<string> GameAttr { get; set; }
 
-		public Guid Hash(HashAlgorithm hashAlgorithm)
+		public override Guid Hash(HashAlgorithm hashAlgorithm)
 		{
 			StringBuilder sb = new StringBuilder();
 

@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 
 namespace prophesizer.Serializable
 {
-	public class ProphTeam
+	public class ProphTeam : ProphBase
 	{
 		[DbIgnore]
 		public string _id { get; set; }
@@ -70,7 +70,7 @@ namespace prophesizer.Serializable
 		public IEnumerable<string> GameAttr { get; set; }
 
 		// Hash just the basic attributes of a team, not including their player roster
-		public  Guid Hash(HashAlgorithm hashAlgorithm)
+		public override Guid Hash(HashAlgorithm hashAlgorithm)
 		{
 			StringBuilder sb = new StringBuilder();
 

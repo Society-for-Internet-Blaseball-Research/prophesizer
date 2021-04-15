@@ -3,59 +3,73 @@ using Cauldron.Serializable;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-public class ProphLeague
+namespace prophesizer.Serializable
 {
-	[DbIgnore]
-	public string _id { get; set; }
-	[DbIgnore]
-	public string id { get; set; }
-	[JsonIgnore]
-	[DbAlias("league_id")]
-	public string Id => _id ?? id;
 
-	[DbAlias("league_name")]
-	public string Name { get; set; }
+	public class ProphLeague : ProphBase
+	{
+		[DbIgnore]
+		public override bool UseHash => false;
 
-	[DbIgnore]
-	public IEnumerable<string> Subleagues { get; set; }
+		[DbIgnore]
+		public string _id { get; set; }
+		[DbIgnore]
+		public string id { get; set; }
+		[JsonIgnore]
+		[DbAlias("league_id")]
+		public string Id => _id ?? id;
 
-	public override string ToString() { return Name; }
-}
+		[DbAlias("league_name")]
+		public string Name { get; set; }
 
-public class ProphSubleague
-{
-	[DbIgnore]
-	public string _id { get; set; }
-	[DbIgnore]
-	public string id { get; set; }
-	[JsonIgnore]
-	[DbAlias("subleague_id")]
-	public string Id => _id ?? id;
+		[DbIgnore]
+		public IEnumerable<string> Subleagues { get; set; }
 
-	[DbAlias("subleague_name")]
-	public string Name { get; set; }
+		public override string ToString() { return Name; }
+	}
 
-	[DbIgnore]
-	public IEnumerable<string> Divisions { get; set; }
+	public class ProphSubleague : ProphBase
+	{
+		[DbIgnore]
+		public override bool UseHash => false;
 
-	public override string ToString() { return Name; }
-}
+		[DbIgnore]
+		public string _id { get; set; }
+		[DbIgnore]
+		public string id { get; set; }
+		[JsonIgnore]
+		[DbAlias("subleague_id")]
+		public string Id => _id ?? id;
 
-public class ProphDivision
-{
-	[DbIgnore]
-	public string _id { get; set; }
-	[DbIgnore]
-	public string id { get; set; }
-	[JsonIgnore]
-	[DbAlias("division_id")]
-	public string Id => _id ?? id;
+		[DbAlias("subleague_name")]
+		public string Name { get; set; }
 
-	[DbAlias("division_name")]
-	public string Name { get; set; }
+		[DbIgnore]
+		public IEnumerable<string> Divisions { get; set; }
 
-	[DbIgnore]
-	public IEnumerable<string> Teams { get; set; }
+		public override string ToString() { return Name; }
+	}
 
-	public override string ToString() { return Name; }
+	public class ProphDivision : ProphBase
+	{
+		[DbIgnore]
+		public override bool UseHash => false;
+
+		[DbIgnore]
+		public string _id { get; set; }
+		[DbIgnore]
+		public string id { get; set; }
+		[JsonIgnore]
+		[DbAlias("division_id")]
+		public string Id => _id ?? id;
+
+		[DbAlias("division_name")]
+		public string Name { get; set; }
+
+		[DbIgnore]
+		public IEnumerable<string> Teams { get; set; }
+
+		public override string ToString() { return Name; }
+	}
+
 }

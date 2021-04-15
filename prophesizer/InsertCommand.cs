@@ -76,6 +76,9 @@ internal class InsertCommand
 					}
 				}
 
+				if (value == null)
+					value = DBNull.Value;
+
 				m_command.Parameters.AddWithValue(colName, value);
 			}
 		}
