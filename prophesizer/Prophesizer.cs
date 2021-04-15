@@ -1,6 +1,7 @@
 using Cauldron;
 using Npgsql;
 using prophesizer;
+using prophesizer.Serializable;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -274,11 +275,11 @@ namespace SIBR
 			{
 				var leagueDivTimestamp = m_dbDivisionTimestamp;
 
-				await LoadUpdates<League>(psqlConnection, "league", leagueDivTimestamp, ProcessLeagues, 100, false);
-				await LoadUpdates<Subleague>(psqlConnection, "subleague", leagueDivTimestamp, ProcessSubleagues, 100, false);
-				await LoadUpdates<Division>(psqlConnection, "division", leagueDivTimestamp, ProcessDivisions);
-				await LoadUpdates<Team>(psqlConnection, "team", m_dbTeamTimestamp, ProcessTeams, 250);
-				await LoadUpdates<Player>(psqlConnection, "player", m_dbPlayerTimestamp, ProcessPlayers, 250);
+				await LoadUpdates<ProphLeague>(psqlConnection, "league", leagueDivTimestamp, ProcessLeagues, 100, false);
+				await LoadUpdates<ProphSubleague>(psqlConnection, "subleague", leagueDivTimestamp, ProcessSubleagues, 100, false);
+				await LoadUpdates<ProphDivision>(psqlConnection, "division", leagueDivTimestamp, ProcessDivisions);
+				await LoadUpdates<ProphTeam>(psqlConnection, "team", m_dbTeamTimestamp, ProcessTeams, 250);
+				await LoadUpdates<ProphPlayer>(psqlConnection, "player", m_dbPlayerTimestamp, ProcessPlayers, 250);
 
 				await StoreTimeMapEvents(psqlConnection);
 			}
@@ -1227,7 +1228,7 @@ namespace SIBR
 			}
 		}
 
-		private async Task ProcessDivisionFinal(ChroniclerItem<Division> div, NpgsqlConnection psqlConnection)
+		private async Task ProcessDivisionFinal(ChroniclerItem<ProphDivision> div, NpgsqlConnection psqlConnection)
 		{
 			var subleagueId = m_divisionToSubleagueMap[div.EntityId];
 			var leagueId = m_subleagueToLeagueMap[subleagueId];
@@ -1241,7 +1242,7 @@ namespace SIBR
 		}
 
 		// Process the list of teams in the division
-		private async Task ProcessDivisionTeamList(Division d, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
+		private async Task ProcessDivisionTeamList(ProphDivision d, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
 			foreach (var teamId in d.Teams)
 			{
@@ -1282,7 +1283,7 @@ namespace SIBR
 		}
 
 		private Dictionary<string, string> m_subleagueToLeagueMap = new Dictionary<string, string>();
-		private async Task ProcessLeagueSubList(ChroniclerItem<League> league, NpgsqlConnection psqlConnection)
+		private async Task ProcessLeagueSubList(ChroniclerItem<ProphLeague> league, NpgsqlConnection psqlConnection)
 		{
 			foreach (var sl in league.Data.Subleagues)
 			{
@@ -1291,9 +1292,9 @@ namespace SIBR
 		}
 
 
-		private async Task ProcessLeagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<League>> divs)
+		private async Task ProcessLeagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<ProphLeague>> divs)
 		{
-			await ProcessEntityList<League>(psqlConnection, divs, "data.leagues", "league_id",
+			await ProcessEntityList<ProphLeague>(psqlConnection, divs, "data.leagues", "league_id",
 				async x =>
 				{
 					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.leagues where league_id=@id and league_name=@name and valid_until is null", psqlConnection);
@@ -1309,7 +1310,7 @@ namespace SIBR
 		}
 
 		private Dictionary<string, string> m_divisionToSubleagueMap = new Dictionary<string, string>();
-		private async Task ProcessSubleagueDivList(ChroniclerItem<Subleague> sub, NpgsqlConnection psqlConnection)
+		private async Task ProcessSubleagueDivList(ChroniclerItem<ProphSubleague> sub, NpgsqlConnection psqlConnection)
 		{
 			foreach(var div in sub.Data.Divisions)
 			{
@@ -1323,9 +1324,9 @@ namespace SIBR
 			await cmd.ExecuteNonQueryAsync();
 		}
 
-		private async Task ProcessSubleagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Subleague>> divs)
+		private async Task ProcessSubleagues(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<ProphSubleague>> divs)
 		{
-			await ProcessEntityList<Subleague>(psqlConnection, divs, "data.subleagues", "subleague_id",
+			await ProcessEntityList<ProphSubleague>(psqlConnection, divs, "data.subleagues", "subleague_id",
 				async x =>
 				{
 					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.subleagues where subleague_id=@id and subleague_name=@name and valid_until is null", psqlConnection);
@@ -1340,9 +1341,9 @@ namespace SIBR
 				});
 		}
 
-		private async Task ProcessDivisions(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Division>> divs)
+		private async Task ProcessDivisions(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<ProphDivision>> divs)
 		{
-			await ProcessEntityList<Division>(psqlConnection, divs, "data.divisions", "division_id",
+			await ProcessEntityList<ProphDivision>(psqlConnection, divs, "data.divisions", "division_id",
 				async x =>
 				{
 					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.divisions where division_id=@id and division_name=@name and valid_until is null", psqlConnection);
@@ -1362,7 +1363,7 @@ namespace SIBR
 
 		
 
-		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Team>> teams)
+		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<ProphTeam>> teams)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
@@ -1370,7 +1371,7 @@ namespace SIBR
 				{
 					await ProcessRoster(t.Data, t.ValidFrom, t.ValidTo, psqlConnection);
 
-					var hash = HashTeamAttrs(md5, t.Data);
+					var hash = t.Data.HashAttrs(md5);
 					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.teams where hash=@hash and valid_until is null", psqlConnection);
 					cmd.Parameters.AddWithValue("hash", hash);
 					cmd.Prepare();
@@ -1408,7 +1409,7 @@ namespace SIBR
 			}
 		}
 
-		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<Player>> players)
+		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<ProphPlayer>> players)
 		{
 			using (MD5 md5 = MD5.Create())
 			{
@@ -1423,8 +1424,7 @@ namespace SIBR
 						}
 					}
 
-					// TODO move hashing into Player
-					var hash = HashObject(md5, p.Data);
+					var hash = p.Data.Hash(md5);
 
 					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.players where hash=@hash and valid_until is null", psqlConnection);
 					cmd.Parameters.AddWithValue("hash", hash);
@@ -1460,22 +1460,9 @@ namespace SIBR
 		}
 
 	
-		private Guid HashObject(HashAlgorithm hashAlgorithm, object obj)
-		{
-			StringBuilder sb = new StringBuilder();
 
-			foreach (var prop in obj.GetType().GetProperties())
-			{
-				sb.Append(prop.GetValue(obj)?.ToString());
-			}
 
-			// Convert the input string to a byte array and compute the hash.
-			byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
-
-			return new Guid(data);
-		}
-
-		private void ProcessPlayerModAttrs(Player p, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
+		private void ProcessPlayerModAttrs(ProphPlayer p, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
 
 			var countCmd = new NpgsqlCommand(@"select count(modification) from data.player_modifications where player_id=@player_id and valid_until is null", psqlConnection);
@@ -1542,7 +1529,7 @@ namespace SIBR
 		}
 
 
-		private async Task ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime timestamp, Team team, string playerId, int rosterPosition, PositionType positionTypeEnum)
+		private async Task ProcessRosterEntry(NpgsqlConnection psqlConnection, DateTime timestamp, ProphTeam team, string playerId, int rosterPosition, PositionType positionTypeEnum)
 		{
 
 			int positionType = (int)positionTypeEnum;
@@ -1605,7 +1592,7 @@ namespace SIBR
 			return cmd;
 		}
 
-		private async Task ProcessRoster(Team t, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
+		private async Task ProcessRoster(ProphTeam t, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
 
 			Stopwatch s = new Stopwatch();
@@ -1671,28 +1658,9 @@ namespace SIBR
 			// if (TIMING) Console.WriteLine($"Processed rosters in {s.ElapsedMilliseconds} ms");
 		}
 
-		// Hash just the basic attributes of a team, not including their player roster
-		private Guid HashTeamAttrs(HashAlgorithm hashAlgorithm, Team obj)
-		{
-			StringBuilder sb = new StringBuilder();
+	
 
-			sb.Append(obj.Id);
-			sb.Append(obj.Location);
-			sb.Append(obj.Nickname);
-			sb.Append(obj.FullName);
-			sb.Append(obj.CardIndex);
-			sb.Append(obj.Slogan);
-			sb.Append(obj.MainColor);
-			sb.Append(obj.SecondaryColor);
-			sb.Append(obj.Emoji);
-			sb.Append(obj.Shorthand);
-
-			// Convert the input string to a byte array and compute the hash.
-			byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
-			return new Guid(data);
-		}
-
-		private async Task ProcessTeamModAttrs(Team p, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
+		private async Task ProcessTeamModAttrs(ProphTeam p, DateTime? validFrom, DateTime? validTo, NpgsqlConnection psqlConnection)
 		{
 
 			var countCmd = new NpgsqlCommand(@"select count(modification) from data.team_modifications where team_id=@team_id and valid_until is null", psqlConnection);
