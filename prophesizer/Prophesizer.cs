@@ -67,7 +67,7 @@ namespace SIBR
 		private object _eventLocker = new object();
 		private object _pitcherLocker = new object();
 
-		private SeasonDay m_lastMaterializedRefresh = new SeasonDay(0,0);
+		private SeasonDay m_lastMaterializedRefresh = new SeasonDay(0, 0);
 		private SeasonDay m_dbSeasonDay;
 		private DateTime? m_dbGameTimestamp;
 		private DateTime? m_dbTeamTimestamp;
@@ -144,26 +144,26 @@ namespace SIBR
 					{
 						gameTime = reader.GetDateTime(2);
 					}
-					if(!reader.IsDBNull(3))
+					if (!reader.IsDBNull(3))
 					{
 						teamTime = reader.GetDateTime(3);
 					}
-					if(!reader.IsDBNull(4))
+					if (!reader.IsDBNull(4))
 					{
 						playerTime = reader.GetDateTime(4);
 					}
-					if(!reader.IsDBNull(5))
+					if (!reader.IsDBNull(5))
 					{
 						divisionTime = reader.GetDateTime(5);
 					}
-					if(!reader.IsDBNull(6))
+					if (!reader.IsDBNull(6))
 					{
 						stadiumTime = reader.GetDateTime(6);
 					}
 				}
 			}
 
-			if(!foundRecord)
+			if (!foundRecord)
 			{
 				NpgsqlCommand insertCmd = new NpgsqlCommand(@"insert into data.chronicler_meta values(0,0,0,null,null,null)", psqlConnection);
 				insertCmd.ExecuteNonQuery();
@@ -241,7 +241,7 @@ namespace SIBR
 		{
 			Metadata meta = new Metadata();
 
-			PollResult result = new PollResult(); 
+			PollResult result = new PollResult();
 
 			Console.WriteLine($"Started poll at {DateTime.UtcNow.ToString()} UTC.");
 
@@ -255,7 +255,7 @@ namespace SIBR
 
 			// Last day recorded in the DB
 			(m_dbSeasonDay, m_dbGameTimestamp, m_dbTeamTimestamp, m_dbPlayerTimestamp, m_dbDivisionTimestamp, m_dbStadiumTimestamp) = await GetChroniclerMeta(psqlConnection);
-			
+
 			// Current day according to blaseball.com
 			SeasonDay simSeasonDay;
 
@@ -280,6 +280,7 @@ namespace SIBR
 				await LoadUpdates<ProphDivision>(psqlConnection, "division", leagueDivTimestamp, ProcessDivisions);
 				await LoadUpdates<ProphTeam>(psqlConnection, "team", m_dbTeamTimestamp, ProcessTeams, 250);
 				await LoadUpdates<ProphPlayer>(psqlConnection, "player", m_dbPlayerTimestamp, ProcessPlayers, 250);
+				await LoadUpdates<ProphStadium>(psqlConnection, "stadium", null, ProcessStadiums, 100, false);
 
 				await StoreTimeMapEvents(psqlConnection);
 			}
@@ -299,11 +300,11 @@ namespace SIBR
 				missingGames = missingGames.Where(sd => sd > new SeasonDay(1, 97));
 
 				IEnumerable<SeasonDay> bustedDays = new SeasonDay[]
-				{ 
+				{
 					new SeasonDay(3,71),
 					new SeasonDay(3,72),
 					new SeasonDay(9,101),
-					new SeasonDay(10,108) 
+					new SeasonDay(10,108)
 				};
 
 				// Ignore the known-busted days
@@ -383,7 +384,7 @@ namespace SIBR
 			HashSet<Guid> existingPatches = new HashSet<Guid>();
 			using (var reader = cmd.ExecuteReader())
 			{
-				while(reader.Read())
+				while (reader.Read())
 				{
 					existingPatches.Add((Guid)reader[0]);
 				}
@@ -399,7 +400,7 @@ namespace SIBR
 						var hashBytes = md5.ComputeHash(Encoding.UTF8.GetBytes(cmdText));
 						var hash = new Guid(hashBytes);
 
-						if(!existingPatches.Contains(hash))
+						if (!existingPatches.Contains(hash))
 						{
 							Console.WriteLine($"Applying patch from {Path.GetFileName(patchFilename)} / {hash.ToString()}:");
 							Console.WriteLine(cmdText);
@@ -429,7 +430,7 @@ namespace SIBR
 				}
 			}
 
-			
+
 		}
 
 		public static string GetExecutingDirectoryName()
@@ -469,7 +470,7 @@ namespace SIBR
 					Int64 numFinishedGames = (Int64)response;
 					Console.WriteLine($"{numFinishedGames} of {numGames} games complete for {m_dbSeasonDay.HumanReadable}...");
 					// If all games are done, refresh our materialized views
-					if ((numGames > 0 && numFinishedGames >= numGames) || 
+					if ((numGames > 0 && numFinishedGames >= numGames) ||
 						(numGames == 0 && m_dbSeasonDay.Season > m_lastMaterializedRefresh.Season) ||
 						(m_lastMaterializedRefresh.Season == 0 && m_lastMaterializedRefresh.Day == 0))
 					{
@@ -478,7 +479,7 @@ namespace SIBR
 
 						printMatviewTime = true;
 
-						ConsoleOrWebhook($"All games complete for {m_dbSeasonDay.HumanReadable}, refreshing materialized views{(isPopulated?" concurrently":"")}!");
+						ConsoleOrWebhook($"All games complete for {m_dbSeasonDay.HumanReadable}, refreshing materialized views{(isPopulated ? " concurrently" : "")}!");
 						string query = isPopulated ? "CALL data.refresh_materialized_views_concurrently()" : "CALL data.refresh_materialized_views()";
 						var refreshCmd = new NpgsqlCommand(query, psqlConnection);
 						await refreshCmd.ExecuteNonQueryAsync();
@@ -525,7 +526,7 @@ namespace SIBR
 					int season = (int)reader[0];
 					int day = (int)reader[1];
 					int tournament = -1;
-					if(!(reader[2] is DBNull))
+					if (!(reader[2] is DBNull))
 						tournament = (int)reader[2];
 
 					days.Add(new SeasonDay(season, day, tournament));
@@ -542,7 +543,7 @@ namespace SIBR
 			List<SeasonDay> days = new List<SeasonDay>();
 			using (var reader = cmd.ExecuteReader())
 			{
-				while(reader.Read())
+				while (reader.Read())
 				{
 					int season = (int)reader[0];
 					int day = (int)reader[1];
@@ -581,7 +582,7 @@ namespace SIBR
 					{
 						query += $"&page={nextPage}";
 					}
-					
+
 				}
 				else
 				{
@@ -604,7 +605,7 @@ namespace SIBR
 						Console.WriteLine("Got no data from Chronicler!");
 						break;
 					}
-					else if(page.Data.Count() == NUM_EVENTS_REQUESTED)
+					else if (page.Data.Count() == NUM_EVENTS_REQUESTED)
 					{
 						morePages = true;
 					}
@@ -713,7 +714,7 @@ namespace SIBR
 				{
 					nextPage = page.NextPage;
 
-					foreach(var chronData in page.Items)
+					foreach (var chronData in page.Items)
 					{
 						SimData simData = chronData.Data;
 						StoreSimDataPhase(psqlConnection, simData.Season, simData.Day, chronData.ValidFrom.Value, simData.Phase);
@@ -728,7 +729,7 @@ namespace SIBR
 		private void StoreSimDataPhase(NpgsqlConnection psqlConnection, int season, int day, DateTime firstTime, int phaseId)
 		{
 			// HACK for Coffee Cup; set the Coffee phases to season -1
-			if(phaseId >= 13 && phaseId <= 15)
+			if (phaseId >= 13 && phaseId <= 15)
 			{
 				season = -1;
 			}
@@ -767,7 +768,7 @@ namespace SIBR
 				Console.Write($"Processing: ");
 				for (int i = 0; i < NUM_TASKS; i++)
 				{
-					if(gameQueue.Count > 0)
+					if (gameQueue.Count > 0)
 					{
 						SeasonDay dayToFetch = gameQueue.Dequeue();
 						tasks[i] = Task.Run(() => FetchAndProcessFullDay(dayToFetch));
@@ -775,7 +776,7 @@ namespace SIBR
 					}
 					else
 					{
-						tasks[i] = Task.Run(() => false );
+						tasks[i] = Task.Run(() => false);
 					}
 				}
 				Console.WriteLine();
@@ -841,7 +842,7 @@ namespace SIBR
 			List<(int, Outcome)> outcomes = new List<(int, Outcome)>();
 			List<(int, string)> hashes = new List<(int, string)>();
 
-			using(var writer = psqlConnection.BeginBinaryImport(
+			using (var writer = psqlConnection.BeginBinaryImport(
 				@"COPY data.game_events(
 					id, perceived_at, game_id, event_type, event_index, inning, top_of_inning, outs_before_play,
 					batter_id, batter_team_id, pitcher_id, pitcher_team_id, home_score, away_score,
@@ -854,17 +855,17 @@ namespace SIBR
 					home_base_count, away_base_count, home_ball_count, away_ball_count
 				)FROM STDIN (FORMAT BINARY)"))
 			{
-				foreach(var ge in gameEvents)
+				foreach (var ge in gameEvents)
 				{
-					foreach(var runner in ge.baseRunners)
+					foreach (var runner in ge.baseRunners)
 					{
 						runners.Add((m_gameEventId, runner));
 					}
-					foreach(var outcome in ge.outcomes)
+					foreach (var outcome in ge.outcomes)
 					{
 						outcomes.Add((m_gameEventId, outcome));
 					}
-					foreach(var hash in ge.updateHashes)
+					foreach (var hash in ge.updateHashes)
 					{
 						if (hash != null)
 							hashes.Add((m_gameEventId, hash));
@@ -927,13 +928,13 @@ namespace SIBR
 				await writer.CompleteAsync();
 			}
 
-			using(var writer = psqlConnection.BeginBinaryImport(
+			using (var writer = psqlConnection.BeginBinaryImport(
 				@"COPY data.game_event_base_runners(
 					game_event_id, runner_id, responsible_pitcher_id, base_before_play, base_after_play,
 					was_base_stolen, was_caught_stealing, was_picked_off, runs_scored
 				)FROM STDIN (FORMAT BINARY)"))
 			{
-				foreach((var id, var r) in runners)
+				foreach ((var id, var r) in runners)
 				{
 					writer.StartRow();
 					writer.Write(id, NpgsqlTypes.NpgsqlDbType.Integer);
@@ -950,12 +951,12 @@ namespace SIBR
 				await writer.CompleteAsync();
 			}
 
-			using(var writer = psqlConnection.BeginBinaryImport(
+			using (var writer = psqlConnection.BeginBinaryImport(
 				@"COPY data.outcomes(
 					game_event_id, entity_id, event_type, original_text
 				)FROM STDIN (FORMAT BINARY)"))
 			{
-				foreach((var id, var o) in outcomes)
+				foreach ((var id, var o) in outcomes)
 				{
 					writer.StartRow();
 					writer.Write(id, NpgsqlTypes.NpgsqlDbType.Integer);
@@ -986,7 +987,7 @@ namespace SIBR
 
 		private async Task PersistGame(NpgsqlConnection psqlConnection, GameEvent gameEvent, int gameEventId)
 		{
-			if(gameEvent.firstPerceivedAt.Year < 2020)
+			if (gameEvent.firstPerceivedAt.Year < 2020)
 			{
 				Console.WriteLine($"Warning! Found a game event with bogus timestamp - event {gameEventId} from game {gameEvent.gameId}, eventIndex {gameEvent.eventIndex}.");
 			}
@@ -995,7 +996,7 @@ namespace SIBR
 			{
 				int id = -1;
 				var response = await gameEventStatement.ExecuteScalarAsync();
-				if(response == null)
+				if (response == null)
 				{
 					return;
 				}
@@ -1036,7 +1037,7 @@ namespace SIBR
 			}
 		}
 
-		
+
 		private NpgsqlCommand PrepareGameEventStatement(NpgsqlConnection psqlConnection, GameEvent gameEvent, int id)
 		{
 			var extra = new Dictionary<string, object>();
@@ -1220,7 +1221,7 @@ namespace SIBR
 
 					}
 
-					if(PostWorkFunc != null)
+					if (PostWorkFunc != null)
 					{
 						await PostWorkFunc(t);
 					}
@@ -1251,7 +1252,7 @@ namespace SIBR
 				cmd.Parameters.AddWithValue("team", teamId);
 				var div = (string)await cmd.ExecuteScalarAsync();
 
-				if(div == d.Id)
+				if (div == d.Id)
 				{
 					// Team is already in that division
 				}
@@ -1312,7 +1313,7 @@ namespace SIBR
 		private Dictionary<string, string> m_divisionToSubleagueMap = new Dictionary<string, string>();
 		private async Task ProcessSubleagueDivList(ChroniclerItem<ProphSubleague> sub, NpgsqlConnection psqlConnection)
 		{
-			foreach(var div in sub.Data.Divisions)
+			foreach (var div in sub.Data.Divisions)
 			{
 				m_divisionToSubleagueMap[div] = sub.EntityId;
 			}
@@ -1361,7 +1362,23 @@ namespace SIBR
 				});
 		}
 
-		
+		private async Task ProcessStadiums(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<ProphStadium>> stadiums)
+		{
+			await ProcessEntityList<ProphStadium>(psqlConnection, stadiums, "data.stadiums", "stadium_id",
+				async x =>
+				{
+					using (MD5 md5 = MD5.Create())
+					{
+						var hash = x.Data.Hash(md5);
+						NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.stadiums where hash=@hash and valid_until is null", psqlConnection);
+						cmd.Parameters.AddWithValue("hash", hash);
+						var count = (long)await cmd.ExecuteScalarAsync();
+						return count == 1;
+					}
+				},
+				null,
+				null);
+		}
 
 		private async Task ProcessTeams(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<ProphTeam>> teams)
 		{
@@ -1371,10 +1388,9 @@ namespace SIBR
 				{
 					await ProcessRoster(t.Data, t.ValidFrom, t.ValidTo, psqlConnection);
 
-					var hash = t.Data.HashAttrs(md5);
+					var hash = t.Data.Hash(md5);
 					NpgsqlCommand cmd = new NpgsqlCommand(@"select count(hash) from data.teams where hash=@hash and valid_until is null", psqlConnection);
 					cmd.Parameters.AddWithValue("hash", hash);
-					cmd.Prepare();
 					var count = (long)await cmd.ExecuteScalarAsync();
 
 					if (count == 1)

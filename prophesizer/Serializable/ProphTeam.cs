@@ -70,7 +70,7 @@ namespace prophesizer.Serializable
 		public IEnumerable<string> GameAttr { get; set; }
 
 		// Hash just the basic attributes of a team, not including their player roster
-		public  Guid HashAttrs(HashAlgorithm hashAlgorithm)
+		public  Guid Hash(HashAlgorithm hashAlgorithm)
 		{
 			StringBuilder sb = new StringBuilder();
 
