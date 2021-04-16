@@ -4,13 +4,13 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <PackageId>SIBR.Prophesizer</PackageId>
-    <Version>2.12.0</Version>
+    <Version>2.12.2</Version>
     <Authors>lilserf</Authors>
     <Company>Society for Internet Blaseball Research</Company>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Evolve" Version="2.4.0" />
+    <PackageReference Include="Evolve" Version="3.0.0" />
     <PackageReference Include="npgsql" Version="4.1.4" />
   </ItemGroup>
 
@@ -35,6 +35,7 @@
     <None Remove="migrations\V2_11_8__Team_Info_Name_Changes.pgsql" />
     <None Remove="migrations\V2_12_0__New_Chronicler_Endpoints.pgsql" />
     <None Remove="migrations\V2_12_1__Stadium_Table_Tweaks.pgsql" />
+    <None Remove="migrations\V2_12_2__Official_Player_Ratings.pgsql" />
     <None Remove="migrations\V2_9_6__Games_Outcomes.pgsql" />
     <ProjectReference Include="..\Cauldron\Cauldron.csproj" />
     <None Update="patch\crabs_to_fridays.sql">

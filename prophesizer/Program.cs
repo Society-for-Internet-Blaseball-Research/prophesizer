@@ -19,8 +19,19 @@ namespace SIBR
 					Locations = new[] { "migrations" },
 					SqlMigrationSuffix = ".pgsql",
 					CommandTimeout = 600,
-					//IsEraseDisabled = true, //< Recommended in production
+					RetryRepeatableMigrationsUntilNoError = true,
 				};
+
+				var dev = Environment.GetEnvironmentVariable("PROPHESIZER_DEV");
+				bool devMode = dev == null ? false : bool.Parse(dev);
+				if(devMode)
+				{
+					evolve.MustEraseOnValidationError = true;
+				}
+				else
+				{
+					evolve.IsEraseDisabled = true; // recommended in production
+				}
 
 				// Find the DB name from the connection string
 				string dbName = "blaseball";

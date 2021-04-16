@@ -77,6 +77,16 @@ namespace prophesizer.Serializable
 
 		public int Evolution { get; set; }
 
+		[DbAlias("batting_rating")]
+		[DbNullValue(-1)]
+		public double? HittingRating { get; set; }
+		[DbNullValue(-1)]
+		public double? PitchingRating { get; set; }
+		[DbNullValue(-1)]
+		public double? BaserunningRating { get; set; }
+		[DbNullValue(-1)]
+		public double? DefenseRating { get; set; }
+
 		[DbIgnore]
 		public IEnumerable<string> PermAttr { get; set; }
 		[DbIgnore]
