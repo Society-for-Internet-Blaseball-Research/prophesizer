@@ -599,7 +599,8 @@ namespace Cauldron
 		private void UpdateFielding(Game newState)
 		{
 			// Sacrifice outs
-			if(newState.lastUpdate.Contains("sacrifice fly"))
+			if(newState.lastUpdate.Contains("sacrifice fly") ||
+				(newState.lastUpdate.Contains("hit a flyout") && newState.lastUpdate.Contains("tags up and scores")))
 			{
 				m_currEvent.isSacrificeFly = true;
 			}
