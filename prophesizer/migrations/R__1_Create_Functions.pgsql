@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/10/2021 
+﻿-- LAST UPDATE: 4/18/2021
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -92,7 +92,7 @@ $$;
 --
 -- Name: players_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone DEFAULT timezone('utc'::text, now())) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric, pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint, url_slug character varying, tournament integer, evolution integer, batting_rating numeric, pitching_rating numeric, baserunning_rating numeric, defense_rating numeric)
+CREATE FUNCTION data.players_from_timestamp(in_timestamp timestamp without time zone DEFAULT timezone('utc'::text, now())) RETURNS TABLE(id integer, player_id character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, player_name character varying, deceased boolean, hash uuid, anticapitalism numeric, base_thirst numeric, buoyancy numeric, chasiness numeric, coldness numeric, continuation numeric, divinity numeric, ground_friction numeric, indulgence numeric, laserlikeness numeric, martyrdom numeric, moxie numeric, musclitude numeric, omniscience numeric, overpowerment numeric, patheticism numeric, ruthlessness numeric, shakespearianism numeric, suppression numeric, tenaciousness numeric, thwackability numeric, tragicness numeric, unthwackability numeric, watchfulness numeric,pressurization numeric, cinnamon numeric, total_fingers smallint, soul smallint, fate smallint, peanut_allergy boolean, armor text, bat text, ritual text, coffee smallint, blood smallint, url_slug character varying, tournament integer, evolution integer, batting_rating numeric, pitching_rating numeric, baserunning_rating numeric, defense_rating numeric)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -473,8 +473,7 @@ $$;
 CREATE FUNCTION data.rating_to_star(in_rating numeric) RETURNS numeric
     LANGUAGE sql
     AS $$
-SELECT 0.5 * data.round_half_even((
-(in_rating)* 10),0);
+SELECT ROUND((5 * in_rating),1);
 $$;
 --
 -- Name: reblase_gameid(character varying); Type: FUNCTION; Schema: data; Owner: -

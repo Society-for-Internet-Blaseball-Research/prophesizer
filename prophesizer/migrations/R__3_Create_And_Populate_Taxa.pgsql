@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/10/2021 
+﻿-- LAST UPDATE: 4/18/2021
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -845,7 +845,9 @@ VALUES
 ('B', 'Ball', 1, 0),
 ('C', 'Called Strike', 0, 1),
 ('K', 'Strike - Assumed', 0, 1),
-('S', 'Swinging Strike', 0, 1);
+('S', 'Swinging Strike', 0, 1),
+('D', 'Double Strike', 0, 2)
+;
 
 --
 -- Data for Name: position_types; Type: TABLE DATA; Schema: taxa; Owner: -
