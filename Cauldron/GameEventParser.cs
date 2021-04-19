@@ -75,6 +75,9 @@ namespace Cauldron
 		// Keep of track of whether we've had a valid batter for this inning
 		HashSet<string> m_startedInnings;
 
+		// Remember a map of player IDs to player names for this game
+		Dictionary<string, string> m_playerLookup;
+
 		// Properties for metrics
 		public int Discards => m_discards;
 		int m_discards = 0;
@@ -198,6 +201,7 @@ namespace Cauldron
 			m_gameId = initState.gameId;
 			m_responsiblePitchers = new Dictionary<string, string>();
 			m_startedInnings = new HashSet<string>();
+			m_playerLookup = new Dictionary<string, string>();
 			m_homeOwningPitcher = null;
 			m_awayOwningPitcher = null;
 
@@ -674,7 +678,8 @@ namespace Cauldron
 			}
 
 			// If this play is known to be ending the inning or game
-			if (m_currEvent.outsBeforePlay + m_currEvent.outsOnPlay >= 3 || newState.gameComplete)
+			if (!newState.lastUpdate.Contains("caught") && 
+				(m_currEvent.outsBeforePlay + m_currEvent.outsOnPlay >= 3 || newState.gameComplete))
 			{
 				// Baserunners should be exactly what we had in the last update
 				// But create a new one if it's null
@@ -800,7 +805,11 @@ namespace Cauldron
 
 					if (newState.lastUpdate.Contains("caught"))
 					{
-						runner.wasCaughtStealing = true;
+						string runnerName = GetPlayerName(runnerId);
+						if (runnerName != null && newState.lastUpdate.Contains(runnerName))
+						{
+							runner.wasCaughtStealing = true;
+						}
 					}
 
 					runner.baseBeforePlay = baseIndex + 1;
@@ -1259,6 +1268,29 @@ namespace Cauldron
 			}
 		}
 
+		// Store id/name mappings for any players in the state
+		public void StorePlayerIds(Game newState)
+		{
+			if(newState.BatterId != null)
+			{
+				m_playerLookup[newState.BatterId] = newState.BatterName;
+			}
+			if(newState.PitcherId != null)
+			{
+				m_playerLookup[newState.PitcherId] = newState.PitcherName;
+			}
+		}
+
+		// Get the name for a given player ID, or null if we haven't seen that id/name pair
+		public string GetPlayerName(string id)
+		{
+			if(m_playerLookup.ContainsKey(id))
+			{
+				return m_playerLookup[id];
+			}
+			return null;
+		}
+
 		/// <summary>
 		/// Call this with every game update for the game this parser is handling
 		/// </summary>f
@@ -1298,6 +1330,8 @@ namespace Cauldron
 			{
 				m_processed++;
 			}
+
+			StorePlayerIds(newState);
 
 			//Debugger.Log(0, "Reorder", $"## ParseGameUpdate for state {newState.playCount} ##\n");
 			PlayCountStatus playCountState = CheckPlayCount(newState);
@@ -1339,19 +1373,6 @@ namespace Cauldron
 					// Discard this event, we're past it and committed already
 					return;
 				}
-
-				//if (playCountState == PlayCountStatus.Decrease)
-				//{
-				//	string s = $"# Game {newState.gameId} : out of order playCount : {m_oldState.playCount} -> {newState.playCount}\n";
-				//	Debugger.Log(0, "OutOfOrder", s);
-				//	Console.Write(s);
-				//}
-				//else if (playCountState == PlayCountStatus.Gap)
-				//{
-				//	string s = $"# Game {newState.gameId} : gap in playCount : {m_oldState.playCount} -> {newState.playCount}\n";
-				//	Debugger.Log(0, "Gap", s);
-				//	Console.Write(s);
-				//}
 			}
 
 			bool validInningState = CheckInningState(newState);

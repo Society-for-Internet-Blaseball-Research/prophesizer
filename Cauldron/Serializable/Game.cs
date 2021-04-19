@@ -152,6 +152,16 @@ namespace Cauldron
 			}
 		}
 
+		[JsonIgnore]
+		public string BatterName
+		{
+			get
+			{
+				string batter = topOfInning ? awayBatterName : homeBatterName;
+				return batter == string.Empty ? null : batter;
+			}
+		}
+
 		// 
 		// Helper - get the current pitcher ID
 		[JsonIgnore]
@@ -161,6 +171,15 @@ namespace Cauldron
 			{
 				// Pitchers are currently never empty
 				return topOfInning ? homePitcher : awayPitcher;
+			}
+		}
+
+		[JsonIgnore]
+		public string PitcherName
+		{
+			get
+			{
+				return topOfInning ? homePitcherName : awayPitcherName;
 			}
 		}
 
