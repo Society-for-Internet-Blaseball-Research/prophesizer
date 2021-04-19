@@ -634,7 +634,7 @@ namespace Cauldron
 			}
 
 			// Caught Stealing
-			if (newState.lastUpdate.Contains("caught stealing"))
+			if (StateImpliesCaughtStealing(newState))
 			{
 				m_currEvent.eventType = GameEventType.CAUGHT_STEALING;
 				m_currEvent.isLastEventForPlateAppearance = false;
@@ -661,6 +661,18 @@ namespace Cauldron
 		}
 
 
+		private bool StateImpliesSteal(Game newState)
+		{
+			return newState.lastUpdate.Contains("steals") ||
+				(newState.lastUpdate.Contains("hops on the Grind Rail") && newState.lastUpdate.Contains("Safe!"));
+		}
+
+		private bool StateImpliesCaughtStealing(Game newState)
+		{
+			return newState.lastUpdate.Contains("caught stealing") ||
+				newState.lastUpdate.Contains("lose their balance and bail") ||
+				newState.lastUpdate.Contains("They're tagged out doing");
+		}
 
 		private const int BASE_RUNNER_OUT = 0;
 		/// <summary>
@@ -670,7 +682,7 @@ namespace Cauldron
 		{
 
 			// Steals
-			if (newState.lastUpdate.Contains("steals"))
+			if (StateImpliesSteal(newState))
 			{
 				m_currEvent.eventType = GameEventType.STOLEN_BASE;
 				m_currEvent.isSteal = true;
@@ -678,7 +690,7 @@ namespace Cauldron
 			}
 
 			// If this play is known to be ending the inning or game
-			if (!newState.lastUpdate.Contains("caught") && 
+			if (!StateImpliesCaughtStealing(newState) && 
 				(m_currEvent.outsBeforePlay + m_currEvent.outsOnPlay >= 3 || newState.gameComplete))
 			{
 				// Baserunners should be exactly what we had in the last update
@@ -728,7 +740,7 @@ namespace Cauldron
 						found = true;
 						if(runner.baseBeforePlay != runner.baseAfterPlay)
 						{
-							if(newState.lastUpdate.Contains("steals"))
+							if(StateImpliesSteal(newState))
 							{
 								runner.wasBaseStolen = true;
 								if (newState.lastUpdate.Contains("Blaserunning!"))
@@ -736,7 +748,7 @@ namespace Cauldron
 									runner.runsScored += 0.2f;
 								}
 							}
-							if(newState.lastUpdate.Contains("caught"))
+							if(StateImpliesCaughtStealing(newState))
 							{
 								runner.wasCaughtStealing = true;
 							}
@@ -790,7 +802,7 @@ namespace Cauldron
 					runner.baseBeforePlay = baseIndex + 1;
 					runner.baseAfterPlay = newState.BatterTeamBases;
 					runner.runsScored += 1;
-					if (newState.lastUpdate.Contains("steals"))
+					if (StateImpliesSteal(newState))
 					{
 						runner.wasBaseStolen = true;
 					}
@@ -803,7 +815,7 @@ namespace Cauldron
 					runner.runnerId = runnerId;
 					SetResponsiblePitcher(runner, runnerId, newState.lastUpdate);
 
-					if (newState.lastUpdate.Contains("caught"))
+					if (StateImpliesCaughtStealing(newState))
 					{
 						string runnerName = GetPlayerName(runnerId);
 						if (runnerName != null && newState.lastUpdate.Contains(runnerName))
