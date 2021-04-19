@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/10/2021 
+﻿-- LAST UPDATE: 4/18/2021
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -687,14 +687,14 @@ p.url_slug,
 	AND ts.timestampd < COALESCE(m.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
 	GROUP BY m.player_id
 ) AS modifications,
-data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
-data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
-data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
-data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
-data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
-data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
-data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
-data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
+p.batting_rating,
+p.baserunning_rating,
+p.defense_rating,
+p.pitching_rating,
+data.rating_to_star(p.batting_rating) AS batting_stars,
+data.rating_to_star(p.baserunning_rating) AS baserunning_stars,
+data.rating_to_star(p.defense_rating) AS defense_stars,
+data.rating_to_star(p.pitching_rating) AS pitching_stars
 FROM 
 (
 	SELECT DISTINCT x.player_id,
@@ -834,14 +834,14 @@ p.url_slug,
 	AND ts.timestampd < COALESCE(m.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
 	GROUP BY m.player_id
 ) AS modifications,
-data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom) AS batting_rating,
-data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction) AS baserunning_rating,
-data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness) AS defense_rating,
-data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness) AS pitching_rating,
-data.rating_to_star(data.batting_rating_raw(p.tragicness, p.patheticism, p.thwackability, p.divinity, p.moxie, p.musclitude, p.martyrdom)) AS batting_stars,
-data.rating_to_star(data.baserunning_rating_raw(p.laserlikeness, p.continuation, p.base_thirst, p.indulgence, p.ground_friction)) AS baserunning_stars,
-data.rating_to_star(data.defense_rating_raw(p.omniscience, p.tenaciousness, p.watchfulness, p.anticapitalism, p.chasiness)) AS defense_stars,
-data.rating_to_star(data.pitching_rating_raw(p.unthwackability, p.ruthlessness, p.overpowerment, p.shakespearianism, p.coldness)) AS pitching_stars
+p.batting_rating,
+p.baserunning_rating,
+p.defense_rating,
+p.pitching_rating,
+data.rating_to_star(p.batting_rating) AS batting_stars,
+data.rating_to_star(p.baserunning_rating) AS baserunning_stars,
+data.rating_to_star(p.defense_rating) AS defense_stars,
+data.rating_to_star(p.pitching_rating) AS pitching_stars
 FROM 
 (
 	SELECT DISTINCT x.player_id,
@@ -3031,26 +3031,34 @@ CREATE VIEW data.running_stats_player_tournament_lifetime AS
 -- Name: stars_team_all_current; Type: VIEW; Schema: data; Owner: -
 --
 CREATE VIEW data.stars_team_all_current AS
- SELECT p.nickname,
-    b.batting,
-    b.running,
-    b.defense,
-    p.pitching,
-    (((b.batting + b.running) + b.defense) + p.pitching) AS total
-   FROM (( SELECT sum(data.rating_to_star(data.batting_rating(rosters_current.player_id))) AS batting,
-            sum(data.rating_to_star(data.baserunning_rating(rosters_current.player_id))) AS running,
-            sum(data.rating_to_star(data.defense_rating(rosters_current.player_id))) AS defense,
-            rosters_current.nickname
-           FROM data.rosters_current
-          WHERE ((rosters_current.position_type)::text = 'BATTER'::text)
-          GROUP BY rosters_current.nickname) b
-     JOIN ( SELECT sum(data.rating_to_star(data.pitching_rating(rosters_current.player_id))) AS pitching,
-            rosters_current.nickname
-           FROM data.rosters_current
-          WHERE ((rosters_current.position_type)::text = 'PITCHER'::text)
-          GROUP BY rosters_current.nickname) p ON ((b.nickname = p.nickname)))
-  GROUP BY p.nickname, b.batting, b.running, b.defense, p.pitching
-  ORDER BY (((b.batting + b.running) + b.defense) + p.pitching) DESC;
+	SELECT p.team,
+	b.batting,
+	b.running,
+	b.defense,
+	p.pitching,
+	(b.batting + b.running + b.defense + p.pitching) AS total
+	FROM 
+	(
+		SELECT sum(data.rating_to_star(batting_rating)) AS batting,
+		sum(data.rating_to_star(baserunning_rating)) AS running,
+		sum(data.rating_to_star(defense_rating)) AS defense,
+		team
+		FROM data.players_info_expanded_all
+		WHERE position_type = 'BATTER'::text
+		AND valid_until is null
+		GROUP BY team
+	) b
+	JOIN 
+	( 
+		SELECT sum(data.rating_to_star(pitching_rating)) AS pitching,
+		team
+		FROM data.players_info_expanded_all
+		WHERE position_type = 'PITCHER'::text
+		AND valid_until is null
+		GROUP BY team
+	) p ON (b.team = p.team)
+	GROUP BY p.team, b.batting, b.running, b.defense, p.pitching
+	ORDER BY (b.batting + b.running + b.defense + p.pitching) DESC;
 
 --
 -- Name: batting_stats_all_events_indx_player_id; Type: INDEX; Schema: data; Owner: -
