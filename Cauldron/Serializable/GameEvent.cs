@@ -46,6 +46,8 @@ namespace Cauldron
 		public static string SUN_2 = "SUN_2";
 		public static string IMMATERIA_SWEPT = "IMMATERIA_SWEPT";
 		public static string ELSEWHERE_ATBAT = "ELSEWHERE_ATBAT";
+		public static string SECRET_BASE_ENTER = "SECRET_BASE_ENTER";
+		public static string SECRET_BASE_EXIT = "SECRET_BASE_EXIT";
 	}
 
 

@@ -413,6 +413,29 @@ namespace Cauldron
 				}
 			}
 
+			// Hacky - record one bonus double strike pitch, then fall through to the logic below
+			if(newState.lastUpdate.Contains("fires a Double Strike"))
+			{
+				// Strikes, swinging
+				if(newState.lastUpdate.Contains("swinging"))
+				{
+					m_currEvent.pitchesList.Add('S');
+					newStrikes--;
+				}
+				// Strike, looking
+				else if(newState.lastUpdate.Contains("looking"))
+				{
+					m_currEvent.pitchesList.Add('C');
+					newStrikes--;
+				}
+				// Foul balls
+				else if(newState.lastUpdate.Contains("Foul Balls"))
+				{
+					m_currEvent.pitchesList.Add('F');
+					if (newStrikes > 1)
+						newStrikes--;
+				}
+			}
 
 			// Oops, we hit a gap, lets see if we can fill it in
 			if (newStrikes + newBalls > 1)
@@ -674,18 +697,34 @@ namespace Cauldron
 				newState.lastUpdate.Contains("They're tagged out doing");
 		}
 
+		
 		private const int BASE_RUNNER_OUT = 0;
+		private const int BASE_SECRET = -1;
 		/// <summary>
 		/// Update stuff around baserunning
 		/// </summary>
 		private void UpdateBaserunning(Game newState)
 		{
+			bool secretBaseEnter = newState.lastUpdate.Contains("enters the Secret Base");
+			bool secretBaseExit = newState.lastUpdate.Contains("exits the Secret Base");
 
 			// Steals
 			if (StateImpliesSteal(newState))
 			{
 				m_currEvent.eventType = GameEventType.STOLEN_BASE;
 				m_currEvent.isSteal = true;
+				m_currEvent.isLastEventForPlateAppearance = false;
+			}
+
+			if(secretBaseEnter)
+			{
+				m_currEvent.eventType = GameEventType.SECRET_BASE_ENTER;
+				m_currEvent.isLastEventForPlateAppearance = false;
+			}
+			
+			if(secretBaseExit)
+			{
+				m_currEvent.eventType = GameEventType.SECRET_BASE_EXIT;
 				m_currEvent.isLastEventForPlateAppearance = false;
 			}
 
@@ -757,7 +796,10 @@ namespace Cauldron
 				}
 				if(!found)
 				{
-					runner.baseBeforePlay = 0;
+					if (secretBaseExit)
+						runner.baseBeforePlay = BASE_SECRET;
+					else
+						runner.baseBeforePlay = 0;
 				}
 
 				m_currEvent.baseRunners.Add(runner);
@@ -790,8 +832,18 @@ namespace Cauldron
 					}
 				}
 
+				if(!found && secretBaseEnter && baseIndex == 1)
+				{
+					GameEventBaseRunner runner = new GameEventBaseRunner();
+					runner.runnerId = runnerId;
+					SetResponsiblePitcher(runner, runnerId, newState.lastUpdate);
+
+					runner.baseBeforePlay = baseIndex + 1;
+					runner.baseAfterPlay = BASE_SECRET;
+					m_currEvent.baseRunners.Add(runner);
+				}
 				// If this old runner was not found and we have runs not attributed yet
-				if (!found && scoreDiff > 0)
+				else if (!found && scoreDiff > 0)
 				{
 					// One run accounted for
 					scoreDiff--;
@@ -1031,6 +1083,8 @@ namespace Cauldron
 			if (startFromCurrent || 
 				m_currEvent.isSteal || 
 				m_currEvent.eventType == GameEventType.CAUGHT_STEALING ||
+				m_currEvent.eventType == GameEventType.SECRET_BASE_ENTER ||
+				m_currEvent.eventType == GameEventType.SECRET_BASE_EXIT ||
 				m_currEvent.eventType == GameEventType.IMMATERIA_SWEPT)
 			{
 				// Start the next event in this state
@@ -1575,6 +1629,8 @@ namespace Cauldron
 				|| m_currEvent.eventType == GameEventType.BLACK_HOLE
 				|| m_currEvent.eventType == GameEventType.SUN_2
 				|| m_currEvent.eventType == GameEventType.IMMATERIA_SWEPT
+				|| m_currEvent.eventType == GameEventType.SECRET_BASE_ENTER
+				|| m_currEvent.eventType == GameEventType.SECRET_BASE_EXIT
 				|| m_inningState == InningState.PlayEnded)
 			{
 				EmitEvent(newState, timeStamp);
