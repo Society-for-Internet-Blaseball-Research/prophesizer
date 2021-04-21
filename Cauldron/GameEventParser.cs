@@ -375,25 +375,32 @@ namespace Cauldron
 			{
 				// If a batter strikes out we never get an update with 3 strikes on it
 				// so check the play text
-				if (newState.lastUpdate.Contains("struck out") || newState.lastUpdate.Contains("strikes out"))
+				if (newState.lastUpdate.Contains("struck out") || newState.lastUpdate.Contains("strikes out swinging") || newState.lastUpdate.Contains("strikes out looking"))
 				{
 					// Set the strikes to the total for the team that WAS batting
 					m_currEvent.totalStrikes = m_oldState.topOfInning ? m_oldState.awayStrikes.GetValueOrDefault() : m_oldState.homeStrikes.GetValueOrDefault();
 					newStrikes = m_currEvent.totalStrikes - m_oldState.atBatStrikes;
 				}
-				else if (newState.lastUpdate.Contains("draws a walk") || newState.lastUpdate.Contains("walks to first"))
+				else if (newState.lastUpdate.Contains("draws a walk") 
+					|| newState.lastUpdate.Contains("walks to first"))
 				{
 					m_currEvent.totalBalls = newState.BatterTeamBalls;
+					m_currEvent.isWalk = true;
 
-					if(newState.lastUpdate.Contains("charms"))
+					if (newState.lastUpdate.Contains("charms"))
 					{
 						m_currEvent.eventType = GameEventType.CHARM_WALK;
+					}
+					else if(newState.lastUpdate.Contains("strikes out thinking"))
+					{
+						// Whoops, not a walk after all
+						m_currEvent.eventType = GameEventType.MIND_TRICK_STRIKEOUT;
+						m_currEvent.isWalk = false;
 					}
 					else
 					{
 						m_currEvent.eventType = GameEventType.WALK;
 					}
-					m_currEvent.isWalk = true;
 					newBalls = m_currEvent.totalBalls - m_oldState.atBatBalls;
 				}
 				else if (newState.lastUpdate.Contains("with a pitch!"))
@@ -537,9 +544,20 @@ namespace Cauldron
 				newState.lastUpdate.Contains("hit into a double play") ||
 				newState.lastUpdate.Contains("tags up"))
 			{
-				if (newState.lastUpdate.Contains("strikes out") || newState.lastUpdate.Contains("struck out"))
+				if(newState.lastUpdate.Contains("strikes out thinking"))
 				{
-					m_currEvent.eventType = GameEventType.STRIKEOUT;
+					m_currEvent.eventType = GameEventType.MIND_TRICK_STRIKEOUT;
+				}
+				else if (newState.lastUpdate.Contains("strikes out") || newState.lastUpdate.Contains("struck out"))
+				{
+					if (newState.lastUpdate.Contains("sends them to first base"))
+					{
+						m_currEvent.eventType = GameEventType.MIND_TRICK_WALK;
+					}
+					else
+					{
+						m_currEvent.eventType = GameEventType.STRIKEOUT;
+					}
 				}
 				else if(newState.lastUpdate.Contains("strike out willingly!"))
 				{

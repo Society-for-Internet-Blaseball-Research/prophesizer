@@ -48,6 +48,8 @@ namespace Cauldron
 		public static string ELSEWHERE_ATBAT = "ELSEWHERE_ATBAT";
 		public static string SECRET_BASE_ENTER = "SECRET_BASE_ENTER";
 		public static string SECRET_BASE_EXIT = "SECRET_BASE_EXIT";
+		public static string MIND_TRICK_WALK = "MIND_TRICK_WALK";
+		public static string MIND_TRICK_STRIKEOUT = "MIND_TRICK_STRIKEOUT";
 	}
 
 
