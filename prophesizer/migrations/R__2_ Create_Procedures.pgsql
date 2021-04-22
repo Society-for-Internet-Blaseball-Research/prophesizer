@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/18/2021
+﻿-- LAST UPDATE: 4/22/2021 mat-views
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();
