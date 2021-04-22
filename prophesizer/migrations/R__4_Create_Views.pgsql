@@ -1,46 +1,48 @@
-﻿-- LAST UPDATE: 4/18/2021
+﻿-- LAST UPDATE: 4/22/2021 mat-views
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_pitching CASCADE;
 DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
-DROP VIEW IF EXISTS data.running_stats_player_season CASCADE;
-DROP VIEW IF EXISTS data.running_stats_team_season CASCADE;
-DROP VIEW IF EXISTS data.running_stats_team_playoffs_season CASCADE;
-DROP VIEW IF EXISTS data.running_stats_player_playoffs_season CASCADE;
-DROP VIEW IF EXISTS data.running_stats_player_lifetime CASCADE;
-DROP VIEW IF EXISTS data.running_stats_player_playoffs_lifetime CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.teams_info_expanded_all CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_playoffs_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_team_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_team_playoffs_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_lifetime CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_playoffs_lifetime CASCADE;
 DROP VIEW IF EXISTS data.rosters_extended_current CASCADE;
 DROP VIEW IF EXISTS data.rosters_current CASCADE;
 DROP VIEW IF EXISTS data.players_extended_current CASCADE;
-DROP VIEW IF EXISTS data.pitching_stats_player_season CASCADE;
-DROP VIEW IF EXISTS data.pitching_stats_team_season CASCADE;
-DROP VIEW IF EXISTS data.pitching_stats_team_playoffs_season CASCADE;
-DROP VIEW IF EXISTS data.pitching_stats_player_playoffs_season CASCADE;
-DROP VIEW IF EXISTS data.pitching_stats_player_lifetime CASCADE;
-DROP VIEW IF EXISTS data.pitching_stats_player_playoffs_lifetime CASCADE;
 DROP VIEW IF EXISTS data.pitching_records_player_single_game CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_all_appearances CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_player_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_team_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_team_playoffs_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_player_playoffs_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_player_lifetime CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_player_playoffs_lifetime CASCADE;
 DROP VIEW IF EXISTS data.fielder_stats_season CASCADE;
 DROP VIEW IF EXISTS data.fielder_stats_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.fielder_stats_playoffs_lifetime CASCADE;
 DROP VIEW IF EXISTS data.fielder_stats_lifetime CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.fielder_stats_all_events CASCADE;
 DROP VIEW IF EXISTS data.charm_counts CASCADE;
-DROP VIEW IF EXISTS data.batting_stats_player_season CASCADE;
-DROP VIEW IF EXISTS data.batting_stats_team_season CASCADE;
-DROP VIEW IF EXISTS data.batting_stats_team_playoffs_season CASCADE;
-DROP VIEW IF EXISTS data.batting_stats_player_playoffs_season CASCADE;
-DROP VIEW IF EXISTS data.batting_stats_player_lifetime CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_single_game CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_season CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_playoffs_single_game CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.batting_records_player_single_game CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_season CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_single_game CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_playoffs_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_playoffs_lifetime CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_lifetime CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_all_events CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_team_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_team_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.batting_records_player_season CASCADE;
 DROP VIEW IF EXISTS data.batting_records_player_playoffs_single_game CASCADE;
 DROP VIEW IF EXISTS data.batting_records_player_playoffs_season CASCADE;
@@ -48,7 +50,6 @@ DROP MATERIALIZED VIEW IF EXISTS data.players_info_expanded_all CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.players_info_expanded_tourney CASCADE;
 DROP VIEW IF EXISTS data.player_status_flags CASCADE;
 DROP VIEW IF EXISTS data.player_incinerations CASCADE;
-DROP VIEW IF EXISTS data.teams_info_expanded_all CASCADE;
 DROP VIEW IF EXISTS data.batting_records_league_season CASCADE;
 DROP VIEW IF EXISTS data.batting_records_league_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.batting_records_combined_teams_single_game CASCADE;
@@ -158,7 +159,7 @@ CREATE SEQUENCE data.pitching_stats_all_appearances_id_seq
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-	
+
 --
 -- Name: running_stats_all_events_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
@@ -398,9 +399,9 @@ CREATE VIEW data.batting_records_league_season AS
   ORDER BY y.event, y.season;
 
 --
--- Name: teams_info_expanded_all; Type: VIEW; Schema: data; Owner: -
+-- Name: teams_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.teams_info_expanded_all AS
+CREATE MATERIALIZED VIEW data.teams_info_expanded_all AS
 SELECT ts.team_id,
 t.location,
 t.nickname,
@@ -484,7 +485,8 @@ LEFT JOIN taxa.leagues l ON (d.league_id = l.league_db_id)
 LEFT JOIN taxa.tournament_teams tt ON (ts.team_id = tt.team_id)
 LEFT JOIN taxa.tournaments xt ON (tt.tournament_db_id = xt.tournament_db_id)
 WHERE ts.timestampd <> timezone('utc', now())
-ORDER BY t.full_name, ts.timestampd;
+ORDER BY t.full_name, ts.timestampd
+WITH NO DATA;
 
 --
 -- Name: player_status_flags; Type: VIEW; Schema: data; Owner: -
@@ -1787,9 +1789,9 @@ CREATE VIEW data.batting_records_team_tournmament AS
 
 
 --
--- Name: batting_stats_player_lifetime; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_player_lifetime; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.batting_stats_player_lifetime AS
+CREATE MATERIALIZED VIEW data.batting_stats_player_lifetime AS
  SELECT p.player_name,
     a.player_id,
 		count(distinct a.game_id) as appearances,
@@ -1836,12 +1838,13 @@ CREATE VIEW data.batting_stats_player_lifetime AS
    FROM (data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((NOT a.is_postseason) AND (a.season > 0))
-  GROUP BY a.player_id, p.player_name;
+  GROUP BY a.player_id, p.player_name
+  WITH NO DATA;
   
 --
--- Name: batting_stats_player_playoffs_lifetime; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_player_playoffs_lifetime; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.batting_stats_player_playoffs_lifetime AS
+CREATE MATERIALIZED VIEW data.batting_stats_player_playoffs_lifetime AS
  SELECT p.player_name,
     a.player_id,
 	
@@ -1889,12 +1892,13 @@ CREATE VIEW data.batting_stats_player_playoffs_lifetime AS
    FROM (data.batting_stats_all_events a
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((a.is_postseason) AND (a.season > 0))
-  GROUP BY a.player_id, p.player_name;
+  GROUP BY a.player_id, p.player_name
+  WITH NO DATA;
 
 --
--- Name: batting_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_player_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.batting_stats_player_playoffs_season AS
+CREATE MATERIALIZED VIEW data.batting_stats_player_playoffs_season AS
  SELECT p.player_name,
      a.player_id,
 	count(distinct a.game_id) as appearances,
@@ -1947,13 +1951,15 @@ CREATE VIEW data.batting_stats_player_playoffs_season AS
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE a.is_postseason and season > 0
-  GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id, t.valid_from, t.valid_until;
+  GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
+  WITH NO DATA;
   
 --
--- Name: batting_stats_player_season; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_player_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.batting_stats_player_season AS
- SELECT p.player_name,
+CREATE MATERIALIZED VIEW data.batting_stats_player_season AS
+ SELECT 
+    p.player_name,
     a.player_id,
     t.team_id,
     t.nickname AS team,
@@ -2006,12 +2012,13 @@ CREATE VIEW data.batting_stats_player_season AS
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((NOT a.is_postseason) AND (a.season > 0))
-  GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id, t.valid_from, t.valid_until;
+  GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
+  WITH NO DATA;
 
 --
--- Name: batting_stats_team_playoffs_season; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_team_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.batting_stats_team_playoffs_season AS
+CREATE MATERIALIZED VIEW data.batting_stats_team_playoffs_season AS
  SELECT 
     t.team_id,
     t.nickname AS team,
@@ -2063,12 +2070,13 @@ CREATE VIEW data.batting_stats_team_playoffs_season AS
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((a.is_postseason) AND (a.season > 0))
-  GROUP BY a.season, t.nickname, t.team_id, t.valid_from, t.valid_until;
+  GROUP BY a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
+  WITH NO DATA;
 
 --
--- Name: batting_stats_team_season; Type: VIEW; Schema: data; Owner: -
+-- Name: batting_stats_team_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.batting_stats_team_season AS
+CREATE MATERIALIZED VIEW data.batting_stats_team_season AS
  SELECT 
     t.team_id,
     t.nickname AS team,
@@ -2120,7 +2128,8 @@ CREATE VIEW data.batting_stats_team_season AS
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((NOT a.is_postseason) AND (a.season > 0))
-  GROUP BY a.season, t.nickname, t.team_id, t.valid_from, t.valid_until;
+  GROUP BY a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
+  WITH NO DATA;
 
 --
 -- Name: batting_stats_player_tournament; Type: VIEW; Schema: data; Owner: -
@@ -2553,9 +2562,9 @@ CREATE VIEW data.pitching_records_player_single_game AS
   WHERE (a.rank = 1)
   ORDER BY a.event, a.season, a.day, a.game_id;
 --
--- Name: pitching_stats_player_lifetime; Type: VIEW; Schema: data; Owner: -
+-- Name: pitching_stats_player_lifetime; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.pitching_stats_player_lifetime AS
+CREATE MATERIALIZED VIEW data.pitching_stats_player_lifetime AS
  SELECT a.player_name,
     p.player_id,
     count(1) AS games,
@@ -2594,12 +2603,13 @@ CREATE VIEW data.pitching_stats_player_lifetime AS
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
-  GROUP BY a.player_name, p.player_id;
+  GROUP BY a.player_name, p.player_id
+  WITH NO DATA;
   
 --
--- Name: pitching_stats_player_playoffs_lifetime; Type: VIEW; Schema: data; Owner: -
+-- Name: pitching_stats_player_playoffs_lifetime; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.pitching_stats_player_playoffs_lifetime AS
+CREATE MATERIALIZED VIEW data.pitching_stats_player_playoffs_lifetime AS
  SELECT a.player_name,
     p.player_id,
     count(1) AS games,
@@ -2638,12 +2648,13 @@ CREATE VIEW data.pitching_stats_player_playoffs_lifetime AS
    FROM (data.pitching_stats_all_appearances p
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL))))
   WHERE ((p.is_postseason) AND (p.season > 0))
-  GROUP BY a.player_name, p.player_id;
+  GROUP BY a.player_name, p.player_id
+  WITH NO DATA;
  
 --
--- Name: pitching_stats_player_season; Type: VIEW; Schema: data; Owner: -
+-- Name: pitching_stats_player_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.pitching_stats_player_season AS
+CREATE MATERIALIZED VIEW data.pitching_stats_player_season AS
  SELECT a.player_name,
     p.player_id,
     p.season,
@@ -2688,12 +2699,13 @@ CREATE VIEW data.pitching_stats_player_season AS
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL)))
 	 JOIN data.teams_info_expanded_all t on (p.team_id = t.team_id and t.valid_until is null))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
-  GROUP BY a.player_name, p.player_id, p.season, p.team_id, t.nickname, t.valid_from, t.valid_until;
+  GROUP BY a.player_name, p.player_id, p.season, p.team_id, t.nickname, t.valid_from, t.valid_until
+  WITH NO DATA;
 
 --
--- Name: pitching_stats_team_playoffs_season; Type: VIEW; Schema: data; Owner: -
+-- Name: pitching_stats_team_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.pitching_stats_team_playoffs_season AS
+CREATE MATERIALIZED VIEW data.pitching_stats_team_playoffs_season AS
  SELECT 
     p.season,
     p.team_id,
@@ -2737,12 +2749,13 @@ CREATE VIEW data.pitching_stats_team_playoffs_season AS
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL)))
 	 JOIN data.teams_info_expanded_all t on (p.team_id = t.team_id and t.valid_until is null))
   WHERE ((p.is_postseason) AND (p.season > 0))
-  GROUP BY p.season, p.team_id, t.nickname, t.valid_from, t.valid_until;
+  GROUP BY p.season, p.team_id, t.nickname, t.valid_from, t.valid_until
+  WITH NO DATA;
 
 --
--- Name: pitching_stats_team_season; Type: VIEW; Schema: data; Owner: -
+-- Name: pitching_stats_team_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.pitching_stats_team_season AS
+CREATE MATERIALIZED VIEW data.pitching_stats_team_season AS
  SELECT 
     p.season,
     p.team_id,
@@ -2786,12 +2799,13 @@ CREATE VIEW data.pitching_stats_team_season AS
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL)))
 	 JOIN data.teams_info_expanded_all t on (p.team_id = t.team_id and t.valid_until is null))
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
-  GROUP BY p.season, p.team_id, t.nickname, t.valid_from, t.valid_until;
+  GROUP BY p.season, p.team_id, t.nickname, t.valid_from, t.valid_until
+  WITH NO DATA;
 
 --
--- Name: pitching_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
+-- Name: pitching_stats_player_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.pitching_stats_player_playoffs_season AS
+CREATE MATERIALIZED VIEW data.pitching_stats_player_playoffs_season AS
  SELECT a.player_name,
     p.player_id,
     p.season,
@@ -2836,7 +2850,8 @@ CREATE VIEW data.pitching_stats_player_playoffs_season AS
      JOIN data.players_info_expanded_all a ON ((((a.player_id)::text = (p.player_id)::text) AND (a.valid_until IS NULL)))
 	 JOIN data.teams_info_expanded_all t on (p.team_id = t.team_id and t.valid_until is null))
   WHERE ((p.is_postseason) AND (p.season > 0))
-  GROUP BY a.player_name, p.player_id, p.season, p.team_id, t.nickname, t.valid_from, t.valid_until;
+  GROUP BY a.player_name, p.player_id, p.season, p.team_id, t.nickname, t.valid_from, t.valid_until
+  WITH NO DATA;
 
 --
 -- Name: rosters_current; Type: VIEW; Schema: data; Owner: -
@@ -2913,9 +2928,9 @@ CREATE MATERIALIZED VIEW data.running_stats_all_events AS
   WITH NO DATA;
   
 --
--- Name: running_stats_player_lifetime; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_player_lifetime; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.running_stats_player_lifetime AS
+CREATE MATERIALIZED VIEW data.running_stats_player_lifetime AS
  SELECT rs.player_id,
     p.player_name,
     sum(rs.was_base_stolen) AS stolen_bases,
@@ -2924,12 +2939,13 @@ CREATE VIEW data.running_stats_player_lifetime AS
    FROM (data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((rs.day < 99) AND (rs.season > 0))
-  GROUP BY rs.player_id, p.player_name;
+  GROUP BY rs.player_id, p.player_name
+  WITH NO DATA;
   
 --
--- Name: running_stats_player_playoffs_lifetime; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_player_playoffs_lifetime; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.running_stats_player_playoffs_lifetime AS
+CREATE MATERIALIZED VIEW data.running_stats_player_playoffs_lifetime AS
  SELECT rs.player_id,
     p.player_name,
     sum(rs.was_base_stolen) AS stolen_bases,
@@ -2938,12 +2954,13 @@ CREATE VIEW data.running_stats_player_playoffs_lifetime AS
    FROM (data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((rs.day > 98) AND (rs.season > 0))
-  GROUP BY rs.player_id, p.player_name;  
+  GROUP BY rs.player_id, p.player_name
+  WITH NO DATA;  
   
 --
--- Name: running_stats_player_season; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_player_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.running_stats_player_season AS
+CREATE MATERIALIZED VIEW data.running_stats_player_season AS
  SELECT rs.player_id,
 	p.player_name, 
 	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE rs.player_id = u.player_id AND p.player_name = u.player_name) AS url_slug,
@@ -2959,12 +2976,13 @@ CREATE VIEW data.running_stats_player_season AS
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      LEFT JOIN data.teams_info_expanded_all t ON ((((p.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((rs.day < 99) AND (rs.season > 0))
-  GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name;
+  GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name
+  WITH NO DATA;
 
 --
--- Name: running_stats_team_season; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_team_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.running_stats_team_season AS
+CREATE MATERIALIZED VIEW data.running_stats_team_season AS
  SELECT p.team,
 	p.team_id,
     rs.season,
@@ -2974,12 +2992,13 @@ CREATE VIEW data.running_stats_team_season AS
    FROM (data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((rs.day < 99) AND (rs.season > 0))
-  GROUP BY p.team, p.team_id, rs.season;
+  GROUP BY p.team, p.team_id, rs.season
+  WITH NO DATA;
   
 --
--- Name: running_stats_team_playoffs_season; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_team_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.running_stats_team_playoffs_season AS
+CREATE MATERIALIZED VIEW data.running_stats_team_playoffs_season AS
  SELECT p.team,
 	p.team_id,
     rs.season,
@@ -2989,12 +3008,13 @@ CREATE VIEW data.running_stats_team_playoffs_season AS
    FROM (data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
   WHERE ((rs.day >= 99) AND (rs.season > 0))
-  GROUP BY p.team, p.team_id, rs.season;
+  GROUP BY p.team, p.team_id, rs.season
+  WITH NO DATA;
 
 --
--- Name: running_stats_player_playoffs_season; Type: VIEW; Schema: data; Owner: -
+-- Name: running_stats_player_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
-CREATE VIEW data.running_stats_player_playoffs_season AS
+CREATE MATERIALIZED VIEW data.running_stats_player_playoffs_season AS
  SELECT rs.player_id,
 	p.player_name, 
 	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE rs.player_id = u.player_id AND p.player_name = u.player_name) AS url_slug,
@@ -3010,7 +3030,8 @@ CREATE VIEW data.running_stats_player_playoffs_season AS
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((p.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((rs.day > 98) AND (rs.season > 0))
-  GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name;
+  GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name
+  WITH NO DATA;
   
 --
 -- Name: running_stats_player_tournament_lifetime; Type: VIEW; Schema: data; Owner: -
@@ -3569,6 +3590,25 @@ CREATE UNIQUE INDEX ON data.players_info_expanded_all (players_info_expanded_all
 CREATE UNIQUE INDEX ON data.players_info_expanded_tourney (players_info_expanded_tourney_id);
 CREATE UNIQUE INDEX ON data.batting_stats_all_events (batting_stats_all_events_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_single_game (batting_stats_player_single_game_id);
+CREATE UNIQUE INDEX ON data.batting_stats_player_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.batting_stats_player_playoffs_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.batting_stats_player_playoffs_lifetime (player_id);
+CREATE UNIQUE INDEX ON data.batting_stats_player_lifetime (player_id);
+CREATE UNIQUE INDEX ON data.batting_stats_team_season (team_id, season);
+CREATE UNIQUE INDEX ON data.batting_stats_team_playoffs_season (team_id, season);
 CREATE UNIQUE INDEX ON data.fielder_stats_all_events (fielder_stats_all_events_id);
 CREATE UNIQUE INDEX ON data.pitching_stats_all_appearances (pitching_stats_all_appearances_id);
+CREATE UNIQUE INDEX ON data.pitching_stats_player_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.pitching_stats_player_playoffs_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.pitching_stats_player_lifetime (player_id);
+CREATE UNIQUE INDEX ON data.pitching_stats_player_playoffs_lifetime (player_id);
+CREATE UNIQUE INDEX ON data.pitching_stats_team_season (team_id, season);
+CREATE UNIQUE INDEX ON data.pitching_stats_team_playoffs_season (team_id, season);
 CREATE UNIQUE INDEX ON data.running_stats_all_events (running_stats_all_events_id);
+CREATE UNIQUE INDEX ON data.running_stats_player_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.running_stats_player_playoffs_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.running_stats_team_season (team_id, season);
+CREATE UNIQUE INDEX ON data.running_stats_team_playoffs_season (team_id, season);
+CREATE UNIQUE INDEX ON data.running_stats_player_lifetime (player_id);
+CREATE UNIQUE INDEX ON data.running_stats_player_playoffs_lifetime (player_id);
+CREATE UNIQUE INDEX ON data.teams_info_expanded_all (team_id, valid_from);

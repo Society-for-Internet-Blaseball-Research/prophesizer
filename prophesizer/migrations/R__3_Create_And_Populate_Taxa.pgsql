@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/18/2021
+﻿-- LAST UPDATE: 4/22/2021 mat-views
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
