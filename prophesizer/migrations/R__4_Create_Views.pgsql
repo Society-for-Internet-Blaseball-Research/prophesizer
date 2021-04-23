@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/22/2021 mat-views
+-- LAST UPDATE: 4/22/2021 fix-run-joins
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -2974,7 +2974,7 @@ CREATE MATERIALIZED VIEW data.running_stats_player_season AS
     sum(rs.runner_scored) AS runs
    FROM ((data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     LEFT JOIN data.teams_info_expanded_all t ON ((((p.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+     LEFT JOIN data.teams_info_expanded_all t ON ((((rs.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((rs.day < 99) AND (rs.season > 0))
   GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name
   WITH NO DATA;
@@ -2983,32 +2983,32 @@ CREATE MATERIALIZED VIEW data.running_stats_player_season AS
 -- Name: running_stats_team_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.running_stats_team_season AS
- SELECT p.team,
-	p.team_id,
+ SELECT t.nickname AS team,
+	rs.team_id,
     rs.season,
     sum(rs.was_base_stolen) AS stolen_bases,
     sum(rs.was_caught_stealing) AS caught_stealing,
     sum(rs.runner_scored) AS runs
    FROM (data.running_stats_all_events rs
-     JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.teams_info_expanded_all t ON (((rs.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL)))
   WHERE ((rs.day < 99) AND (rs.season > 0))
-  GROUP BY p.team, p.team_id, rs.season
+  GROUP BY rs.team_id, rs.season, team;
   WITH NO DATA;
   
 --
 -- Name: running_stats_team_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 CREATE MATERIALIZED VIEW data.running_stats_team_playoffs_season AS
- SELECT p.team,
-	p.team_id,
+ SELECT t.nickname AS team,
+	rs.team_id,
     rs.season,
     sum(rs.was_base_stolen) AS stolen_bases,
     sum(rs.was_caught_stealing) AS caught_stealing,
     sum(rs.runner_scored) AS runs
    FROM (data.running_stats_all_events rs
-     JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
+     JOIN data.teams_info_expanded_all t ON (((rs.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL)))
   WHERE ((rs.day >= 99) AND (rs.season > 0))
-  GROUP BY p.team, p.team_id, rs.season
+  GROUP BY rs.team_id, rs.season, team;
   WITH NO DATA;
 
 --
@@ -3028,7 +3028,7 @@ CREATE MATERIALIZED VIEW data.running_stats_player_playoffs_season AS
     sum(rs.runner_scored) AS runs
    FROM ((data.running_stats_all_events rs
      JOIN data.players_info_expanded_all p ON ((((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
-     JOIN data.teams_info_expanded_all t ON ((((p.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
+     JOIN data.teams_info_expanded_all t ON ((((rs.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((rs.day > 98) AND (rs.season > 0))
   GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name
   WITH NO DATA;
