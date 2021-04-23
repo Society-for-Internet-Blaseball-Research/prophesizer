@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/21/2021
+﻿-- LAST UPDATE: 4/22/2021 fix-run-joins
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -638,6 +638,7 @@ begin
 	ORDER BY c.stat, c.rank, a.player_name;	
 	end;
 $$;
+
 --
 -- Name: ref_leaderboard_season_pitching(integer); Type: FUNCTION; Schema: data; Owner: -
 --
@@ -773,14 +774,34 @@ $$;
 CREATE FUNCTION data.refresh_matviews() RETURNS void
     LANGUAGE sql SECURITY DEFINER
     AS $$
+REFRESH MATERIALIZED VIEW data.teams_info_expanded_all;
 REFRESH MATERIALIZED VIEW data.player_debuts;
 REFRESH MATERIALIZED VIEW data.players_info_expanded_all;
 REFRESH MATERIALIZED VIEW data.players_info_expanded_tourney;
 REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
+REFRESH MATERIALIZED VIEW data.batting_stats_player_season;
+REFRESH MATERIALIZED VIEW data.batting_stats_player_playoffs_season;
+REFRESH MATERIALIZED VIEW data.batting_stats_player_playoffs_lifetime;
+REFRESH MATERIALIZED VIEW data.batting_stats_player_lifetime;
+REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
+REFRESH MATERIALIZED VIEW data.batting_stats_team_season;
+REFRESH MATERIALIZED VIEW data.batting_stats_team_playoffs_season;
 REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
 REFRESH MATERIALIZED VIEW data.running_stats_all_events;
+REFRESH MATERIALIZED VIEW data.running_stats_player_season;
+REFRESH MATERIALIZED VIEW data.running_stats_player_playoffs_season;
+REFRESH MATERIALIZED VIEW data.running_stats_team_season;
+REFRESH MATERIALIZED VIEW data.running_stats_team_playoffs_season;
+REFRESH MATERIALIZED VIEW data.running_stats_player_lifetime;
+REFRESH MATERIALIZED VIEW data.running_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
+REFRESH MATERIALIZED VIEW data.pitching_stats_player_season;
+REFRESH MATERIALIZED VIEW data.pitching_stats_player_playoffs_season;
+REFRESH MATERIALIZED VIEW data.pitching_stats_player_lifetime;
+REFRESH MATERIALIZED VIEW data.pitching_stats_player_playoffs_lifetime;
+REFRESH MATERIALIZED VIEW data.pitching_stats_team_season;
+REFRESH MATERIALIZED VIEW data.pitching_stats_team_playoffs_season;
 $$;
 
 --
@@ -789,14 +810,34 @@ $$;
 CREATE FUNCTION data.refresh_matviews_concurrently() RETURNS void
     LANGUAGE sql SECURITY DEFINER
     AS $$
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.teams_info_expanded_all;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.player_debuts;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.players_info_expanded_all;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.players_info_expanded_tourney;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_all_events;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_single_game;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_playoffs_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_playoffs_lifetime;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_lifetime;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_all_events;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_team_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_team_playoffs_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.fielder_stats_all_events;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_all_events;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_playoffs_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_team_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_team_playoffs_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_lifetime;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_all_appearances;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_playoffs_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_lifetime;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_playoffs_lifetime;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_team_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_team_playoffs_season;
 $$;
 
 --

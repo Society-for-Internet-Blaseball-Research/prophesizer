@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/21/2021
+-- LAST UPDATE: 4/22/2021 fix-run-joins
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();
