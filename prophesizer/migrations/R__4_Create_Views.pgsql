@@ -1,4 +1,4 @@
--- LAST UPDATE: 4/22/2021 fix-run-joins
+-- LAST UPDATE: 4/23/2021 fix-syntax
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -2992,7 +2992,7 @@ CREATE MATERIALIZED VIEW data.running_stats_team_season AS
    FROM (data.running_stats_all_events rs
      JOIN data.teams_info_expanded_all t ON (((rs.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL)))
   WHERE ((rs.day < 99) AND (rs.season > 0))
-  GROUP BY rs.team_id, rs.season, team;
+  GROUP BY rs.team_id, rs.season, team
   WITH NO DATA;
   
 --
@@ -3008,7 +3008,7 @@ CREATE MATERIALIZED VIEW data.running_stats_team_playoffs_season AS
    FROM (data.running_stats_all_events rs
      JOIN data.teams_info_expanded_all t ON (((rs.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL)))
   WHERE ((rs.day >= 99) AND (rs.season > 0))
-  GROUP BY rs.team_id, rs.season, team;
+  GROUP BY rs.team_id, rs.season, team
   WITH NO DATA;
 
 --

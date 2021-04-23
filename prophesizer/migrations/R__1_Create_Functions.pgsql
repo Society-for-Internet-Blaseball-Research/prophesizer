@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/22/2021 fix-run-joins
+﻿-- LAST UPDATE: 4/23/2021 fix-syntax
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
