@@ -1,4 +1,4 @@
--- LAST UPDATE: 4/23/2021 fix-syntax
+-- LAST UPDATE: 4/24/2021 fix-win-pct
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();
