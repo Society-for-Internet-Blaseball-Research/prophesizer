@@ -1,4 +1,4 @@
--- LAST UPDATE: 4/23/2021 fix-syntax
+-- LAST UPDATE: 4/24/2021 fix-win-pct
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -2425,7 +2425,10 @@ CREATE OR REPLACE VIEW data.pitching_stats_player_tournament
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
- 	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+ 	CASE
+		WHEN (sum(p.win) + sum(p.loss) = 0) THEN NULL::numeric
+		ELSE round(sum(p.win)::numeric / (sum(p.win)::numeric + sum(p.loss)::numeric), 2)
+	END AS win_pct,
 	sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
@@ -2570,7 +2573,10 @@ CREATE MATERIALIZED VIEW data.pitching_stats_player_lifetime AS
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
-	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+	CASE
+		WHEN (sum(p.win) + sum(p.loss) = 0) THEN NULL::numeric
+		ELSE round(sum(p.win)::numeric / (sum(p.win)::numeric + sum(p.loss)::numeric), 2)
+	END AS win_pct,
     sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
@@ -2615,7 +2621,10 @@ CREATE MATERIALIZED VIEW data.pitching_stats_player_playoffs_lifetime AS
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
-	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+	CASE
+		WHEN (sum(p.win) + sum(p.loss) = 0) THEN NULL::numeric
+		ELSE round(sum(p.win)::numeric / (sum(p.win)::numeric + sum(p.loss)::numeric), 2)
+	END AS win_pct,
     sum(p.pitches_thrown) AS pitches_thrown,	
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
@@ -2665,7 +2674,10 @@ CREATE MATERIALIZED VIEW data.pitching_stats_player_season AS
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
-	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+	CASE
+		WHEN (sum(p.win) + sum(p.loss) = 0) THEN NULL::numeric
+		ELSE round(sum(p.win)::numeric / (sum(p.win)::numeric + sum(p.loss)::numeric), 2)
+	END AS win_pct,
     sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
@@ -2715,7 +2727,10 @@ CREATE MATERIALIZED VIEW data.pitching_stats_team_playoffs_season AS
     count(distinct game_id) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
-	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+	CASE
+		WHEN (sum(p.win) + sum(p.loss) = 0) THEN NULL::numeric
+		ELSE round(sum(p.win)::numeric / (sum(p.win)::numeric + sum(p.loss)::numeric), 2)
+	END AS win_pct,
     sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
@@ -2765,7 +2780,10 @@ CREATE MATERIALIZED VIEW data.pitching_stats_team_season AS
     count(distinct game_id) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
-	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+	CASE
+		WHEN (sum(p.win) + sum(p.loss) = 0) THEN NULL::numeric
+		ELSE round(sum(p.win)::numeric / (sum(p.win)::numeric + sum(p.loss)::numeric), 2)
+	END AS win_pct,
     sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
@@ -2816,7 +2834,10 @@ CREATE MATERIALIZED VIEW data.pitching_stats_player_playoffs_season AS
     count(1) AS games,
     sum(p.win) AS wins,
     sum(p.loss) AS losses,
-	round(sum(p.win)::numeric/(count(1))::numeric,2) as win_pct,
+	CASE
+		WHEN (sum(p.win) + sum(p.loss) = 0) THEN NULL::numeric
+		ELSE round(sum(p.win)::numeric / (sum(p.win)::numeric + sum(p.loss)::numeric), 2)
+	END AS win_pct,
     sum(p.pitches_thrown) AS pitches_thrown,
     sum(p.batters_faced) AS batters_faced,
     sum(p.outs_recorded) AS outs_recorded,
