@@ -86,9 +86,24 @@ Evolve doesn't support the following PostgreSQL commands in migrations:
 
 ## Deploy Steps for sibr.dev
 
-At the moment only @lilserf has the permissions to do this process, but it should be documented for the future.
+At the moment only @lilserf and @shibboh have the permissions to do this process, but it should be documented for the future.
 
-1. Stop the Prophesizer container via Portainer (Stacks -> datablase -> datablase_prophesizer_1 -> Stop)
-2. Deploy DB if necessary (TODO: get that deploy script committed somewhere useful)
-3. Update the Datablase stack to the new Prophesizer version (Stacks -> Editor -> change the version number, Update Stack)
+1. Stop the `datablasedev` prophesizer container.
+2. Clear the `datablasedev` DB using pgAdmin. BE SURE YOU'RE ON THE DEV DB:
 
+```
+drop schema data cascade;
+drop schema taxa cascade;
+drop table changelog;
+```
+
+3. Update the `datablasedev` stack to the new Prophesizer version.
+4. Wait for prophesizer to populate the dev DB
+5. Run the Postman tests against the dev stack!
+6. Once the DB exists and the tests pass, back it up by right-clicking the dev DB, choosing `Backup...` and naming the DB according to the prophesizer version number (e.g. `blaseball-2.12.2`)
+7. In pgAdmin, move to the **prod** server and add a new Database named `blaseball-X.Y.Z` using the new version number
+8. Right-click the prod DB and choose `Restore...` and type in the filename you used to backup above. This will populate this new database with the backup from the dev stack.
+9. Change the `datablase` (prod) stack to use the new version of prophesizer; don't save yet, though.
+10. Change all instances of the database name in the `datablase` stack to the new DB version name - there should be 5 or 6 instances amongst all the containers.
+11. Profit: now the prod stack should be using the new prophesizer version, and talking to a new DB
+12. Over time as guests start accessing the new DB you should eventually be able to delete the old one
