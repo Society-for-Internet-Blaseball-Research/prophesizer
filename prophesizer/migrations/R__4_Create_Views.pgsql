@@ -1,4 +1,4 @@
--- LAST UPDATE: 4/24/2021 fix-win-pct
+-- LAST UPDATE: 4/30/2021 add partytime timestamps back to teams_info view, add batting _stats_player_season_combined
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -36,6 +36,7 @@ DROP VIEW IF EXISTS data.batting_records_team_playoffs_single_game CASCADE;
 DROP VIEW IF EXISTS data.batting_records_team_playoffs_season CASCADE;
 DROP VIEW IF EXISTS data.batting_records_player_single_game CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_season_combined CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_single_game CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_playoffs_season CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.batting_stats_player_playoffs_lifetime CASCADE;
@@ -464,7 +465,6 @@ FROM
 		SELECT DISTINCT xtm.team_id,
 		ARRAY[xtm.valid_from, COALESCE(xtm.valid_until, timezone('utc', now()))] AS a
 		FROM data.team_modifications xtm
-		WHERE xtm.modification <> 'PARTY_TIME'
 	) x
 ) ts
 JOIN data.teams t ON 
@@ -2015,6 +2015,72 @@ CREATE MATERIALIZED VIEW data.batting_stats_player_season AS
   GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
   WITH NO DATA;
 
+--
+-- Name: batting_stats_player_season_combined; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+CREATE MATERIALIZED VIEW data.batting_stats_player_season_combined AS
+	SELECT 
+	p.player_name,
+	a.player_id,
+	a.season,
+	count(distinct a.game_id) as appearances,
+	min(a.day) as first_appearance,
+	  CASE
+	      WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+	      ELSE data.batting_average(sum(a.hit), sum(a.at_bat))
+	  END AS batting_average,
+	  CASE
+	      WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+	      ELSE data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly))
+	  END AS on_base_percentage,
+	  CASE
+	      WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+	      ELSE data.slugging(sum(a.total_bases), sum(a.at_bat))
+	  END AS slugging,
+	sum(a.plate_appearance) AS plate_appearances,
+	sum(a.at_bat) AS at_bats,
+	sum(a.hit) AS hits,
+	sum(a.walk) AS walks,
+	sum(a.single) AS singles,
+	sum(a.double) AS doubles,
+	sum(a.triple) AS triples,
+	sum(a.quadruple) as quadruples,
+	sum(a.home_run) AS home_runs,
+	sum(a.runs_batted_in) AS runs_batted_in,
+	sum(a.strikeout) AS strikeouts,
+	sum(a.sacrifice_bunt) AS sacrifice_bunts,
+	sum(a.sacrifice_fly) AS sacrifice_flies,
+	sum(a.at_bat_risp) AS at_bats_risp,
+	sum(a.hits_risp) AS hits_risp,
+	  CASE
+	      WHEN (sum(a.at_bat_risp) = 0) THEN NULL::numeric
+	      ELSE data.batting_average(sum(a.hits_risp), sum(a.at_bat_risp))
+	  END AS batting_average_risp,
+	  CASE
+	      WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
+	      ELSE 
+			(
+				data.on_base_percentage(sum(a.hit), sum(a.at_bat), sum(a.walk), 
+				sum(a.sacrifice_bunt) + SUM(a.sacrifice_fly)) + data.slugging(sum(a.total_bases), sum(a.at_bat))
+			)
+	  END AS on_base_slugging,
+	sum(a.total_bases) AS total_bases,
+	sum(a.hbp) AS hit_by_pitches,
+	sum(a.ground_out) AS ground_outs,
+	sum(a.flyout) AS flyouts,
+	sum(a.gidp) AS gidp
+	FROM data.batting_stats_all_events a
+	JOIN data.players_info_expanded_all p 
+	ON 
+	(
+		a.player_id = p.player_id 
+		AND p.valid_until IS null
+	) 
+	WHERE NOT a.is_postseason AND a.season > 0
+	GROUP BY a.player_id, p.player_name, a.season
+	ORDER BY season, player_name, appearances DESC
+	WITH NO DATA;  
+	
 --
 -- Name: batting_stats_team_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --

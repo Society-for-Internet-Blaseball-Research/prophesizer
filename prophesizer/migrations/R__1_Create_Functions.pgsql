@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/24/2021 fix-win-pct
+﻿-- LAST UPDATE: 4/30/2021 s15 elections gamephase, adding season_combined matviews to refresh
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -289,6 +289,7 @@ RETURNS TABLE(season integer, tournament integer, gameday integer, phase_type VA
     AS $$
 SELECT
 CASE
+	when in_timestamp BETWEEN '2021-04-11 18:00' AND '2021-04-11 19:00' THEN 14 -- Elections S15
 	WHEN season = -1 AND day = 115 and tm.phase_id = 13 THEN 11 -- Elections S12
 	WHEN season = -1 AND day = 116 and tm.phase_id = 13 THEN 13 -- Elections S14
 	WHEN season = 10 AND first_time > '2021-11-01' THEN NULL -- Time after Cup, before S12
@@ -781,6 +782,7 @@ REFRESH MATERIALIZED VIEW data.players_info_expanded_tourney;
 REFRESH MATERIALIZED VIEW data.batting_stats_all_events;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_single_game;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_season;
+REFRESH MATERIALIZED VIEW data.batting_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW data.batting_stats_player_lifetime;
@@ -790,6 +792,7 @@ REFRESH MATERIALIZED VIEW data.batting_stats_team_playoffs_season;
 REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
 REFRESH MATERIALIZED VIEW data.running_stats_all_events;
 REFRESH MATERIALIZED VIEW data.running_stats_player_season;
+REFRESH MATERIALIZED VIEW data.running_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW data.running_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW data.running_stats_team_season;
 REFRESH MATERIALIZED VIEW data.running_stats_team_playoffs_season;
@@ -797,6 +800,7 @@ REFRESH MATERIALIZED VIEW data.running_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW data.running_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_season;
+REFRESH MATERIALIZED VIEW data.pitching_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_playoffs_lifetime;
@@ -817,6 +821,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY data.players_info_expanded_tourney;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_all_events;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_single_game;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_player_lifetime;
@@ -826,6 +831,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_team_playoffs_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.fielder_stats_all_events;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_all_events;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_team_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_team_playoffs_season;
@@ -833,6 +839,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_all_appearances;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_playoffs_lifetime;
