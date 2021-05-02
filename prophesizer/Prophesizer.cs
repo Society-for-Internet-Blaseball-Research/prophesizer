@@ -67,6 +67,7 @@ namespace SIBR
 		private object _eventLocker = new object();
 		private object _pitcherLocker = new object();
 
+		private int m_lastMatRefreshPhase = 0;
 		private SeasonDay m_lastMaterializedRefresh = new SeasonDay(0, 0);
 		private SeasonDay m_dbSeasonDay;
 		private DateTime? m_dbGameTimestamp;
@@ -258,12 +259,13 @@ namespace SIBR
 
 			// Current day according to blaseball.com
 			SeasonDay simSeasonDay;
+			SimulationData simData;
 
 			var response = await m_blaseballClient.GetAsync("simulationData");
 			if (response.IsSuccessStatusCode)
 			{
 				string strResponse = await response.Content.ReadAsStringAsync();
-				var simData = JsonSerializer.Deserialize<SimulationData>(strResponse, m_options);
+				simData = JsonSerializer.Deserialize<SimulationData>(strResponse, m_options);
 				simSeasonDay = new SeasonDay(simData.Season, simData.Day, simData.Tournament);
 			}
 			else
@@ -326,7 +328,7 @@ namespace SIBR
 
 			if (DO_REFRESH_MATVIEWS)
 			{
-				meta.RefreshedMatviews = await RefreshMaterializedViews(psqlConnection);
+				meta.RefreshedMatviews = await RefreshMaterializedViews(psqlConnection, simData);
 			}
 
 			CloseMetadata(meta, recordId, psqlConnection);
@@ -439,14 +441,15 @@ namespace SIBR
 			return new FileInfo(location.AbsolutePath).Directory.FullName;
 		}
 
-		private async Task<bool> RefreshMaterializedViews(NpgsqlConnection psqlConnection)
+		private async Task<bool> RefreshMaterializedViews(NpgsqlConnection psqlConnection, SimulationData simData)
 		{
 			bool printMatviewTime = false;
 			Stopwatch matviewTimer = new Stopwatch();
 			matviewTimer.Start();
 			bool refreshed = false;
 			// If it's been at least one day since the last refresh
-			if (m_dbSeasonDay > m_lastMaterializedRefresh)
+			// Or the previous refresh wasn't in the Election phase and we've now entered the Election phase
+			if (m_dbSeasonDay > m_lastMaterializedRefresh || (m_lastMatRefreshPhase != 13 && simData.Phase == 13))
 			{
 				// Count how many games were today
 				var countCmd = new NpgsqlCommand("SELECT COUNT(DISTINCT(game_id)) FROM data.game_events WHERE season=@season AND day=@day", psqlConnection);
@@ -472,7 +475,8 @@ namespace SIBR
 					// If all games are done, refresh our materialized views
 					if ((numGames > 0 && numFinishedGames >= numGames) ||
 						(numGames == 0 && m_dbSeasonDay.Season > m_lastMaterializedRefresh.Season) ||
-						(m_lastMaterializedRefresh.Season == 0 && m_lastMaterializedRefresh.Day == 0))
+						(m_lastMaterializedRefresh.Season == 0 && m_lastMaterializedRefresh.Day == 0) ||
+						simData.Phase == 13)
 					{
 						var checkCmd = new NpgsqlCommand("SELECT relispopulated FROM pg_class WHERE relname = 'players_info_expanded_all'", psqlConnection);
 						var isPopulated = (bool)(checkCmd.ExecuteScalar() ?? false);
@@ -485,6 +489,7 @@ namespace SIBR
 						await refreshCmd.ExecuteNonQueryAsync();
 
 						m_lastMaterializedRefresh = m_dbSeasonDay;
+						m_lastMatRefreshPhase = simData.Phase;
 						refreshed = true;
 					}
 				}
@@ -729,7 +734,7 @@ namespace SIBR
 		private void StoreSimDataPhase(NpgsqlConnection psqlConnection, int season, int day, DateTime firstTime, int phaseId)
 		{
 			// HACK for Coffee Cup; set the Coffee phases to season -1
-			if (phaseId >= 13 && phaseId <= 15)
+			if (phaseId >= 13 && phaseId <= 15 && firstTime < new DateTime(2021,1,1))
 			{
 				season = -1;
 			}
