@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 4/30/2021 s15 elections gamephase, adding season_combined matviews to refresh
+﻿-- LAST UPDATE: 5/2/2021, updated reblase_gameeventid to full link
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -491,16 +491,16 @@ $$;
 CREATE FUNCTION data.reblase_gameeventid(in_game_event_id bigint) RETURNS UUID
     LANGUAGE sql
     AS $$
-SELECT update_hash
-FROM DATA.chronicler_hash_game_event ch
-JOIN
+SELECT data.reblase_gameid((SELECT game_id FROM DATA.game_events WHERE id = in_game_event_id)) 
+
+|| '#' || update_hash
+FROM DATA.chronicler_hash_game_event
+WHERE chronicler_hash_game_event_id =
 (
 	SELECT MIN(chronicler_hash_game_event_id) AS chronicler_hash_game_event_id
 	FROM DATA.chronicler_hash_game_event
-	GROUP BY game_event_id
-) mch
-ON (ch.chronicler_hash_game_event_id = mch.chronicler_hash_game_event_id)
-WHERE game_event_id = in_game_event_id;
+	WHERE game_event_id = in_game_event_id
+);
 $$;
 
 --

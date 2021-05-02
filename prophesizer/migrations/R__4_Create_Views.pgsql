@@ -1,4 +1,4 @@
--- LAST UPDATE: 4/30/2021 add partytime timestamps back to teams_info view, add batting _stats_player_season_combined
+-- LAST UPDATE: 5/2/2021 is_mindtrick to batting_stats_all_events, bring is_haunting up to seasonal batting views
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -1209,9 +1209,13 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
 		ELSE 0
 	END AS is_murder,
 	CASE
-		WHEN POSITION('charm' IN event_text::TEXT) > 0 THEN 1
+		WHEN ge.event_type like 'CHARM%' THEN 1
 		ELSE 0
 	END AS is_charm,
+	CASE
+		WHEN ge.event_type like 'MIND_TRICK%' THEN 1
+		ELSE 0
+	END AS is_mindtrick,
 	CASE
 		WHEN POSITION('Base Instincts take them directly to second base!' IN event_text::TEXT) > 0 THEN 1
 		WHEN POSITION('Base Instincts take them directly to third base!' IN event_text::TEXT) > 0 THEN 2
@@ -1966,6 +1970,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_player_season AS
 	t.valid_from as team_valid_from,
 	t.valid_until as team_valid_until,
     a.season,
+	a.is_haunting,
 	count(distinct a.game_id) as appearances,
 	min(a.day) as first_appearance,
         CASE
@@ -2012,7 +2017,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_player_season AS
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((NOT a.is_postseason) AND (a.season > 0))
-  GROUP BY a.player_id, p.player_name, a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
+  GROUP BY a.player_id, a.is_haunting, p.player_name, a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
   WITH NO DATA;
 
 --
@@ -2023,6 +2028,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_player_season_combined AS
 	p.player_name,
 	a.player_id,
 	a.season,
+	a.is_haunting,
 	count(distinct a.game_id) as appearances,
 	min(a.day) as first_appearance,
 	  CASE
@@ -2077,7 +2083,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_player_season_combined AS
 		AND p.valid_until IS null
 	) 
 	WHERE NOT a.is_postseason AND a.season > 0
-	GROUP BY a.player_id, p.player_name, a.season
+	GROUP BY a.player_id, a.is_haunting, p.player_name, a.season
 	ORDER BY season, player_name, appearances DESC
 	WITH NO DATA;  
 	
@@ -2091,6 +2097,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_team_playoffs_season AS
 	t.valid_from as team_valid_from,
 	t.valid_until as team_valid_until,
     a.season,
+	a.is_haunting,
 	count(distinct a.game_id) as appearances,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
@@ -2136,7 +2143,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_team_playoffs_season AS
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((a.is_postseason) AND (a.season > 0))
-  GROUP BY a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
+  GROUP BY a.season, a.is_haunting, t.nickname, t.team_id, t.valid_from, t.valid_until
   WITH NO DATA;
 
 --
@@ -2149,6 +2156,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_team_season AS
 	t.valid_from as team_valid_from,
 	t.valid_until as team_valid_until,
     a.season,
+	a.is_haunting,
 	count(distinct a.game_id) as appearances,
         CASE
             WHEN (sum(a.at_bat) = 0) THEN NULL::numeric
@@ -2194,7 +2202,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_team_season AS
      JOIN data.players_info_expanded_all p ON ((((a.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))))
      JOIN data.teams_info_expanded_all t ON ((((a.batter_team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((NOT a.is_postseason) AND (a.season > 0))
-  GROUP BY a.season, t.nickname, t.team_id, t.valid_from, t.valid_until
+  GROUP BY a.season, a.is_haunting, t.nickname, t.team_id, t.valid_from, t.valid_until
   WITH NO DATA;
 
 --
@@ -3678,6 +3686,7 @@ CREATE UNIQUE INDEX ON data.players_info_expanded_tourney (players_info_expanded
 CREATE UNIQUE INDEX ON data.batting_stats_all_events (batting_stats_all_events_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_single_game (batting_stats_player_single_game_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.batting_stats_player_season_combined (player_id, season, is_haunting);
 CREATE UNIQUE INDEX ON data.batting_stats_player_playoffs_season (player_id, season, team_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_playoffs_lifetime (player_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_lifetime (player_id);
