@@ -96,6 +96,9 @@ namespace prophesizer.Serializable
 		[DbIgnore]
 		public IEnumerable<string> GameAttr { get; set; }
 
+		[DbIgnore]
+		public IEnumerable<ProphItem> Items { get; set; }
+
 		public override Guid Hash(HashAlgorithm hashAlgorithm)
 		{
 			StringBuilder sb = new StringBuilder();
