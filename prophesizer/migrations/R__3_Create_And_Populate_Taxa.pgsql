@@ -1,4 +1,4 @@
--- LAST UPDATE: 4/28/2021 phase taxa adds, event_type taxa adds
+-- LAST UPDATE: 5/2/21 #2
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;

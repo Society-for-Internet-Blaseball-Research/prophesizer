@@ -1,4 +1,4 @@
--- LAST UPDATE: 4/30/2021 add partytime timestamps back to teams_info view, add batting _stats_player_season_combined
+-- LAST UPDATE: 5/2/21 #2
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
