@@ -1,5 +1,4 @@
--- LAST UPDATE: 7/8/2021:x
--- filtering out runners with empty string ids at all_events
+-- LAST UPDATE: 7/13/2021 single-game-views
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
@@ -10,6 +9,7 @@ DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.games_info_expanded_all CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.teams_info_expanded_all CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_single_game CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_season CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_season_combined CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_playoffs_season CASCADE;
@@ -2735,18 +2735,23 @@ CREATE MATERIALIZED VIEW data.pitching_stats_all_appearances AS
 	NEXTVAL('DATA.pitching_stats_all_appearances_id_seq') as pitching_stats_all_appearances_id,
 	ge.game_id,
     ge.pitcher_id AS player_id,
+    p.player_name AS player_name,
     ge.pitcher_team_id AS team_id,
+	t.nickname as team,
+	t.valid_from as team_valid_from,
+	t.valid_until as team_valid_until,
     ge.season,
     ge.day,
-        CASE
-            WHEN ((ga.winning_pitcher_id)::text = (ge.pitcher_id)::text) THEN 1
-            ELSE 0
-        END AS win,
-        CASE
-            WHEN ((ga.losing_pitcher_id)::text = (ge.pitcher_id)::text) THEN 1
-            ELSE 0
-        END AS loss,
+    CASE
+        WHEN ((ga.winning_pitcher_id)::text = (ge.pitcher_id)::text) THEN 1
+        ELSE 0
+    END AS win,
+    CASE
+        WHEN ((ga.losing_pitcher_id)::text = (ge.pitcher_id)::text) THEN 1
+        ELSE 0
+    END AS loss,
     sum(array_length(ge.pitches, 1)) AS pitches_thrown,
+    round(floor(sum(ge.outs_on_play) / 3::numeric) + mod(sum(ge.outs_on_play), 3::numeric) / 10::numeric, 1) AS innings,
     ge.top_of_inning,
     sum(ge.outs_on_play) AS outs_recorded,
     sum(ge.runs_batted_in) AS runs_allowed,
@@ -2775,9 +2780,11 @@ CREATE MATERIALIZED VIEW data.pitching_stats_all_appearances AS
     ga.weather AS weather_id,
     ga.is_postseason
    FROM ((data.game_events ge
+     JOIN data.teams_info_expanded_all t on (ge.pitcher_team_id = t.team_id and t.valid_until is null)
      JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
+     JOIN data.players_info_expanded_tourney p ON ge.pitcher_id::text = p.player_id::text AND p.valid_until IS NULL
      JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
-  GROUP BY ge.season, ge.day, ge.game_id, ge.pitcher_id, ga.winning_pitcher_id, ga.losing_pitcher_id, ge.pitcher_team_id, ge.top_of_inning, ga.weather, ga.is_postseason
+  GROUP BY ge.season, ge.day, ge.game_id, ge.pitcher_id, p.player_name, ga.winning_pitcher_id, ga.losing_pitcher_id, ge.pitcher_team_id, ge.top_of_inning, ga.weather, ga.is_postseason, t.nickname, t.valid_from, t.valid_until
   HAVING sum(xe.plate_appearance) > 0 
   WITH NO DATA;
   
@@ -3369,6 +3376,31 @@ CREATE MATERIALIZED VIEW data.running_stats_all_events AS
    WHERE coalesce(geb.runner_id,'') <> ''
   WITH NO DATA;
   
+--
+-- Name: running_stats_player_single_game; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+CREATE MATERIALIZED VIEW data.running_stats_player_single_game AS
+  SELECT
+	rs.player_id AS player_id,
+    p.player_name,
+    rs.team_id AS team_id,
+    t.nickname AS team,
+    t.valid_from AS team_valid_from,
+    t.valid_until AS team_valid_until,
+    rs.season,
+    rs.day,
+    rs.game_id,
+    sum(rs.was_base_stolen) AS stolen_bases,
+    sum(rs.was_caught_stealing) AS caught_stealing,
+    sum(rs.runner_scored) AS runs
+   FROM (data.running_stats_all_events rs
+     JOIN data.games ga ON ((rs.game_id)::text = (ga.game_id)::text)
+     JOIN data.players_info_expanded_all p ON (((rs.player_id)::text = (p.player_id)::text) AND (p.valid_until IS NULL))
+     JOIN data.teams_info_expanded_all t ON (rs.team_id = t.team_id AND t.valid_until IS NULL))
+   WHERE rs.player_id <> ''
+   GROUP BY rs.player_id, p.player_name, rs.team_id, t.nickname, t.valid_from, t.valid_until, rs.game_id, rs.season, rs.day
+   WITH NO DATA;
+
 --
 -- Name: running_stats_player_lifetime; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
@@ -4066,6 +4098,7 @@ CREATE UNIQUE INDEX ON data.pitching_stats_player_playoffs_lifetime (player_id);
 CREATE UNIQUE INDEX ON data.pitching_stats_team_season (team_id, season);
 CREATE UNIQUE INDEX ON data.pitching_stats_team_playoffs_season (team_id, season);
 CREATE UNIQUE INDEX ON data.running_stats_all_events (running_stats_all_events_id);
+CREATE UNIQUE INDEX ON data.running_stats_player_single_game (player_id, team_id, game_id);
 CREATE UNIQUE INDEX ON data.running_stats_player_season (player_id, season, team_id);
 CREATE UNIQUE INDEX ON data.running_stats_player_season_combined (player_id, season);
 CREATE UNIQUE INDEX ON data.running_stats_player_playoffs_season (player_id, season, team_id);

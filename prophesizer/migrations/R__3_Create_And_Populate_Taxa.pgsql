@@ -1,5 +1,4 @@
--- LAST UPDATE: 7/8/2021:x
--- Added more pre-history teams
+-- LAST UPDATE: 7/13/2021 single-game-views
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
