@@ -1403,7 +1403,53 @@ namespace SIBR
 						return count == 1;
 					}
 				},
-				null,
+				async x =>
+				{
+					NpgsqlCommand curr = new NpgsqlCommand(@"select modification, level from data.stadium_modifications where stadium_id=@sid and valid_until is null", psqlConnection);
+					curr.Parameters.AddWithValue("sid", x.Data.Id);
+
+					Dictionary<string, int> modList = new Dictionary<string, int>();
+					using(var dr = curr.ExecuteReader())
+					{
+						while (dr.Read())
+						{
+							modList[dr.GetString(0)] = dr.GetInt32(1);
+						}
+					}
+
+					var currMods = x.Data.RenoLog.Concat(x.Data.Weather);
+					var goneMods = modList.Except(currMods);
+					var newMods = currMods.Except(modList);
+
+					if(goneMods.Count() > 0)
+					{
+						foreach (var mod in goneMods)
+						{
+							Console.WriteLine($"    Found a lack of {mod.Key}:{mod.Value} for {x.Data.Nickname} at {x.ValidFrom}!");
+							NpgsqlCommand upd = new NpgsqlCommand(@"update data.stadium_modifications set valid_until=@timestamp where stadium_id=@sid and modification=@mod and level=@lev", psqlConnection);
+							upd.Parameters.AddWithValue("timestamp", x.ValidFrom);
+							upd.Parameters.AddWithValue("sid", x.Data.Id);
+							upd.Parameters.AddWithValue("mod", mod.Key);
+							upd.Parameters.AddWithValue("lev", mod.Value);
+							int rows = await upd.ExecuteNonQueryAsync();
+							if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+						}
+					}
+					if(newMods.Count() > 0)
+					{
+						foreach(var mod in newMods)
+						{
+							Console.WriteLine($"    Found new mod {mod.Key}:{mod.Value} for {x.Data.Nickname} at {x.ValidFrom}!");
+							NpgsqlCommand add = new NpgsqlCommand(@"insert into data.stadium_modifications (stadium_id, modification, level, valid_from, valid_until) values (@sid, @mod, @lev, @from, NULL)", psqlConnection);
+							add.Parameters.AddWithValue("sid", x.Data.Id);
+							add.Parameters.AddWithValue("mod", mod.Key);
+							add.Parameters.AddWithValue("lev", mod.Value);
+							add.Parameters.AddWithValue("from", x.ValidFrom);
+							int rows = await add.ExecuteNonQueryAsync();
+							if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+						}
+					}
+				},
 				null);
 		}
 
