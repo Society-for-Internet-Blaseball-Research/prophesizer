@@ -34,6 +34,11 @@ namespace prophesizer.Serializable
 		public float Inconvenience { get; set; }
 		public float Luxuriousness { get; set; }
 
+		[DbIgnore]
+		public Dictionary<string, int> RenoLog { get; set; }
+		[DbIgnore]
+		public Dictionary<string, int> Weather { get; set; }
+
 		public override string ToString()
 		{
 			return "Stadium";

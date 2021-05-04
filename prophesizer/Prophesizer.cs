@@ -1131,6 +1131,8 @@ namespace SIBR
 			string nextPage = null;
 			DateTime? lastSeenTime = null;
 
+			var transaction = psqlConnection.BeginTransaction();
+
 			while (true)
 			{
 				string query = $"versions?type={type}&count={count}";
@@ -1172,6 +1174,8 @@ namespace SIBR
 				updateCmd.Parameters.AddWithValue("ts", lastSeenTime);
 				int updateResult = await updateCmd.ExecuteNonQueryAsync();
 			}
+
+			await transaction.CommitAsync();
 		}
 
 		/// <summary>
@@ -1399,7 +1403,53 @@ namespace SIBR
 						return count == 1;
 					}
 				},
-				null,
+				async x =>
+				{
+					NpgsqlCommand curr = new NpgsqlCommand(@"select modification, level from data.stadium_modifications where stadium_id=@sid and valid_until is null", psqlConnection);
+					curr.Parameters.AddWithValue("sid", x.Data.Id);
+
+					Dictionary<string, int> modList = new Dictionary<string, int>();
+					using(var dr = curr.ExecuteReader())
+					{
+						while (dr.Read())
+						{
+							modList[dr.GetString(0)] = dr.GetInt32(1);
+						}
+					}
+
+					var currMods = x.Data.RenoLog.Concat(x.Data.Weather);
+					var goneMods = modList.Except(currMods);
+					var newMods = currMods.Except(modList);
+
+					if(goneMods.Count() > 0)
+					{
+						foreach (var mod in goneMods)
+						{
+							Console.WriteLine($"    Found a lack of {mod.Key}:{mod.Value} for {x.Data.Nickname} at {x.ValidFrom}!");
+							NpgsqlCommand upd = new NpgsqlCommand(@"update data.stadium_modifications set valid_until=@timestamp where stadium_id=@sid and modification=@mod and level=@lev", psqlConnection);
+							upd.Parameters.AddWithValue("timestamp", x.ValidFrom);
+							upd.Parameters.AddWithValue("sid", x.Data.Id);
+							upd.Parameters.AddWithValue("mod", mod.Key);
+							upd.Parameters.AddWithValue("lev", mod.Value);
+							int rows = await upd.ExecuteNonQueryAsync();
+							if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+						}
+					}
+					if(newMods.Count() > 0)
+					{
+						foreach(var mod in newMods)
+						{
+							Console.WriteLine($"    Found new mod {mod.Key}:{mod.Value} for {x.Data.Nickname} at {x.ValidFrom}!");
+							NpgsqlCommand add = new NpgsqlCommand(@"insert into data.stadium_modifications (stadium_id, modification, level, valid_from, valid_until) values (@sid, @mod, @lev, @from, NULL)", psqlConnection);
+							add.Parameters.AddWithValue("sid", x.Data.Id);
+							add.Parameters.AddWithValue("mod", mod.Key);
+							add.Parameters.AddWithValue("lev", mod.Value);
+							add.Parameters.AddWithValue("from", x.ValidFrom);
+							int rows = await add.ExecuteNonQueryAsync();
+							if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+						}
+					}
+				},
 				null);
 		}
 
@@ -1448,6 +1498,68 @@ namespace SIBR
 			}
 		}
 
+		private async Task ProcessItems(NpgsqlConnection psqlConnection, DateTime timestamp, ProphPlayer player)
+		{
+			NpgsqlCommand currCmd = new NpgsqlCommand(@"select item_id from data.player_items where player_id=@pid and valid_until is null", psqlConnection);
+			currCmd.Parameters.AddWithValue("pid", player.Id);
+
+			List<string> oldItems = new List<string>();
+			using (NpgsqlDataReader dr = currCmd.ExecuteReader())
+			{ 
+				while (dr.Read())
+				{
+					oldItems.Add(dr.GetString(0));
+				}
+			}
+
+			var goneItems = oldItems.Except(player.Items.Select(x => x.Id));
+
+			foreach(var itemId in goneItems)
+			{
+				NpgsqlCommand update = new NpgsqlCommand(@"update data.player_items set valid_until=@timestamp where player_id=@pid and item_id=@iid and valid_until is null", psqlConnection);
+				update.Parameters.AddWithValue("timestamp", timestamp);
+				update.Parameters.AddWithValue("pid", player.Id);
+				update.Parameters.AddWithValue("iid", itemId);
+				int rows = await update.ExecuteNonQueryAsync();
+				if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+			}
+
+			foreach (var item in player.Items)
+			{
+				item.PlayerId = player.Id;
+
+				// This will need to change to a more sophisticated hash if properties other than ownership and health ever change after the fact for items
+				NpgsqlCommand cmd = new NpgsqlCommand(@"select count(*) from data.player_items where player_id=@pid and item_id=@iid and health=@health and valid_until is null", psqlConnection);
+				cmd.Parameters.AddWithValue("pid", item.PlayerId);
+				cmd.Parameters.AddWithValue("iid", item.Id);
+				cmd.Parameters.AddWithValue("health", item.Health);
+				var count = (long)cmd.ExecuteScalar();
+
+				if(count == 1)
+				{
+					// record exists
+				}
+				else
+				{
+					Console.WriteLine($"Processing update for item {item} owned by {item.PlayerId}...");
+
+					// Update the old record
+					NpgsqlCommand update = new NpgsqlCommand(@"update data.player_items set valid_until=@timestamp where player_id=@pid and item_id=@iid and valid_until is null", psqlConnection);
+					update.Parameters.AddWithValue("timestamp", timestamp);
+					update.Parameters.AddWithValue("pid", item.PlayerId);
+					update.Parameters.AddWithValue("iid", item.Id);
+					int rows = await update.ExecuteNonQueryAsync();
+					if (rows > 1) throw new InvalidOperationException($"Tried to update the current row but got {rows} rows affected!");
+
+					var extra = new Dictionary<string, object>();
+					extra["valid_from"] = timestamp;
+					// Try to insert our current data
+					InsertCommand insertCmd = new InsertCommand(psqlConnection, "data.player_items", item, extra);
+					var newId = await insertCmd.Command.ExecuteNonQueryAsync();
+				}
+			}
+		}
+
 		private async Task ProcessPlayers(NpgsqlConnection psqlConnection, IEnumerable<ChroniclerItem<ProphPlayer>> players)
 		{
 			using (MD5 md5 = MD5.Create())
@@ -1461,6 +1573,11 @@ namespace SIBR
 							// Override the scattered name we're getting
 							p.Data.Name = ((JsonElement)p.Data.State["unscatteredName"]).GetString();
 						}
+					}
+
+					if (p.Data.Items != null)
+					{
+						await ProcessItems(psqlConnection, p.ValidFrom.Value, p.Data);
 					}
 
 					var hash = p.Data.Hash(md5);
@@ -1478,7 +1595,7 @@ namespace SIBR
 						Console.WriteLine($"    Processing player update {p.Hash} for {p.Data.Name} ({p.Data.Id})");
 
 						// Update the old record
-						NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id = @player_id and valid_until is null", psqlConnection);
+						NpgsqlCommand update = new NpgsqlCommand(@"update data.players set valid_until=@timestamp where player_id=@player_id and valid_until is null", psqlConnection);
 						update.Parameters.AddWithValue("timestamp", p.ValidFrom);
 						update.Parameters.AddWithValue("player_id", p.Data.Id);
 						int rows = await update.ExecuteNonQueryAsync();
