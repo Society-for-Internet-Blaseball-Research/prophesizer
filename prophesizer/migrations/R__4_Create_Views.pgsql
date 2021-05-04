@@ -3678,6 +3678,7 @@ CREATE UNIQUE INDEX ON data.players_info_expanded_tourney (players_info_expanded
 CREATE UNIQUE INDEX ON data.batting_stats_all_events (batting_stats_all_events_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_single_game (batting_stats_player_single_game_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.batting_stats_player_season_combined (player_id, season);
 CREATE UNIQUE INDEX ON data.batting_stats_player_playoffs_season (player_id, season, team_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_playoffs_lifetime (player_id);
 CREATE UNIQUE INDEX ON data.batting_stats_player_lifetime (player_id);
