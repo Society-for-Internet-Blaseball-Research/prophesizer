@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 5/2/2021 #2
+﻿-- LAST UPDATE: 5/7/2021 ,added pitching_combined, running_combined views to refresh
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -792,6 +792,7 @@ REFRESH MATERIALIZED VIEW data.batting_stats_team_playoffs_season;
 REFRESH MATERIALIZED VIEW data.fielder_stats_all_events;
 REFRESH MATERIALIZED VIEW data.running_stats_all_events;
 REFRESH MATERIALIZED VIEW data.running_stats_player_season;
+REFRESH MATERIALIZED VIEW data.running_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW data.running_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW data.running_stats_team_season;
 REFRESH MATERIALIZED VIEW data.running_stats_team_playoffs_season;
@@ -799,6 +800,7 @@ REFRESH MATERIALIZED VIEW data.running_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW data.running_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW data.pitching_stats_all_appearances;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_season;
+REFRESH MATERIALIZED VIEW data.pitching_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_playoffs_lifetime;
@@ -829,6 +831,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY data.batting_stats_team_playoffs_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.fielder_stats_all_events;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_all_events;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_team_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_team_playoffs_season;
@@ -836,6 +839,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.running_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_all_appearances;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_season_combined;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_playoffs_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_playoffs_lifetime;

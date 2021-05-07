@@ -1,4 +1,4 @@
--- LAST UPDATE: 5/2/21 #2
+-- LAST UPDATE: 5/7/2021 added is_mindtrick, pitching_combined, running_combined views
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -8,6 +8,7 @@ DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.teams_info_expanded_all CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_season_combined CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_playoffs_season CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_team_season CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_team_playoffs_season CASCADE;
@@ -19,6 +20,7 @@ DROP VIEW IF EXISTS data.players_extended_current CASCADE;
 DROP VIEW IF EXISTS data.pitching_records_player_single_game CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_all_appearances CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_player_season CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_player_season_combined CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_team_season CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_team_playoffs_season CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.pitching_stats_player_playoffs_season CASCADE;
@@ -1209,9 +1211,13 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
 		ELSE 0
 	END AS is_murder,
 	CASE
-		WHEN POSITION('charm' IN event_text::TEXT) > 0 THEN 1
+		WHEN ge.event_type like 'CHARM%' THEN 1
 		ELSE 0
 	END AS is_charm,
+	CASE
+		WHEN ge.event_type like 'MINDTRICK%' THEN 1
+		ELSE 0
+	END AS is_mindtrick,
 	CASE
 		WHEN POSITION('Base Instincts take them directly to second base!' IN event_text::TEXT) > 0 THEN 1
 		WHEN POSITION('Base Instincts take them directly to third base!' IN event_text::TEXT) > 0 THEN 2
@@ -1239,6 +1245,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
 	ON (ge.id = geb.game_event_id)
 	WHERE xe.plate_appearance = 1
   WITH NO DATA;
+  
 --
 -- Name: batting_stats_player_single_game; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
@@ -2779,6 +2786,55 @@ CREATE MATERIALIZED VIEW data.pitching_stats_player_season AS
   WHERE ((NOT p.is_postseason) AND (p.season > 0))
   GROUP BY a.player_name, p.player_id, p.season, p.team_id, t.nickname, t.valid_from, t.valid_until
   WITH NO DATA;
+  
+--
+-- Name: pitching_stats_player_season_combined; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+CREATE MATERIALIZED VIEW data.pitching_stats_player_season_combined AS
+ SELECT a.player_name,
+    p.player_id,
+    p.season,
+    count(1) AS games,
+    sum(p.win) AS wins,
+    sum(p.loss) AS losses,
+	CASE
+		WHEN (sum(p.win) + sum(p.loss) = 0) THEN NULL::numeric
+		ELSE round(sum(p.win)::numeric / (sum(p.win)::numeric + sum(p.loss)::numeric), 2)
+	END AS win_pct,
+    sum(p.pitches_thrown) AS pitches_thrown,
+    sum(p.batters_faced) AS batters_faced,
+    sum(p.outs_recorded) AS outs_recorded,
+    round((floor((sum(p.outs_recorded) / (3)::numeric)) + (mod(sum(p.outs_recorded), (3)::numeric) / (10)::numeric)), 1) AS innings,
+    sum(p.runs_allowed) AS runs_allowed,
+    sum(
+        CASE
+            WHEN (p.runs_allowed = (0)::numeric) THEN 1
+            ELSE 0
+        END) AS shutouts,
+    sum(
+        CASE
+            WHEN ((p.runs_allowed < (4)::numeric) AND (p.outs_recorded > 18)) THEN 1
+            ELSE 0
+        END) AS quality_starts,
+    sum(p.strikeouts) AS strikeouts,
+    sum(p.walks) AS walks,
+    sum(p.home_runs_allowed) AS home_runs_allowed,
+    sum(p.hits_allowed) AS hits_allowed,
+    sum(p.hit_by_pitches) AS hit_by_pitches,
+    round((((9)::numeric * sum(p.runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS earned_run_average,
+    round((((9)::numeric * sum(p.walks)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS walks_per_9,
+    round((((9)::numeric * sum(p.hits_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS hits_per_9,
+    round((((9)::numeric * sum(p.strikeouts)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS strikeouts_per_9,
+    round((((9)::numeric * sum(p.home_runs_allowed)) / (sum(p.outs_recorded) / (3)::numeric)), 2) AS home_runs_per_9,
+	round(((sum(p.walks)+sum(p.hits_allowed))/(sum(p.outs_recorded) / (3)::numeric)),3) AS whip,
+	case
+		WHEN sum(p.walks) = 0 THEN sum(p.strikeouts) ELSE round(sum(p.strikeouts)/sum(p.walks),2)
+	end AS strikeouts_per_walk
+   FROM data.pitching_stats_all_appearances p
+     JOIN data.players_info_expanded_all a ON (a.player_id = p.player_id AND a.valid_until IS NULL)
+  WHERE NOT p.is_postseason AND p.season > 0
+  GROUP BY a.player_name, p.player_id, p.season
+  WITH NO DATA;
 
 --
 -- Name: pitching_stats_team_playoffs_season; Type: MATERIALIZED VIEW; Schema: data; Owner: -
@@ -3064,6 +3120,23 @@ CREATE MATERIALIZED VIEW data.running_stats_player_season AS
      LEFT JOIN data.teams_info_expanded_all t ON ((((rs.team_id)::text = (t.team_id)::text) AND (t.valid_until IS NULL))))
   WHERE ((rs.day < 99) AND (rs.season > 0))
   GROUP BY rs.player_id, rs.season, rs.team_id, t.nickname, t.valid_from, t.valid_until, p.player_name
+  WITH NO DATA;
+  
+--
+-- Name: running_stats_player_season_combined; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+CREATE MATERIALIZED VIEW data.running_stats_player_season_combined AS
+ SELECT rs.player_id,
+	p.player_name, 
+	(SELECT DISTINCT u.url_slug FROM DATA.players u WHERE rs.player_id = u.player_id AND p.player_name = u.player_name) AS url_slug,
+    rs.season,
+    sum(rs.was_base_stolen) AS stolen_bases,
+    sum(rs.was_caught_stealing) AS caught_stealing,
+    sum(rs.runner_scored) AS runs
+   FROM data.running_stats_all_events rs
+     JOIN data.players_info_expanded_all p ON (rs.player_id = p.player_id AND p.valid_until IS NULL)
+  WHERE ((rs.day < 99) AND (rs.season > 0))
+  GROUP BY rs.player_id, rs.season, p.player_name
   WITH NO DATA;
 
 --
@@ -3687,6 +3760,7 @@ CREATE UNIQUE INDEX ON data.batting_stats_team_playoffs_season (team_id, season)
 CREATE UNIQUE INDEX ON data.fielder_stats_all_events (fielder_stats_all_events_id);
 CREATE UNIQUE INDEX ON data.pitching_stats_all_appearances (pitching_stats_all_appearances_id);
 CREATE UNIQUE INDEX ON data.pitching_stats_player_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.pitching_stats_player_season_combined (player_id, season);
 CREATE UNIQUE INDEX ON data.pitching_stats_player_playoffs_season (player_id, season, team_id);
 CREATE UNIQUE INDEX ON data.pitching_stats_player_lifetime (player_id);
 CREATE UNIQUE INDEX ON data.pitching_stats_player_playoffs_lifetime (player_id);
@@ -3694,6 +3768,7 @@ CREATE UNIQUE INDEX ON data.pitching_stats_team_season (team_id, season);
 CREATE UNIQUE INDEX ON data.pitching_stats_team_playoffs_season (team_id, season);
 CREATE UNIQUE INDEX ON data.running_stats_all_events (running_stats_all_events_id);
 CREATE UNIQUE INDEX ON data.running_stats_player_season (player_id, season, team_id);
+CREATE UNIQUE INDEX ON data.running_stats_player_season_combined (player_id, season);
 CREATE UNIQUE INDEX ON data.running_stats_player_playoffs_season (player_id, season, team_id);
 CREATE UNIQUE INDEX ON data.running_stats_team_season (team_id, season);
 CREATE UNIQUE INDEX ON data.running_stats_team_playoffs_season (team_id, season);
