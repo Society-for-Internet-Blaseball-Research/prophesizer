@@ -23,7 +23,7 @@ namespace prophesizer.Serializable
 
 		[DbIgnore]
 		public Dictionary<string, object> State { get; set; }
-		public bool Deceased { get; set; }
+		public bool? Deceased { get; set; }
 
 		// Attributes
 		public double Anticapitalism { get; set; }

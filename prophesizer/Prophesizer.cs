@@ -676,23 +676,7 @@ namespace SIBR
 			return pollResult;
 		}
 
-		// Election results show up in phase 0
-		private const int PHASE_ELECTIONS = 0;
-		// Boss Fights are phase 9
-		private const int PHASE_BOSS_FIGHT = 9;
-
-		private const int PHASE_REG_SEASON = 2;
-
-		// See https://docs.sibr.dev/docs/apis/docs/phases.md
-		// Regular season is phase 2
-		// Then 3 and 7 are gaps before postseason
-		// 10 is wild card games
-		// 11 is between rounds of playoffs
-		// 4 is playoffs in progress
-		// 9 is boss fights
-		// 5 is after playoffs, before elections
-		// 6 is the same as 5 and we don't know why
-		// 0 is elections
+	
 
 		// Find all the "special" times in the season and add them to time_map
 		private async Task StoreTimeMapEvents(NpgsqlConnection psqlConnection)
@@ -700,6 +684,7 @@ namespace SIBR
 			string nextPage = null;
 
 			var trans = psqlConnection.BeginTransaction();
+			Console.WriteLine($"Populating Time Map...");
 
 			while (true)
 			{
@@ -1882,33 +1867,7 @@ namespace SIBR
 
 		}
 
-		private async Task PersistTimeMap(IEnumerable<GameEvent> events, NpgsqlConnection psqlConnection)
-		{
 
-			foreach (var e in events)
-			{
-
-				if (e.firstPerceivedAt != DateTime.MinValue && e.firstPerceivedAt.Year != 1970)
-				{
-
-					// Record the first time seen for each season and day
-					// Note that the phase is 2 which is regular season games
-					var updateTimeMap = new NpgsqlCommand(@"
-        insert into data.time_map(season, day, first_time, phase_id) values(@season, @day, @first_time, 2)
-        on conflict on constraint season_day_unique do
-        update set first_time = EXCLUDED.first_time
-        where time_map.first_time > EXCLUDED.first_time;
-        ", psqlConnection);
-
-					updateTimeMap.Parameters.AddWithValue("season", e.season);
-					updateTimeMap.Parameters.AddWithValue("day", e.day);
-					updateTimeMap.Parameters.AddWithValue("first_time", e.firstPerceivedAt);
-					//updateTimeMap.Prepare();
-					await updateTimeMap.ExecuteNonQueryAsync();
-				}
-			}
-
-		}
 
 		/// <summary>
 		/// Generate a command for inserting a Game into the `game` table
