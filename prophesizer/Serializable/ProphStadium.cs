@@ -11,7 +11,7 @@ namespace prophesizer.Serializable
 		[DbAlias("stadium_id")]
 		public string Id { get; set; }
 
-		public int Hype { get; set; }
+		public float Hype { get; set; }
 
 		public string Name { get; set; }
 		public string Nickname { get; set; }
