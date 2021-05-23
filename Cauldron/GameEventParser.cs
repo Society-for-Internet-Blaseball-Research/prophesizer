@@ -835,6 +835,12 @@ namespace Cauldron
 			float oldScore = m_oldState.topOfInning ? m_oldState.awayScore : m_oldState.homeScore;
 			float scoreDiff = newScore - oldScore;
 
+			// In Polarity- weather unruns get scored so we need to flip this for our logic to work
+			if(newState.weather == WEATHER_POLARITY_NEGATIVE)
+			{
+				scoreDiff *= -1;
+			}
+
 			// Handle runners present in the old state but possibly not in the new ('cuz they scored)
 			foreach (var kvp in oldBases.OrderByDescending(x => x.Key))
 			{
@@ -1080,14 +1086,36 @@ namespace Cauldron
 				if(newScoreDiff > 0)
 				{
 					// Home is now winning
-					var leadingRunner = m_currEvent.baseRunners.Where(x => x.runsScored > 0).OrderByDescending(x => x.baseBeforePlay).FirstOrDefault();
-					m_awayOwningPitcher = leadingRunner?.responsiblePitcherId ?? m_awayOwningPitcher;
+
+					if(newState.topOfInning)
+					{
+						// Home took the lead while pitching, via Polarity- or Triple Threat or some future mechanic
+						// It's not really the away pitcher's fault, but nobody else can really own the lead change
+						m_awayOwningPitcher = newState.awayPitcher;
+					}
+					else
+					{
+						// Home took the lead while batting, so the away owning pitcher is whoever put the leading runner on base
+						var leadingRunner = m_currEvent.baseRunners.Where(x => x.runsScored > 0).OrderByDescending(x => x.baseBeforePlay).FirstOrDefault();
+						m_awayOwningPitcher = leadingRunner?.responsiblePitcherId ?? m_awayOwningPitcher;
+					}
+
 				}
 				else if(newScoreDiff < 0)
 				{
 					// Away is now winning
-					var leadingRunner = m_currEvent.baseRunners.Where(x => x.runsScored > 0).OrderByDescending(x => x.baseBeforePlay).FirstOrDefault();
-					m_homeOwningPitcher = leadingRunner?.responsiblePitcherId ?? m_homeOwningPitcher;
+					if (newState.topOfInning)
+					{
+						// Away took the lead while batting, so the home owning pitcher is whoever put the leading runner on base
+						var leadingRunner = m_currEvent.baseRunners.Where(x => x.runsScored > 0).OrderByDescending(x => x.baseBeforePlay).FirstOrDefault();
+						m_homeOwningPitcher = leadingRunner?.responsiblePitcherId ?? m_homeOwningPitcher;
+					}
+					else
+					{
+						// Away took the lead while pitching, via Polarity- or Triple Threat or some future mechanic
+						// It's not really the home pitcher's fault, but nobody else can really own the lead change
+						m_homeOwningPitcher = newState.homePitcher;
+					}
 				}
 			}
 		}
@@ -1374,6 +1402,9 @@ namespace Cauldron
 			}
 			return null;
 		}
+
+		static int WEATHER_POLARITY_POSITIVE = 20;
+		static int WEATHER_POLARITY_NEGATIVE = 21;
 
 		/// <summary>
 		/// Call this with every game update for the game this parser is handling
