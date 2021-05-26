@@ -568,6 +568,12 @@ CASE
 				WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = 'RETIRED'
 			)
 		)
+		AND NOT EXISTS
+		(
+			SELECT 1
+			FROM data.team_roster rc
+			WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND rc.position_type_id >= 2 AND rc.tournament = -1
+		)
 	)
 	THEN 'main_roster'
 	WHEN EXISTS 
