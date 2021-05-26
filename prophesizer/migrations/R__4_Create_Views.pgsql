@@ -449,7 +449,10 @@ xt.tournament_name,
 	AND m.valid_from <= ts.timestampd
 	AND ts.timestampd < COALESCE(m.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
 	GROUP BY m.team_id
-) AS modifications
+) AS modifications,
+s.stadium_id,
+s.name AS stadium_name,
+s.nickname AS stadium_nickname
 FROM 
 (
 	SELECT DISTINCT x.team_id,
@@ -467,6 +470,18 @@ FROM
 		SELECT DISTINCT xtm.team_id,
 		ARRAY[xtm.valid_from, COALESCE(xtm.valid_until, timezone('utc', now()))] AS a
 		FROM data.team_modifications xtm
+		UNION
+		SELECT DISTINCT xs.team_id,
+		ARRAY[xs.valid_from, xs.valid_until] AS a
+		FROM (
+			SELECT xxs.team_id, xxs.name, xxs.nickname, xxs.grp, MIN(xxs.valid_from) AS valid_from, MAX(COALESCE(xxs.valid_until, timezone('utc', now()))) AS valid_until
+			FROM (
+				SELECT *,
+					ROW_NUMBER() OVER (ORDER BY xxxs.team_id, xxxs.valid_from) - ROW_NUMBER() OVER (PARTITION BY xxxs.team_id, xxxs.name, xxxs.nickname ORDER BY xxxs.team_id, xxxs.valid_from) AS grp
+				FROM data.stadiums xxxs
+			) xxs
+			GROUP BY xxs.team_id, xxs.name, xxs.nickname, xxs.grp
+		) xs
 	) x
 ) ts
 JOIN data.teams t ON 
@@ -486,6 +501,12 @@ LEFT JOIN taxa.divisions d ON (dt.division_id = d.division_id)
 LEFT JOIN taxa.leagues l ON (d.league_id = l.league_db_id)
 LEFT JOIN taxa.tournament_teams tt ON (ts.team_id = tt.team_id)
 LEFT JOIN taxa.tournaments xt ON (tt.tournament_db_id = xt.tournament_db_id)
+LEFT JOIN data.stadiums s ON
+(
+	ts.team_id = s.team_id
+	AND s.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(s.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+)
 WHERE ts.timestampd <> timezone('utc', now())
 ORDER BY t.full_name, ts.timestampd
 WITH NO DATA;
