@@ -1,4 +1,4 @@
--- LAST UPDATE: 5/7/2021 - Updating lists for attributes, modifications
+-- LAST UPDATE: 5/24/2021
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;

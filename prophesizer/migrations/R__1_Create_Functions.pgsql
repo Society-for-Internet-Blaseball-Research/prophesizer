@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 5/7/2021 ,added pitching_combined, running_combined views to refresh
+﻿-- LAST UPDATE: 5/24/2021
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;

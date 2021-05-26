@@ -1,4 +1,9 @@
--- LAST UPDATE: 5/7/2021 added is_mindtrick, pitching_combined, running_combined views
+-- LAST UPDATE: 5/24/2021: 
+-- CASE set for players_info to calculate ratings and stars from Before.  
+-- Player Status only checks non Cup teams for Active vs Shadow.
+-- Evolution added to players_info_expanded_all 
+-- Starting to add Item info to players_info_expanded_all
+
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
@@ -554,7 +559,7 @@ CASE
 	(
 		SELECT 1
 		FROM data.team_roster rc
-		WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND rc.position_type_id < 2
+		WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND rc.position_type_id < 2 AND rc.tournament = -1
 		AND NOT EXISTS 
 		(
 			SELECT 1
@@ -619,6 +624,7 @@ SELECT
 NEXTVAL('DATA.players_info_expanded_all_id_seq') as players_info_expanded_all_id,
 p.player_id,
 p.player_name,
+p.evolution,
 ps.current_state,
 ps.current_location,
 pd.debut_gameday,
@@ -691,14 +697,40 @@ p.url_slug,
 	AND ts.timestampd < COALESCE(m.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
 	GROUP BY m.player_id
 ) AS modifications,
-p.batting_rating,
-p.baserunning_rating,
-p.defense_rating,
-p.pitching_rating,
-data.rating_to_star(p.batting_rating) AS batting_stars,
-data.rating_to_star(p.baserunning_rating) AS baserunning_stars,
-data.rating_to_star(p.defense_rating) AS defense_stars,
-data.rating_to_star(p.pitching_rating) AS pitching_stars
+CASE
+	when p.batting_rating in (0,-1) THEN data.batting_rating_raw(tragicness, patheticism, thwackability, divinity, moxie, musclitude, martyrdom)
+	else p.batting_rating
+end as batting_rating,
+case
+	when p.baserunning_rating in (0,-1) THEN data.baserunning_rating_raw(laserlikeness, continuation, base_thirst, indulgence, ground_friction)
+	else p.baserunning_rating
+end as baserunning_rating,
+case
+	when p.defense_rating in (0,-1) THEN data.defense_rating_raw(omniscience, tenaciousness, watchfulness, anticapitalism, chasiness)
+	else p.defense_rating
+end as defense_rating,
+case
+	when p.pitching_rating in (0,-1) THEN data.pitching_rating_raw(unthwackability, ruthlessness, overpowerment, shakespearianism, coldness)
+	else p.pitching_rating
+end as pitching_rating,
+CASE
+	when p.batting_rating in (0,-1) THEN data.rating_to_star(data.batting_rating_raw(tragicness, patheticism, thwackability, divinity, moxie, musclitude, martyrdom))
+	else data.rating_to_star(p.batting_rating)
+end as batting_stars,
+case
+	when p.baserunning_rating in (0,-1) THEN data.rating_to_star(data.baserunning_rating_raw(laserlikeness, continuation, base_thirst, indulgence, ground_friction))
+	else data.rating_to_star(p.baserunning_rating)
+end as baserunning_stars,
+case
+	when p.defense_rating in (0,-1) THEN data.rating_to_star(data.defense_rating_raw(omniscience, tenaciousness, watchfulness, anticapitalism, chasiness))
+	else data.rating_to_star(p.defense_rating)
+end as defense_stars,
+case
+	when p.pitching_rating in (0,-1) THEN data.rating_to_star(data.pitching_rating_raw(unthwackability, ruthlessness, overpowerment, shakespearianism, coldness))
+	else data.rating_to_star(p.pitching_rating)
+end as pitching_stars
+,items, durabilities, healths
+,item_batting_rating, item_defense_rating, item_baserunning_rating, item_pitching_rating
 FROM 
 (
 	SELECT DISTINCT x.player_id,
@@ -719,6 +751,10 @@ FROM
 		ARRAY[xr.valid_from, COALESCE(xr.valid_until, timezone('utc', now()))] AS a
 		FROM data.team_roster xr
 		WHERE tournament = -1
+		UNION
+		SELECT DISTINCT xi.player_id,
+		ARRAY[xi.valid_from, COALESCE(xi.valid_until, timezone('utc', now()))] AS a
+		FROM data.player_items xi
 	) x
 ) ts
 JOIN data.players p ON 
@@ -729,6 +765,48 @@ JOIN data.players p ON
 	AND p.tournament = -1
 )
 JOIN data.player_status_flags ps ON (ts.player_id = ps.player_id)
+LEFT JOIN
+(
+	SELECT ts.player_id, 
+	array_agg(NAME ORDER BY NAME) AS items, 
+	array_agg(durability order by NAME) AS durabilities, 
+	array_agg(health ORDER BY NAME) AS healths,
+	ts.timestampd AS valid_from,
+	SUM(hitting_rating) AS item_batting_rating,
+	SUM(baserunning_rating) AS item_baserunning_rating,
+	SUM(defense_rating) AS item_defense_rating,
+	SUM(pitching_rating) AS item_pitching_rating,
+	CASE
+		WHEN lead(ts.timestampd) OVER (PARTITION BY ts.player_id ORDER BY ts.timestampd) = timezone('utc', now())
+		THEN NULL
+		ELSE lead(ts.timestampd) OVER (PARTITION BY ts.player_id ORDER BY ts.timestampd) 
+	END AS valid_until
+	FROM DATA.player_items pit
+	JOIN
+	(
+		SELECT DISTINCT x.player_id,
+		unnest(x.a) AS timestampd
+		FROM 
+		(		SELECT DISTINCT player_id,
+			ARRAY[valid_from, COALESCE(valid_until, timezone('utc', now()))] AS a
+			FROM data.player_items
+		) x
+	) ts
+	ON 
+	(
+		ts.player_id = pit.player_id
+		AND pit.valid_from <= ts.timestampd
+		AND ts.timestampd < COALESCE(pit.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+	)
+	WHERE ts.timestampd <> timezone('utc', now())
+	GROUP BY ts.player_id, ts.timestampd
+) itm
+ON 
+(
+	ts.player_id = itm.player_id
+	AND itm.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(itm.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+)
 LEFT JOIN data.player_debuts pd ON (ts.player_id = pd.player_id)
 LEFT JOIN data.player_incinerations pi ON (ts.player_id = pi.player_id)
 LEFT JOIN 	  
@@ -754,7 +832,7 @@ LEFT JOIN data.teams_info_expanded_all t ON (r.team_id = t.team_id AND t.valid_u
 LEFT JOIN taxa.blood xb ON (p.blood = xb.blood_id)
 LEFT JOIN taxa.coffee xc ON (p.coffee = xc.coffee_id)
 
-WHERE ts.timestampd <> timezone('utc', now())	 
+WHERE ts.timestampd <> timezone('utc', NOW())	 
 WITH NO DATA;
 
 --
