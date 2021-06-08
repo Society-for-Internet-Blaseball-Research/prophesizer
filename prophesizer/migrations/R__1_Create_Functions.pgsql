@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 6/7/2021 add-stadium-to-teams
+-- LAST UPDATE: 6/7/2021 various-player-info-updates
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;

@@ -1,4 +1,4 @@
--- LAST UPDATE: 6/7/2021 add-stadium-to-teams
+-- LAST UPDATE: 6/7/2021 various-player-info-updates
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
