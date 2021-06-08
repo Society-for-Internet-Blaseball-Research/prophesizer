@@ -1,4 +1,4 @@
--- LAST UPDATE: 5/7/2021 added is_mindtrick, pitching_combined, running_combined views
+-- LAST UPDATE: 6/7/2021 add-stadium-to-teams
 
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
