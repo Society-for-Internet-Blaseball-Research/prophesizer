@@ -1,4 +1,4 @@
--- LAST UPDATE: 5/7/2021
+-- LAST UPDATE: 6/7/2021 add-stadium-to-teams
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();
