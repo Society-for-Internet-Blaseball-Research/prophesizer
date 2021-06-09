@@ -1,4 +1,5 @@
--- LAST UPDATE: 6/7/2021 various-player-info-updates
+-- LAST UPDATE: 6/8/2021:
+-- adding teams_info_expanded_all_id to teams_from_timestamp
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -903,7 +904,7 @@ $$;
 --
 -- Name: teams_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(team_id character varying, location text, nickname text, full_name text, team_abbreviation character varying, url_slug character varying, current_team_status text, valid_from timestamp without time zone, valid_until timestamp without time zone, gameday_from integer, season_from integer, tournament_from integer, phase_type_from character varying, team_main_color character varying, team_secondary_color character varying, team_slogan character varying, team_emoji character varying, division character varying, division_id character varying, league character varying, league_id character varying, tournament_name character varying, modifications character varying[], stadium_id character varying, stadium_name text, stadium_nickname text)
+CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(teams_info_expanded_all_id bigint, team_id character varying, location text, nickname text, full_name text, team_abbreviation character varying, url_slug character varying, current_team_status text, valid_from timestamp without time zone, valid_until timestamp without time zone, gameday_from integer, season_from integer, tournament_from integer, phase_type_from character varying, team_main_color character varying, team_secondary_color character varying, team_slogan character varying, team_emoji character varying, division character varying, division_id character varying, league character varying, league_id character varying, tournament_name character varying, modifications character varying[], stadium_id character varying, stadium_name text, stadium_nickname text)
     LANGUAGE plpgsql
     AS $$
 begin

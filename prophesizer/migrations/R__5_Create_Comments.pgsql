@@ -1,4 +1,4 @@
--- LAST UPDATE: 6/7/2021 various-player-info-updates
+-- LAST UPDATE: 6/8/2021 
 
 --Public schema
 COMMENT ON table public.changelog IS 'Used by Prophesizer to keep track of versioining and migration scripts.  Should be truncated (As well as dropping data and taxa schemas) before a full database refresh.';
