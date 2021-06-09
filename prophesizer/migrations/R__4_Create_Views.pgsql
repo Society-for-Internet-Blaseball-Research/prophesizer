@@ -241,6 +241,119 @@ ORDER BY tournament, season, DAY, player_id
 WITH NO DATA;
 
 --
+-- Name: teams_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+
+CREATE MATERIALIZED VIEW data.teams_info_expanded_all AS
+SELECT 
+NEXTVAL('DATA.teams_info_expanded_all_id_seq') as teams_info_expanded_all_id,
+ts.team_id,
+t.location,
+t.nickname,
+t.full_name,
+ta.team_abbreviation,
+t.url_slug,
+CASE
+	WHEN EXISTS 
+	(
+		SELECT 1
+		FROM taxa.tournament_teams xtt
+		WHERE xtt.team_id = ts.team_id
+	) 
+	THEN 'tournament'
+	WHEN t.nickname IN ('PODS','Hall Stars')
+	THEN 'disbanded'
+   ELSE 'active'
+END AS current_team_status,
+ts.timestampd AS valid_from,
+lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
+    ( SELECT gd1.gameday
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd1) AS gameday_from,
+    ( SELECT gd2.season
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd2) AS season_from,
+    ( SELECT gd3.tournament
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd3) AS tournament_from,
+    ( SELECT gd4.phase_type
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd4) AS phase_type_from,
+t.team_main_color,
+t.team_secondary_color,
+t.team_slogan,
+t.team_emoji,
+d.division_text AS division,
+d.division_id,
+l.league_text AS league,
+l.league_id,
+xt.tournament_name,
+(
+	SELECT array_agg(DISTINCT m.modification ORDER BY m.modification)
+	FROM data.team_modifications m
+	WHERE m.team_id = ts.team_id 
+	AND m.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(m.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+	GROUP BY m.team_id
+) AS modifications,
+s.stadium_id,
+s.name AS stadium_name,
+s.nickname AS stadium_nickname
+FROM 
+(
+	SELECT DISTINCT x.team_id,
+	unnest(x.a) AS timestampd
+	FROM 
+	( 
+		SELECT DISTINCT xt.team_id,
+		ARRAY[xt.valid_from, COALESCE(xt.valid_until, timezone('utc', now()))] AS a
+		FROM data.teams xt
+		UNION
+		SELECT DISTINCT xdt.team_id,
+		ARRAY[xdt.valid_from, COALESCE(xdt.valid_until, timezone('utc', now()))] AS a
+		FROM taxa.division_teams xdt
+		UNION
+		SELECT DISTINCT xtm.team_id,
+		ARRAY[xtm.valid_from, COALESCE(xtm.valid_until, timezone('utc', now()))] AS a
+		FROM data.team_modifications xtm
+		UNION
+		SELECT DISTINCT xs.team_id,
+		ARRAY[xs.valid_from, xs.valid_until] AS a
+		FROM (
+			SELECT xxs.team_id, xxs.name, xxs.nickname, xxs.grp, MIN(xxs.valid_from) AS valid_from, MAX(COALESCE(xxs.valid_until, timezone('utc', now()))) AS valid_until
+			FROM (
+				SELECT *,
+					ROW_NUMBER() OVER (ORDER BY xxxs.team_id, xxxs.valid_from) - ROW_NUMBER() OVER (PARTITION BY xxxs.team_id, xxxs.name, xxxs.nickname ORDER BY xxxs.team_id, xxxs.valid_from) AS grp
+				FROM data.stadiums xxxs
+			) xxs
+			GROUP BY xxs.team_id, xxs.name, xxs.nickname, xxs.grp
+		) xs
+	) x
+) ts
+JOIN data.teams t ON 
+(
+	ts.team_id = t.team_id
+	AND t.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(t.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+)
+LEFT JOIN taxa.team_additional_info ta ON (ts.team_id = ta.team_id)
+LEFT JOIN taxa.division_teams dt ON 
+(
+	ts.team_id = dt.team_id 
+	AND dt.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(dt.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+)
+LEFT JOIN taxa.divisions d ON (dt.division_id = d.division_id)
+LEFT JOIN taxa.leagues l ON (d.league_id = l.league_db_id)
+LEFT JOIN taxa.tournament_teams tt ON (ts.team_id = tt.team_id)
+LEFT JOIN taxa.tournaments xt ON (tt.tournament_db_id = xt.tournament_db_id)
+LEFT JOIN data.stadiums s ON
+(
+	ts.team_id = s.team_id
+	AND s.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(s.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+)
+WHERE ts.timestampd <> timezone('utc', now())
+ORDER BY t.full_name, ts.timestampd
+WITH NO DATA;
+
+--
 -- Name: games_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
 --
 
@@ -324,11 +437,7 @@ CREATE VIEW DATA.team_seasonal_standings AS
 	home_win_objects+away_win_objects AS win_objects,
 	home_wins+away_wins AS wins, home_losses+away_losses AS losses, 
 	ROUND((home_wins+away_wins)::DECIMAL/(home_wins+away_wins+home_losses+away_losses)::DECIMAL,3) AS win_pct,
-	home_win_objects, home_wins, home_losses, away_win_objects, away_wins, away_losses,
-	(SELECT ROUND(runs_batted_in,1) FROM DATA.batting_stats_team_season rb WHERE rb.season = h.season AND rb.team_id = h.team_id)
-	AS runs_scored,
-	(SELECT round(runs_allowed,1) FROM DATA.pitching_stats_team_season rp WHERE rp.season = h.season AND rp.team_id = h.team_id) 
-	AS runs_allowed
+	home_win_objects, home_wins, home_losses, away_win_objects, away_wins, away_losses
 	FROM
 	
 	(
@@ -572,118 +681,6 @@ CREATE VIEW data.batting_records_league_season AS
                   GROUP BY 'RBIS'::text, ge.season) x) y
   WHERE (y.this = 1)
   ORDER BY y.event, y.season;
-
---
--- Name: teams_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
---
-CREATE MATERIALIZED VIEW data.teams_info_expanded_all AS
-SELECT 
-NEXTVAL('DATA.teams_info_expanded_all_id_seq') as teams_info_expanded_all_id,
-ts.team_id,
-t.location,
-t.nickname,
-t.full_name,
-ta.team_abbreviation,
-t.url_slug,
-CASE
-	WHEN EXISTS 
-	(
-		SELECT 1
-		FROM taxa.tournament_teams xtt
-		WHERE xtt.team_id = ts.team_id
-	) 
-	THEN 'tournament'
-	WHEN t.nickname IN ('PODS','Hall Stars')
-	THEN 'disbanded'
-   ELSE 'active'
-END AS current_team_status,
-ts.timestampd AS valid_from,
-lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
-    ( SELECT gd1.gameday
-           FROM data.gamephase_from_timestamp(ts.timestampd) gd1) AS gameday_from,
-    ( SELECT gd2.season
-           FROM data.gamephase_from_timestamp(ts.timestampd) gd2) AS season_from,
-    ( SELECT gd3.tournament
-           FROM data.gamephase_from_timestamp(ts.timestampd) gd3) AS tournament_from,
-    ( SELECT gd4.phase_type
-           FROM data.gamephase_from_timestamp(ts.timestampd) gd4) AS phase_type_from,
-t.team_main_color,
-t.team_secondary_color,
-t.team_slogan,
-t.team_emoji,
-d.division_text AS division,
-d.division_id,
-l.league_text AS league,
-l.league_id,
-xt.tournament_name,
-(
-	SELECT array_agg(DISTINCT m.modification ORDER BY m.modification)
-	FROM data.team_modifications m
-	WHERE m.team_id = ts.team_id 
-	AND m.valid_from <= ts.timestampd
-	AND ts.timestampd < COALESCE(m.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
-	GROUP BY m.team_id
-) AS modifications,
-s.stadium_id,
-s.name AS stadium_name,
-s.nickname AS stadium_nickname
-FROM 
-(
-	SELECT DISTINCT x.team_id,
-	unnest(x.a) AS timestampd
-	FROM 
-	( 
-		SELECT DISTINCT xt.team_id,
-		ARRAY[xt.valid_from, COALESCE(xt.valid_until, timezone('utc', now()))] AS a
-		FROM data.teams xt
-		UNION
-		SELECT DISTINCT xdt.team_id,
-		ARRAY[xdt.valid_from, COALESCE(xdt.valid_until, timezone('utc', now()))] AS a
-		FROM taxa.division_teams xdt
-		UNION
-		SELECT DISTINCT xtm.team_id,
-		ARRAY[xtm.valid_from, COALESCE(xtm.valid_until, timezone('utc', now()))] AS a
-		FROM data.team_modifications xtm
-		UNION
-		SELECT DISTINCT xs.team_id,
-		ARRAY[xs.valid_from, xs.valid_until] AS a
-		FROM (
-			SELECT xxs.team_id, xxs.name, xxs.nickname, xxs.grp, MIN(xxs.valid_from) AS valid_from, MAX(COALESCE(xxs.valid_until, timezone('utc', now()))) AS valid_until
-			FROM (
-				SELECT *,
-					ROW_NUMBER() OVER (ORDER BY xxxs.team_id, xxxs.valid_from) - ROW_NUMBER() OVER (PARTITION BY xxxs.team_id, xxxs.name, xxxs.nickname ORDER BY xxxs.team_id, xxxs.valid_from) AS grp
-				FROM data.stadiums xxxs
-			) xxs
-			GROUP BY xxs.team_id, xxs.name, xxs.nickname, xxs.grp
-		) xs
-	) x
-) ts
-JOIN data.teams t ON 
-(
-	ts.team_id = t.team_id
-	AND t.valid_from <= ts.timestampd
-	AND ts.timestampd < COALESCE(t.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
-)
-LEFT JOIN taxa.team_additional_info ta ON (ts.team_id = ta.team_id)
-LEFT JOIN taxa.division_teams dt ON 
-(
-	ts.team_id = dt.team_id 
-	AND dt.valid_from <= ts.timestampd
-	AND ts.timestampd < COALESCE(dt.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
-)
-LEFT JOIN taxa.divisions d ON (dt.division_id = d.division_id)
-LEFT JOIN taxa.leagues l ON (d.league_id = l.league_db_id)
-LEFT JOIN taxa.tournament_teams tt ON (ts.team_id = tt.team_id)
-LEFT JOIN taxa.tournaments xt ON (tt.tournament_db_id = xt.tournament_db_id)
-LEFT JOIN data.stadiums s ON
-(
-	ts.team_id = s.team_id
-	AND s.valid_from <= ts.timestampd
-	AND ts.timestampd < COALESCE(s.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
-)
-WHERE ts.timestampd <> timezone('utc', now())
-ORDER BY t.full_name, ts.timestampd
-WITH NO DATA;
 
 --
 -- Name: player_status_flags; Type: VIEW; Schema: data; Owner: -
