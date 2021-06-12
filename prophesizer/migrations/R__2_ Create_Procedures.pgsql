@@ -1,4 +1,4 @@
--- LAST UPDATE: 6/7/2021 various-player-info-updates
+-- LAST UPDATE: 6/8/2021
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();

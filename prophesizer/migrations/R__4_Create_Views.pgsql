@@ -1,14 +1,16 @@
--- LAST UPDATE: 6/7/2021 various-player-info-updates:
---  CASE set for players_info to calculate ratings and stars from Before.  
---  Player Status only checks non Cup teams for Active vs Shadow.
---  Evolution added to players_info_expanded_all 
---  Starting to add Item info to players_info_expanded_all
+-- LAST UPDATE: 6/8/2021:
+-- games_info_expanded_all matview (& sequence), team_seasonal_standings view
+-- teams_info_expanded_all sequence created and added to view
+-- update sequences from int to bigint
+-- added legendary, replica, dust to player_status_flags
 
+DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_batting CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_pitching CASCADE;
 DROP VIEW IF EXISTS DATA.ref_recordboard_player_season_pitching CASCADE;
 DROP VIEW IF EXISTS data.stars_team_all_current CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS data.games_info_expanded_all CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.teams_info_expanded_all CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_all_events CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS data.running_stats_player_season CASCADE;
@@ -76,6 +78,8 @@ DROP VIEW IF EXISTS data.batting_records_team_tournament CASCADE;
 DROP VIEW IF EXISTS data.pitching_stats_player_tournament CASCADE;
 DROP SEQUENCE IF EXISTS data.player_debuts_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS data.players_info_expanded_all_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.games_info_expanded_all_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS data.teams_info_expanded_all_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS data.players_info_expanded_tourney_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS data.batting_stats_all_events_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS data.batting_stats_player_single_game_id_seq CASCADE;
@@ -96,11 +100,35 @@ CREATE SEQUENCE data.player_debuts_id_seq
     CACHE 1;
 	
 --
+-- Name: games_info_expanded_all_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.games_info_expanded_all_id_seq
+    AS bigint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;	
+	
+--
+-- Name: teams_info_expanded_all_id_seq; Type: SEQUENCE; Schema: data; Owner: -
+--
+
+CREATE SEQUENCE data.teams_info_expanded_all_id_seq
+    AS bigint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+	
+--
 -- Name: players_info_expanded_all_id_seq; Type: SEQUENCE; Schema: data; Owner: -
 --
 
 CREATE SEQUENCE data.players_info_expanded_all_id_seq
-    AS integer
+    AS bigint
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -124,7 +152,7 @@ CREATE SEQUENCE data.players_info_expanded_tourney_id_seq
 --
 
 CREATE SEQUENCE data.batting_stats_all_events_id_seq
-    AS integer
+    AS bigint
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -136,7 +164,7 @@ CREATE SEQUENCE data.batting_stats_all_events_id_seq
 --
 
 CREATE SEQUENCE data.batting_stats_player_single_game_id_seq
-    AS integer
+    AS bigint
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -148,7 +176,7 @@ CREATE SEQUENCE data.batting_stats_player_single_game_id_seq
 --
 
 CREATE SEQUENCE data.fielder_stats_all_events_id_seq
-    AS integer
+    AS bigint
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -160,7 +188,7 @@ CREATE SEQUENCE data.fielder_stats_all_events_id_seq
 --
 
 CREATE SEQUENCE data.pitching_stats_all_appearances_id_seq
-    AS integer
+    AS bigint
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -172,7 +200,7 @@ CREATE SEQUENCE data.pitching_stats_all_appearances_id_seq
 --
 
 CREATE SEQUENCE data.running_stats_all_events_id_seq
-    AS integer
+    AS bigint
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -213,8 +241,256 @@ ORDER BY tournament, season, DAY, player_id
 WITH NO DATA;
 
 --
+-- Name: teams_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+
+CREATE MATERIALIZED VIEW data.teams_info_expanded_all AS
+SELECT 
+NEXTVAL('DATA.teams_info_expanded_all_id_seq') as teams_info_expanded_all_id,
+ts.team_id,
+t.location,
+t.nickname,
+t.full_name,
+ta.team_abbreviation,
+t.url_slug,
+CASE
+	WHEN EXISTS 
+	(
+		SELECT 1
+		FROM taxa.tournament_teams xtt
+		WHERE xtt.team_id = ts.team_id
+	) 
+	THEN 'tournament'
+	WHEN t.nickname IN ('PODS','Hall Stars')
+	THEN 'disbanded'
+   ELSE 'active'
+END AS current_team_status,
+ts.timestampd AS valid_from,
+lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
+    ( SELECT gd1.gameday
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd1) AS gameday_from,
+    ( SELECT gd2.season
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd2) AS season_from,
+    ( SELECT gd3.tournament
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd3) AS tournament_from,
+    ( SELECT gd4.phase_type
+           FROM data.gamephase_from_timestamp(ts.timestampd) gd4) AS phase_type_from,
+t.team_main_color,
+t.team_secondary_color,
+t.team_slogan,
+t.team_emoji,
+d.division_text AS division,
+d.division_id,
+l.league_text AS league,
+l.league_id,
+xt.tournament_name,
+(
+	SELECT array_agg(DISTINCT m.modification ORDER BY m.modification)
+	FROM data.team_modifications m
+	WHERE m.team_id = ts.team_id 
+	AND m.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(m.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+	GROUP BY m.team_id
+) AS modifications,
+s.stadium_id,
+s.name AS stadium_name,
+s.nickname AS stadium_nickname
+FROM 
+(
+	SELECT DISTINCT x.team_id,
+	unnest(x.a) AS timestampd
+	FROM 
+	( 
+		SELECT DISTINCT xt.team_id,
+		ARRAY[xt.valid_from, COALESCE(xt.valid_until, timezone('utc', now()))] AS a
+		FROM data.teams xt
+		UNION
+		SELECT DISTINCT xdt.team_id,
+		ARRAY[xdt.valid_from, COALESCE(xdt.valid_until, timezone('utc', now()))] AS a
+		FROM taxa.division_teams xdt
+		UNION
+		SELECT DISTINCT xtm.team_id,
+		ARRAY[xtm.valid_from, COALESCE(xtm.valid_until, timezone('utc', now()))] AS a
+		FROM data.team_modifications xtm
+		UNION
+		SELECT DISTINCT xs.team_id,
+		ARRAY[xs.valid_from, xs.valid_until] AS a
+		FROM (
+			SELECT xxs.team_id, xxs.name, xxs.nickname, xxs.grp, MIN(xxs.valid_from) AS valid_from, MAX(COALESCE(xxs.valid_until, timezone('utc', now()))) AS valid_until
+			FROM (
+				SELECT *,
+					ROW_NUMBER() OVER (ORDER BY xxxs.team_id, xxxs.valid_from) - ROW_NUMBER() OVER (PARTITION BY xxxs.team_id, xxxs.name, xxxs.nickname ORDER BY xxxs.team_id, xxxs.valid_from) AS grp
+				FROM data.stadiums xxxs
+			) xxs
+			GROUP BY xxs.team_id, xxs.name, xxs.nickname, xxs.grp
+		) xs
+	) x
+) ts
+JOIN data.teams t ON 
+(
+	ts.team_id = t.team_id
+	AND t.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(t.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+)
+LEFT JOIN taxa.team_additional_info ta ON (ts.team_id = ta.team_id)
+LEFT JOIN taxa.division_teams dt ON 
+(
+	ts.team_id = dt.team_id 
+	AND dt.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(dt.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+)
+LEFT JOIN taxa.divisions d ON (dt.division_id = d.division_id)
+LEFT JOIN taxa.leagues l ON (d.league_id = l.league_db_id)
+LEFT JOIN taxa.tournament_teams tt ON (ts.team_id = tt.team_id)
+LEFT JOIN taxa.tournaments xt ON (tt.tournament_db_id = xt.tournament_db_id)
+LEFT JOIN data.stadiums s ON
+(
+	ts.team_id = s.team_id
+	AND s.valid_from <= ts.timestampd
+	AND ts.timestampd < COALESCE(s.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
+)
+WHERE ts.timestampd <> timezone('utc', now())
+ORDER BY t.full_name, ts.timestampd
+WITH NO DATA;
+
+--
+-- Name: games_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
+--
+
+CREATE MATERIALIZED VIEW data.games_info_expanded_all AS
+	SELECT 
+	
+	NEXTVAL('DATA.games_info_expanded_all_id_seq') as games_info_expanded_all_id,
+	ga.game_id, ga.day, ga.season, ga.home_score, ga.away_score, 
+	(
+		SELECT COUNT(1)
+		FROM DATA.game_events ge
+		WHERE event_type = 'SUN_2'
+		AND ge.batter_team_id = ga.home_team AND ge.game_id = ga.game_id
+	) 
+	+
+	(
+		SELECT COUNT(1) * -1
+		FROM DATA.game_events ge
+		WHERE event_type = 'BLACK_HOLE'
+		AND ge.batter_team_id = ga.away_team AND ge.game_id = ga.game_id
+	)
+	+
+	(
+		CASE WHEN home_score > away_score THEN 1 ELSE 0 END
+		*
+		CASE WHEN season = 18 THEN -1 ELSE 1 END 
+	)
+	AS home_win_objects,
+	(
+		SELECT COUNT(1)
+		FROM DATA.game_events ge
+		WHERE event_type = 'SUN_2'
+		AND ge.batter_team_id = ga.away_team AND ge.game_id = ga.game_id
+	) 
+	+
+	(
+		SELECT COUNT(1) * -1
+		FROM DATA.game_events ge
+		WHERE event_type = 'BLACK_HOLE'
+		AND ge.batter_team_id = ga.home_team AND ge.game_id = ga.game_id
+	)
+	+
+	(
+		CASE WHEN home_score < away_score THEN 1 ELSE 0 END
+		*
+		CASE WHEN season = 18 THEN -1 ELSE 1 END 
+	)
+	AS away_win_objects,
+	ga.is_postseason, 
+	ga.home_team, ga.away_team,
+	ga.home_odds, ga.away_odds, 
+	xw.weather_id, 
+	CASE
+		when season = 0 THEN 'Sunny'
+		else xw.weather_text 
+	end AS weather, 
+	s.stadium_id, s.hype, s.name AS stadium_name, s.birds, s.nickname AS stadium_nickname,
+	s.mysticism, s.viscosity, s.elongation, s.obtuseness, s.forwardness, s.grandiosity, 
+	s.ominousness, s.fortification, s.inconvenience
+	
+	FROM DATA.games ga
+	JOIN taxa.weather xw
+	ON (ga.weather = xw.weather_id)
+	LEFT JOIN DATA.stadiums s
+	ON 
+	(
+		ga.home_team = s.team_id AND DATA.timestamp_from_gameday(ga.season, ga.day) 
+		BETWEEN s.valid_from AND COALESCE(s.valid_until,NOW())
+	)
+	WHERE home_score <> away_score
+	AND tournament = -1
+	WITH NO DATA;
+
+--
+-- Name: team_seasonal_standings; Type: VIEW; Schema: data; Owner: -
+--
+CREATE VIEW DATA.team_seasonal_standings AS
+	SELECT 
+	h.season, h.team_id, 
+	t.nickname, t.division, t.league,
+	home_win_objects+away_win_objects AS win_objects,
+	home_wins+away_wins AS wins, home_losses+away_losses AS losses, 
+	ROUND((home_wins+away_wins)::DECIMAL/(home_wins+away_wins+home_losses+away_losses)::DECIMAL,3) AS win_pct,
+	home_win_objects, home_wins, home_losses, away_win_objects, away_wins, away_losses
+	FROM
+	
+	(
+		SELECT 
+		season, home_team AS team_id, SUM(home_win_objects) AS home_win_objects, 
+		SUM
+		(
+			CASE WHEN home_score > away_score THEN 1 ELSE 0 end
+		) AS home_wins,
+		SUM
+		(
+			CASE WHEN home_score < away_score THEN 1 ELSE 0 end
+		) AS home_losses
+		FROM
+		data.games_info_expanded_all
+		WHERE NOT is_postseason
+		AND home_score <> away_score
+		GROUP BY season, home_team
+	) h
+	JOIN
+	(
+		SELECT 
+		season, away_team AS team_id, SUM(away_win_objects) AS away_win_objects, 
+		SUM
+		(
+			CASE WHEN home_score < away_score THEN 1 ELSE 0 end
+		) AS away_wins,
+		SUM
+		(
+			CASE WHEN home_score > away_score THEN 1 ELSE 0 end
+		) AS away_losses
+		FROM
+		data.games_info_expanded_all
+		WHERE NOT is_postseason
+		AND home_score <> away_score
+		GROUP BY season, away_team
+	) a
+	ON (h.team_id = a.team_id AND h.season = a.season)
+	left JOIN DATA.teams_info_expanded_all t
+	ON 
+	(
+		h.team_id = t.team_id AND 
+		case
+			WHEN h.season < 2 THEN DATA.timestamp_from_gameday(2, 0) BETWEEN t.valid_from AND COALESCE(t.valid_until,NOW())
+			else DATA.timestamp_from_gameday(h.season, 0) BETWEEN t.valid_from AND COALESCE(t.valid_until,NOW())
+		end
+	)
+	ORDER BY season, division, home_win_objects+away_win_objects DESC, home_wins+away_wins DESC, nickname;
+	
+--
 -- Name: batting_records_combined_teams_playoffs_single_game; Type: VIEW; Schema: data; Owner: -
 --
+
 CREATE VIEW data.batting_records_combined_teams_playoffs_single_game AS
  SELECT y.that AS record,
     y.game_id,
@@ -269,6 +545,7 @@ CREATE VIEW data.batting_records_combined_teams_playoffs_single_game AS
 --
 -- Name: batting_records_combined_teams_single_game; Type: VIEW; Schema: data; Owner: -
 --
+
 CREATE VIEW data.batting_records_combined_teams_single_game AS
  SELECT y.that AS record,
     y.game_id,
@@ -406,116 +683,6 @@ CREATE VIEW data.batting_records_league_season AS
   ORDER BY y.event, y.season;
 
 --
--- Name: teams_info_expanded_all; Type: MATERIALIZED VIEW; Schema: data; Owner: -
---
-CREATE MATERIALIZED VIEW data.teams_info_expanded_all AS
-SELECT ts.team_id,
-t.location,
-t.nickname,
-t.full_name,
-ta.team_abbreviation,
-t.url_slug,
-CASE
-	WHEN EXISTS 
-	(
-		SELECT 1
-		FROM taxa.tournament_teams xtt
-		WHERE xtt.team_id = ts.team_id
-	) 
-	THEN 'tournament'
-	WHEN t.nickname IN ('PODS','Hall Stars')
-	THEN 'disbanded'
-   ELSE 'active'
-END AS current_team_status,
-ts.timestampd AS valid_from,
-lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
-    ( SELECT gd1.gameday
-           FROM data.gamephase_from_timestamp(ts.timestampd) gd1) AS gameday_from,
-    ( SELECT gd2.season
-           FROM data.gamephase_from_timestamp(ts.timestampd) gd2) AS season_from,
-    ( SELECT gd3.tournament
-           FROM data.gamephase_from_timestamp(ts.timestampd) gd3) AS tournament_from,
-    ( SELECT gd4.phase_type
-           FROM data.gamephase_from_timestamp(ts.timestampd) gd4) AS phase_type_from,
-t.team_main_color,
-t.team_secondary_color,
-t.team_slogan,
-t.team_emoji,
-d.division_text AS division,
-d.division_id,
-l.league_text AS league,
-l.league_id,
-xt.tournament_name,
-(
-	SELECT array_agg(DISTINCT m.modification ORDER BY m.modification)
-	FROM data.team_modifications m
-	WHERE m.team_id = ts.team_id 
-	AND m.valid_from <= ts.timestampd
-	AND ts.timestampd < COALESCE(m.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
-	GROUP BY m.team_id
-) AS modifications,
-s.stadium_id,
-s.name AS stadium_name,
-s.nickname AS stadium_nickname
-FROM 
-(
-	SELECT DISTINCT x.team_id,
-	unnest(x.a) AS timestampd
-	FROM 
-	( 
-		SELECT DISTINCT xt.team_id,
-		ARRAY[xt.valid_from, COALESCE(xt.valid_until, timezone('utc', now()))] AS a
-		FROM data.teams xt
-		UNION
-		SELECT DISTINCT xdt.team_id,
-		ARRAY[xdt.valid_from, COALESCE(xdt.valid_until, timezone('utc', now()))] AS a
-		FROM taxa.division_teams xdt
-		UNION
-		SELECT DISTINCT xtm.team_id,
-		ARRAY[xtm.valid_from, COALESCE(xtm.valid_until, timezone('utc', now()))] AS a
-		FROM data.team_modifications xtm
-		UNION
-		SELECT DISTINCT xs.team_id,
-		ARRAY[xs.valid_from, xs.valid_until] AS a
-		FROM (
-			SELECT xxs.team_id, xxs.name, xxs.nickname, xxs.grp, MIN(xxs.valid_from) AS valid_from, MAX(COALESCE(xxs.valid_until, timezone('utc', now()))) AS valid_until
-			FROM (
-				SELECT *,
-					ROW_NUMBER() OVER (ORDER BY xxxs.team_id, xxxs.valid_from) - ROW_NUMBER() OVER (PARTITION BY xxxs.team_id, xxxs.name, xxxs.nickname ORDER BY xxxs.team_id, xxxs.valid_from) AS grp
-				FROM data.stadiums xxxs
-			) xxs
-			GROUP BY xxs.team_id, xxs.name, xxs.nickname, xxs.grp
-		) xs
-	) x
-) ts
-JOIN data.teams t ON 
-(
-	ts.team_id = t.team_id
-	AND t.valid_from <= ts.timestampd
-	AND ts.timestampd < COALESCE(t.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
-)
-LEFT JOIN taxa.team_additional_info ta ON (ts.team_id = ta.team_id)
-LEFT JOIN taxa.division_teams dt ON 
-(
-	ts.team_id = dt.team_id 
-	AND dt.valid_from <= ts.timestampd
-	AND ts.timestampd < COALESCE(dt.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
-)
-LEFT JOIN taxa.divisions d ON (dt.division_id = d.division_id)
-LEFT JOIN taxa.leagues l ON (d.league_id = l.league_db_id)
-LEFT JOIN taxa.tournament_teams tt ON (ts.team_id = tt.team_id)
-LEFT JOIN taxa.tournaments xt ON (tt.tournament_db_id = xt.tournament_db_id)
-LEFT JOIN data.stadiums s ON
-(
-	ts.team_id = s.team_id
-	AND s.valid_from <= ts.timestampd
-	AND ts.timestampd < COALESCE(s.valid_until, timezone('utc', now()) + '1 MILLISECONDS'::interval)
-)
-WHERE ts.timestampd <> timezone('utc', now())
-ORDER BY t.full_name, ts.timestampd
-WITH NO DATA;
-
---
 -- Name: player_status_flags; Type: VIEW; Schema: data; Owner: -
 --
 CREATE VIEW data.player_status_flags AS
@@ -544,6 +711,39 @@ CASE
 		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification in ('REDACTED')
 	) 
 	THEN 'redacted'
+	WHEN EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = ('LEGENDARY')
+	) 	
+	AND NOT EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification in ('DUST','REPLICA')
+	) 
+	THEN 'legendary'
+	WHEN EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = ('REPLICA')
+	) 	
+	AND NOT EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification in ('DUST')
+	) 
+	THEN 'replica'
+	WHEN EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = ('DUST')
+	) 	
+	THEN 'dust'		
 	ELSE 'active'
 END AS current_state,
 CASE
