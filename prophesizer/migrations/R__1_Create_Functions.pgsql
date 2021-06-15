@@ -1,4 +1,4 @@
--- LAST UPDATE: 6/8/2021:
+-- LAST UPDATE: 6/14/2021:
 -- adding teams_info_expanded_all_id to teams_from_timestamp
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;

@@ -1,4 +1,5 @@
--- LAST UPDATE: 6/8/2021
+-- LAST UPDATE: 6/14/2021:
+-- position_type_id of 4 for Shadows (combined)
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -999,8 +1000,9 @@ INSERT INTO taxa.position_types
 VALUES 
 (0, 'BATTER'),
 (1, 'PITCHER'),
-(2, 'BULLPEN'),
-(3, 'BENCH');
+(2, 'SHADOWS'),
+(3, 'SHADOWS'),
+(4, 'SHADOWS');
 
 --
 -- Data for Name: team_additional_info; Type: TABLE DATA; Schema: taxa; Owner: -

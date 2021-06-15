@@ -25,6 +25,8 @@ namespace prophesizer.Serializable
 		public IEnumerable<string> Bullpen { get; set; }
 		[DbIgnore]
 		public IEnumerable<string> Bench { get; set; }
+		[DbIgnore]
+		public IEnumerable<string> Shadows { get; set; }
 
 		public string Location { get; set; }
 		public string Nickname { get; set; }
