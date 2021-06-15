@@ -1,8 +1,4 @@
--- LAST UPDATE: 6/8/2021:
--- games_info_expanded_all matview (& sequence), team_seasonal_standings view
--- teams_info_expanded_all sequence created and added to view
--- update sequences from int to bigint
--- added legendary, replica, dust to player_status_flags
+-- LAST UPDATE: 6/14/2021:
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;

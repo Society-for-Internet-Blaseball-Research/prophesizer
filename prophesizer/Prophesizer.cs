@@ -1722,7 +1722,8 @@ namespace SIBR
 			Batter = 0,
 			Pitcher,
 			Bullpen,
-			Bench
+			Bench,
+			Shadows
 		}
 
 		private NpgsqlCommand CountPositionTypeCommand(NpgsqlConnection psqlConnection, string teamId, PositionType posType)
@@ -1743,7 +1744,7 @@ namespace SIBR
 			var response = await cmd.ExecuteScalarAsync();
 			var maxBatters = response is System.DBNull ? 0 : (int)response + 1;
 
-			for (int i = 0; i < Math.Max(maxBatters, t.Lineup.Count()); i++)
+			for (int i = 0; i < Math.Max(maxBatters, t.Lineup?.Count() ?? 0); i++)
 			{
 				string playerId = null;
 				if (i < t.Lineup.Count())
@@ -1756,8 +1757,8 @@ namespace SIBR
 			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Pitcher);
 			response = await cmd.ExecuteScalarAsync();
 			maxBatters = response is System.DBNull ? 0 : (int)response + 1;
-
-			for (int i = 0; i < Math.Max(maxBatters, t.Rotation.Count()); i++)
+			
+			for (int i = 0; i < Math.Max(maxBatters, t.Rotation?.Count() ?? 0); i++)
 			{
 				string playerId = null;
 				if (i < t.Rotation.Count())
@@ -1771,10 +1772,10 @@ namespace SIBR
 			response = await cmd.ExecuteScalarAsync();
 			maxBatters = response is System.DBNull ? 0 : (int)response + 1;
 
-			for (int i = 0; i < Math.Max(maxBatters, t.Bullpen.Count()); i++)
+			for (int i = 0; i < Math.Max(maxBatters, t.Bullpen?.Count() ?? 0); i++)
 			{
 				string playerId = null;
-				if (i < t.Bullpen.Count())
+				if (i < (t.Bullpen?.Count() ?? 0))
 				{
 					playerId = t.Bullpen.ElementAt(i);
 				}
@@ -1784,17 +1785,31 @@ namespace SIBR
 			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Bench);
 			response = await cmd.ExecuteScalarAsync();
 			maxBatters = response is System.DBNull ? 0 : (int)response + 1;
-
-			for (int i = 0; i < Math.Max(maxBatters, t.Bench.Count()); i++)
+			
+			for (int i = 0; i < Math.Max(maxBatters, t.Bench?.Count() ?? 0); i++)
 			{
 				string playerId = null;
-				if (i < t.Bench.Count())
+				if (i < (t.Bench?.Count() ?? 0))
 				{
 					playerId = t.Bench.ElementAt(i);
 				}
 				await ProcessRosterEntry(psqlConnection, validFrom.Value, t, playerId, i, PositionType.Bench);
 			}
 
+			cmd = CountPositionTypeCommand(psqlConnection, t.Id, PositionType.Shadows);
+			response = await cmd.ExecuteScalarAsync();
+			maxBatters = response is System.DBNull ? 0 : (int)response + 1;
+			
+			for (int i = 0; i < Math.Max(maxBatters, t.Shadows?.Count() ?? 0); i++)
+			{
+				string playerId = null;
+				if (i < (t.Shadows?.Count() ?? 0))
+				{
+					playerId = t.Shadows.ElementAt(i);
+				}
+				await ProcessRosterEntry(psqlConnection, validFrom.Value, t, playerId, i, PositionType.Shadows);
+			}
+			
 			s.Stop();
 			// if (TIMING) Console.WriteLine($"Processed rosters in {s.ElapsedMilliseconds} ms");
 		}
