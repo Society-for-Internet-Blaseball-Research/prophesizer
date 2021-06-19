@@ -1,4 +1,5 @@
--- LAST UPDATE: 6/14/2021:
+-- LAST UPDATE: 6/16/2021:
+-- player_status deal with active/shadow Cup issue, expanded on other statuses
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
@@ -756,7 +757,7 @@ CASE
 		FROM data.player_modifications pm
 		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = 'COFFEE_EXIT'
 	)	
-	THEN NULL
+	THEN 'hall_of_flame'
 	WHEN EXISTS 
 	( 
 		SELECT 1
@@ -768,7 +769,14 @@ CASE
 	( 
 		SELECT 1
 		FROM data.player_modifications pm
-		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification in ('REDACTED','RETIRED')
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = 'REDACTED'
+	)
+	THEN 'vaulted'
+	WHEN EXISTS 
+	( 
+		SELECT 1
+		FROM data.player_modifications pm
+		WHERE pm.player_id = p.player_id AND pm.valid_until IS NULL AND pm.modification = 'RETIRED'
 	)
 	THEN NULL	
 	WHEN EXISTS 
@@ -801,7 +809,7 @@ CASE
 	(
 		SELECT 1
 		FROM data.team_roster rc
-		WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND rc.position_type_id > 1
+		WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND rc.position_type_id >= 2 and rc.tournament = -1
 	)
 	THEN 'shadows'
 	ELSE NULL::text

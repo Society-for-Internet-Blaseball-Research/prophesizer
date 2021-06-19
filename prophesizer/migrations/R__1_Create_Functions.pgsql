@@ -1,5 +1,4 @@
--- LAST UPDATE: 6/14/2021:
--- adding teams_info_expanded_all_id to teams_from_timestamp
+-- LAST UPDATE: 6/16/2021:
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;

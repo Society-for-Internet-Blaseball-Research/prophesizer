@@ -1,5 +1,4 @@
--- LAST UPDATE: 6/14/2021:
--- position_type_id of 4 for Shadows (combined)
+-- LAST UPDATE: 6/16/2021:
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
