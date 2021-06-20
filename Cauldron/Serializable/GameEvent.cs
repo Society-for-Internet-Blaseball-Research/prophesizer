@@ -50,6 +50,10 @@ namespace Cauldron
 		public static string SECRET_BASE_EXIT = "SECRET_BASE_EXIT";
 		public static string MIND_TRICK_WALK = "MIND_TRICK_WALK";
 		public static string MIND_TRICK_STRIKEOUT = "MIND_TRICK_STRIKEOUT";
+		public static string TUNNEL_STEAL_RUN = "TUNNEL_STEAL_RUN";
+		public static string TUNNEL_STEAL_ITEM = "TUNNEL_STEAL_ITEM";
+		public static string TUNNEL_STEAL_CAUGHT = "TUNNEL_STEAL_CAUGHT";
+		public static string TUNNEL_NOTHING = "TUNNEL_NOTHING";
 	}
 
 
