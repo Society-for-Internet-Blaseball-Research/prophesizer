@@ -28,6 +28,7 @@ namespace Cauldron
 		public static string PARTYING = "PARTYING";
 		public static string BLACK_HOLE = "BLACK_HOLE";
 		public static string SUN_2 = "SUN_2";
+		public static string TUNNEL_STEAL_ITEM = "TUNNEL_STEAL_ITEM";
 	}
 
 
