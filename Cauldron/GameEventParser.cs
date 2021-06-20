@@ -985,13 +985,15 @@ namespace Cauldron
 				return true;
 			}
 
-			if(newState.lastUpdate.Contains("The Black Hole swallows the Runs"))
+			if(newState.lastUpdate.Contains("The Black Hole swallows the Runs") ||
+			  	newState.lastUpdate.Contains("The Black Hole swallowed the Runs"))
 			{
 				m_currEvent.eventType = GameEventType.BLACK_HOLE;
 				return true;
 			}
 
-			if(newState.lastUpdate.Contains("Sun 2 smiles."))
+			if(newState.lastUpdate.Contains("Sun 2 smiles.") ||
+			  	newState.lastUpdate.Contains("Sun 2 smiled at"))
 			{
 				m_currEvent.eventType = GameEventType.SUN_2;
 				return true;
