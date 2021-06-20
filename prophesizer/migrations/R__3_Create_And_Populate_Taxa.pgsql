@@ -1052,7 +1052,7 @@ VALUES
 (40,'bb4a9de5-c924-4923-a0cb-9d1445f1ee5d','OHWO'),
 (41,'46358869-dce9-4a01-bfba-ac24fc56f57e','CORE'),
 (42,'d9f89a8a-c563-493e-9d64-78e4f9a55d4a','ATL'),
-(43,'88151292-6c12-4fb8-b2d6-3e64821293b3','AT8');
+(43,'88151292-6c12-4fb8-b2d6-3e64821293b3','AL8');
 
 --
 -- Data for Name: team_divine_favor; Type: TABLE DATA; Schema: taxa; Owner: -
