@@ -185,7 +185,7 @@ namespace Cauldron
 				{
 					if (line.Trim() != string.Empty)
 					{
-						var halves = line.Split('|');
+						var halves = line.Split('|', 2);
 						m_simpleOutcomes.Add((halves[0], halves[1]));
 					}
 				}
