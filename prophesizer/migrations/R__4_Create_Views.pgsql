@@ -1,5 +1,5 @@
--- LAST UPDATE: 6/16/2021:
--- player_status deal with active/shadow Cup issue, expanded on other statuses
+-- LAST UPDATE: 6/25/2021:
+-- teams_info_expanded_all now pulling team_current_status from taxa.team_additional_info
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
@@ -250,18 +250,7 @@ t.nickname,
 t.full_name,
 ta.team_abbreviation,
 t.url_slug,
-CASE
-	WHEN EXISTS 
-	(
-		SELECT 1
-		FROM taxa.tournament_teams xtt
-		WHERE xtt.team_id = ts.team_id
-	) 
-	THEN 'tournament'
-	WHEN t.nickname IN ('PODS','Hall Stars')
-	THEN 'disbanded'
-   ELSE 'active'
-END AS current_team_status,
+ta.team_current_status,
 ts.timestampd AS valid_from,
 lead(ts.timestampd) OVER (PARTITION BY ts.team_id ORDER BY ts.timestampd) AS valid_until,
     ( SELECT gd1.gameday
@@ -789,7 +778,7 @@ CASE
 			SELECT 1
 			FROM data.team_roster rc
 			JOIN data.teams_info_expanded_all t ON (rc.team_id = t.team_id)
-			WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND t.current_team_status = 'ascended'
+			WHERE rc.player_id = p.player_id AND rc.valid_until IS NULL AND t.team_current_status = 'ascended'
 			AND NOT EXISTS
 			(
 				SELECT 1
@@ -1230,7 +1219,7 @@ JOIN
 		rr.team_id = rt.team_id AND rt.valid_until IS NULL
 	)
 	WHERE rr.tournament > -1
-	and rt.current_team_status = 'tournament'
+	and rt.team_current_status = 'tournament'
 ) r ON 
 (
 	ts.player_id = r.player_id
