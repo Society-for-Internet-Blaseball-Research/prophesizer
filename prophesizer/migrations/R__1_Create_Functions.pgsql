@@ -1,4 +1,5 @@
 -- LAST UPDATE: 6/25/2021:
+-- Update team url_slug function to specifically handle crabs-2 and artists-2
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -895,9 +896,20 @@ $$;
 CREATE FUNCTION data.team_slug_creation() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-BEGIN
-	new.url_slug = replace(regexp_replace(lower(unaccent(replace(new.nickname,'&','and'))), '[^A-Za-z'' ]', '','g'),' ','-');
-	RETURN new;
+BEGIN	
+
+	UPDATE new
+	SET new.url_slug = 
+	   CASE NEW.team_id
+		WHEN '9494152b-99f6-4adb-9573-f9e084bc813f'
+		THEN 'crabs-2'
+		WHEN '3b0a289b-aebd-493c-bc11-96793e7216d5' 
+		THEN 'artists-2'
+		ELSE replace(regexp_replace(lower(unaccent(replace(new.nickname,'&','and'))), '[^A-Za-z'' ]', '','g'),' ','-')
+   END;
+
+RETURN NEW;
+
 END;
 $$;
 --

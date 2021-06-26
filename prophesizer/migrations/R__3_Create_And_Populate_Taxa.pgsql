@@ -1,4 +1,4 @@
--- LAST UPDATE: 6/25/2021:
+-- LAST UPDATE: 6/25/2021
 -- adding taxa.team_url_slugs (for Artists/Crabs)
 -- adding current_team_status column for taxa.team_additional_info (deal with deceased vs disbanded vs tournament)
 
@@ -1071,7 +1071,9 @@ VALUES
 (45,'71c621eb-85dc-4bd7-a690-0c68c0e6fb90','DOG','disbanded'),
 (46,'54d0d0f2-16e0-42a0-9fff-79cfa7c4a157','SK8','deceased'),
 (47,'88151292-6c12-4fb8-b2d6-3e64821293b3','AL8','deceased'),
-(48,'a4b23784-0132-4813-b300-f7449cb06493','TRNK','disbanded');
+(48,'a4b23784-0132-4813-b300-f7449cb06493','TRNK','disbanded'),
+(49,'c4f4115f-8856-a0c4-8a65-6a9ed046f509','TRK','deceased'),
+(50,'2a62cb4a-b56f-2a2f-9232-21c7bf2f3ffe','SK8','disbanded');
 --
 -- Data for Name: team_divine_favor; Type: TABLE DATA; Schema: taxa; Owner: -
 --
