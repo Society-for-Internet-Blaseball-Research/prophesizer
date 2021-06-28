@@ -1,5 +1,5 @@
--- LAST UPDATE: 6/25/2021:
--- Update team url_slug function to specifically handle crabs-2 and artists-2
+-- LAST UPDATE: 6/28/2021:x
+-- another attempt to fix crabs-2 and artists-2
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -807,6 +807,7 @@ REFRESH MATERIALIZED VIEW data.pitching_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW data.pitching_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW data.pitching_stats_team_season;
 REFRESH MATERIALIZED VIEW data.pitching_stats_team_playoffs_season;
+REFRESH MATERIALIZED VIEW data.games_info_expanded_all;
 $$;
 
 --
@@ -846,6 +847,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_player_playoffs_lifetime;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_team_season;
 REFRESH MATERIALIZED VIEW CONCURRENTLY data.pitching_stats_team_playoffs_season;
+REFRESH MATERIALIZED VIEW CONCURRENTLY data.games_info_expanded_all;
 $$;
 
 --
@@ -896,20 +898,15 @@ $$;
 CREATE FUNCTION data.team_slug_creation() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-BEGIN	
-
-	UPDATE new
-	SET new.url_slug = 
-	   CASE NEW.team_id
-		WHEN '9494152b-99f6-4adb-9573-f9e084bc813f'
-		THEN 'crabs-2'
-		WHEN '3b0a289b-aebd-493c-bc11-96793e7216d5' 
-		THEN 'artists-2'
-		ELSE replace(regexp_replace(lower(unaccent(replace(new.nickname,'&','and'))), '[^A-Za-z'' ]', '','g'),' ','-')
-   END;
-
-RETURN NEW;
-
+BEGIN
+	
+	update data.teams set url_slug = 'crabs-2' WHERE team_id = '9494152b-99f6-4adb-9573-f9e084bc813f';
+	update data.teams set url_slug = 'artists-2' WHERE team_id = 'd6a352fc-b675-40a0-864d-f4fd50aaeea0'; 
+	update data.teams set url_slug = replace(regexp_replace(lower(unaccent(replace(new.nickname,'&','and'))), '[^A-Za-z'' ]', '','g'),' ','-')
+		WHERE coalesce(url_slug,'') = '';
+		
+	return new;
+	
 END;
 $$;
 --
@@ -944,5 +941,5 @@ CREATE TRIGGER player_insert BEFORE INSERT ON data.players FOR EACH ROW EXECUTE 
 --
 -- Name: teams team_insert; Type: TRIGGER; Schema: data; Owner: -
 --
-CREATE TRIGGER team_insert BEFORE INSERT ON data.teams FOR EACH ROW EXECUTE FUNCTION data.team_slug_creation();
+CREATE TRIGGER team_insert AFTER INSERT ON data.teams FOR EACH ROW EXECUTE FUNCTION data.team_slug_creation();
 

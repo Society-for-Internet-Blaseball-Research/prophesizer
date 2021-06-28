@@ -1,4 +1,4 @@
--- LAST UPDATE: 6/25/2021
+-- LAST UPDATE: 6/28/2021x
 -- teams_info_expanded_all now pulling team_current_status from taxa.team_additional_info
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;

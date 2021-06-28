@@ -1,6 +1,7 @@
--- LAST UPDATE: 6/25/2021
+-- LAST UPDATE: 6/28/2021:x
 -- adding taxa.team_url_slugs (for Artists/Crabs)
 -- adding current_team_status column for taxa.team_additional_info (deal with deceased vs disbanded vs tournament)
+-- adding additional weathers in taxa
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -1230,7 +1231,15 @@ VALUES
 (16, 'Coffee 2'),
 (17, 'Coffee 3s'),
 (18, 'Flooding'),
-(19, 'Salmon');
+(19, 'Salmon'),
+(20, 'Polarity +'),
+(21, 'Polarity -'),
+(22, '???'),
+(23, 'Sun 90'),
+(24, 'Sun .1'),
+(25, 'Sum Sun'),
+(26, 'Jazz'),
+(27, 'Night');
 
 --
 -- Name: attributes attributes_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -

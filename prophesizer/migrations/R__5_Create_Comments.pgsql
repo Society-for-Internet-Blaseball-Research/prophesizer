@@ -1,4 +1,4 @@
--- LAST UPDATE: 6/25/2021 
+-- LAST UPDATE: 6/28/2021x
 -- Changes to taxa.team_additional_info, taxa.team_url_slugs
 
 --Public schema

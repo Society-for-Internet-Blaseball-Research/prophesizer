@@ -1,4 +1,4 @@
--- LAST UPDATE: 6/25/2021
+-- LAST UPDATE: 6/28/2021x
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();
