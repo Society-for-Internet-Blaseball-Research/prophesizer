@@ -1,4 +1,7 @@
--- LAST UPDATE: 6/16/2021:
+-- LAST UPDATE: 6/28/2021:x
+-- adding taxa.team_url_slugs (for Artists/Crabs)
+-- adding current_team_status column for taxa.team_additional_info (deal with deceased vs disbanded vs tournament)
+-- adding additional weathers in taxa
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -7,6 +10,7 @@ DROP SEQUENCE IF EXISTS taxa.team_divine_favor_team_divine_favor_id_seq CASCADE;
 DROP TABLE IF EXISTS taxa.team_divine_favor CASCADE;
 DROP SEQUENCE IF EXISTS taxa.team_abbreviations_team_abbreviation_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS taxa.player_url_slugs_player_url_slug_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS taxa.team_url_slugs_team_url_slug_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS taxa.team_additional_info_team_additional_info_id_seq CASCADE;
 DROP TABLE IF EXISTS taxa.pitch_types CASCADE;
 DROP TABLE IF EXISTS taxa.phases CASCADE;
@@ -21,6 +25,7 @@ DROP SEQUENCE IF EXISTS taxa.attributes_attribute_id_seq CASCADE;
 DROP TABLE IF EXISTS taxa.attributes CASCADE;
 DROP TABLE IF EXISTS taxa.additional_info CASCADE;
 DROP TABLE IF EXISTS taxa.player_url_slugs CASCADE;
+DROP TABLE IF EXISTS taxa.team_url_slugs CASCADE;
 DROP TABLE IF EXISTS taxa.position_types CASCADE;
 DROP TABLE IF EXISTS taxa.coffee CASCADE;
 DROP TABLE IF EXISTS taxa.blood CASCADE;
@@ -107,7 +112,8 @@ CREATE TABLE taxa.team_abbreviations (
 CREATE TABLE taxa.team_additional_info (
 	team_additional_info_id INTEGER NOT NULL,
 	team_id character varying,
-	team_abbreviation character varying
+	team_abbreviation character varying,
+	team_current_status character varying
 );
 --
 -- Name: team_abbreviations_team_abbreviation_id_seq; Type: SEQUENCE; Schema: taxa; Owner: -
@@ -153,6 +159,16 @@ CREATE TABLE taxa.player_url_slugs (
     player_id character varying,
     url_slug character varying,
     player_name character varying
+);
+
+--
+-- Name: team_url_slugs; Type: TABLE; Schema: taxa; Owner: -
+--
+CREATE TABLE taxa.team_url_slugs (
+	team_url_slug_id SERIAL,
+	team_id VARCHAR NULL DEFAULT NULL,
+	url_slug VARCHAR NULL DEFAULT NULL,
+	team_name VARCHAR NULL DEFAULT NULL
 );
 
 --
@@ -1009,49 +1025,56 @@ VALUES
 
 INSERT INTO taxa.team_additional_info
 VALUES 
-(1,'8d87c468-699a-47a8-b40d-cfb73a5660ad','CRAB'),
-(2,'c73b705c-40ad-4633-a6ed-d357ee2e2bcf','LIFT'),
-(3,'878c1bf6-0d21-4659-bfee-916c8314d69c','TACO'),
-(4,'7fcb63bc-11f2-40b9-b465-f1d458692a63',NULL),
-(5,'e3f90fa1-0bbe-40df-88ce-578d0723a23b',NULL),
-(6,'a3ea6358-ce03-4f23-85f9-deb38cb81b20',NULL),
-(7,'f29d6e60-8fce-4ac6-8bc2-b5e3cabc5696',NULL),
-(8,'b63be8c2-576a-4d6e-8daf-814f8bcea96f','DALE'),
-(9,'3f8bbb15-61c0-4e3f-8e4a-907a5fb1565e','BOS'),
-(10,'36569151-a2fb-43c1-9df7-2df512424c82','NYM'),
-(11,'eb67ae5e-c4bf-46ca-bbbc-425cd34182ff','CAN'),
-(12,'49181b72-7f1c-4f1c-929f-928d763ad7fb',NULL),
-(13,'4d921519-410b-41e2-882e-9726a4e54a6a',NULL),
-(14,'bfd38797-8404-4b38-8b82-341da28b1f83','CHST'),
-(15,'7966eb04-efcc-499b-8f03-d13916330531','YELL'),
-(16,'9a5ab308-41f2-4889-a3c3-733b9aab806e',NULL),
-(17,'b3b9636a-f88a-47dc-a91d-86ecc79f9934',NULL),
-(18,'3b0a289b-aebd-493c-bc11-96793e7216d5',NULL),
-(19,'d2634113-b650-47b9-ad95-673f8e28e687',NULL),
-(20,'b024e975-1c4a-4575-8936-a3754a08806a','STK'),
-(21,'b72f3061-f573-40d7-832a-5ad475bd7909','LVRS'),
-(22,'979aee4a-6d80-4863-bf1c-ee1a78e06024','FRI'),
-(23,'d8f82163-2e74-496b-8e4b-2ab35b2d3ff1',NULL),
-(24,'a7592bd7-1d3c-4ffb-8b3a-0b1e4bc321fd',NULL),
-(25,'9e42c12a-7561-42a2-b2d0-7cf81a817a5e',NULL),
-(26,'70eab4ab-6cb1-41e7-ac8b-1050ee12eecc',NULL),
-(27,'4e5d0063-73b4-440a-b2d1-214a7345cf16',NULL),
-(28,'e8f7ffee-ec53-4fe0-8e87-ea8ff1d0b4a9',NULL),
-(29,'23e4cbc1-e9cd-47fa-a35b-bfa06f726cb7','PIES'),
-(30,'105bc3ff-1320-4e37-8ef0-8d595cb95dd0','SEA'),
-(31,'a37f9158-7f82-46bc-908c-c9e2dda7c33b','JAZZ'),
-(32,'f02aeae2-5e6a-4098-9842-02d2273f25c7','HELL'),
-(33,'ca3f1c8c-c025-4d8e-8eef-5be6accbeb16','CHI'),
-(34,'c6c01051-cdd4-47d6-8a98-bb5b754f937f','STAR'),
-(35,'adc5b394-8f76-416d-9ce9-813706877b84','KCBM'),
-(36,'747b8e4a-7e50-4638-a973-ea7950a3e739','TGRS'),
-(37,'9debc64f-74b7-4ae1-a4d6-fce0144b6ea5','SPY'),
-(38,'57ec08cc-0411-4643-b304-0e80dbc15ac7','CDMX'),
-(39,'40b9ec2a-cb43-4dbb-b836-5accb62e7c20','PODS'),
-(40,'bb4a9de5-c924-4923-a0cb-9d1445f1ee5d','OHWO'),
-(41,'46358869-dce9-4a01-bfba-ac24fc56f57e','CORE'),
-(42,'d9f89a8a-c563-493e-9d64-78e4f9a55d4a','ATL');
-
+(1,'8d87c468-699a-47a8-b40d-cfb73a5660ad','CRAB','active'),
+(2,'c73b705c-40ad-4633-a6ed-d357ee2e2bcf','LIFT','active'),
+(3,'878c1bf6-0d21-4659-bfee-916c8314d69c','TACO','active'),
+(4,'7fcb63bc-11f2-40b9-b465-f1d458692a63',NULL,'tournament'),
+(5,'e3f90fa1-0bbe-40df-88ce-578d0723a23b',NULL,'tournament'),
+(6,'a3ea6358-ce03-4f23-85f9-deb38cb81b20',NULL,'tournament'),
+(7,'f29d6e60-8fce-4ac6-8bc2-b5e3cabc5696',NULL,'tournament'),
+(8,'b63be8c2-576a-4d6e-8daf-814f8bcea96f','DALE','active'),
+(9,'3f8bbb15-61c0-4e3f-8e4a-907a5fb1565e','BOS','active'),
+(10,'36569151-a2fb-43c1-9df7-2df512424c82','NYM','active'),
+(11,'eb67ae5e-c4bf-46ca-bbbc-425cd34182ff','CAN','active'),
+(12,'49181b72-7f1c-4f1c-929f-928d763ad7fb',NULL,'tournament'),
+(13,'4d921519-410b-41e2-882e-9726a4e54a6a',NULL,'tournament'),
+(14,'bfd38797-8404-4b38-8b82-341da28b1f83','CHST','active'),
+(15,'7966eb04-efcc-499b-8f03-d13916330531','YELL','active'),
+(16,'9a5ab308-41f2-4889-a3c3-733b9aab806e',NULL,'tournament'),
+(17,'b3b9636a-f88a-47dc-a91d-86ecc79f9934',NULL,'tournament'),
+(18,'3b0a289b-aebd-493c-bc11-96793e7216d5',NULL,'tournament'),
+(19,'d2634113-b650-47b9-ad95-673f8e28e687',NULL,'tournament'),
+(20,'b024e975-1c4a-4575-8936-a3754a08806a','STK','active'),
+(21,'b72f3061-f573-40d7-832a-5ad475bd7909','LVRS','active'),
+(22,'979aee4a-6d80-4863-bf1c-ee1a78e06024','FRI','active'),
+(23,'d8f82163-2e74-496b-8e4b-2ab35b2d3ff1',NULL,'tournament'),
+(24,'a7592bd7-1d3c-4ffb-8b3a-0b1e4bc321fd',NULL,'tournament'),
+(25,'9e42c12a-7561-42a2-b2d0-7cf81a817a5e',NULL,'tournament'),
+(26,'70eab4ab-6cb1-41e7-ac8b-1050ee12eecc',NULL,'tournament'),
+(27,'4e5d0063-73b4-440a-b2d1-214a7345cf16',NULL,'tournament'),
+(28,'e8f7ffee-ec53-4fe0-8e87-ea8ff1d0b4a9',NULL,'tournament'),
+(29,'23e4cbc1-e9cd-47fa-a35b-bfa06f726cb7','PIES','active'),
+(30,'105bc3ff-1320-4e37-8ef0-8d595cb95dd0','SEA','active'),
+(31,'a37f9158-7f82-46bc-908c-c9e2dda7c33b','JAZZ','active'),
+(32,'f02aeae2-5e6a-4098-9842-02d2273f25c7','HELL','active'),
+(33,'ca3f1c8c-c025-4d8e-8eef-5be6accbeb16','CHI','active'),
+(34,'c6c01051-cdd4-47d6-8a98-bb5b754f937f','STAR','disbanded'),
+(35,'adc5b394-8f76-416d-9ce9-813706877b84','KCBM','active'),
+(36,'747b8e4a-7e50-4638-a973-ea7950a3e739','TGRS','active'),
+(37,'9debc64f-74b7-4ae1-a4d6-fce0144b6ea5','SPY','active'),
+(38,'57ec08cc-0411-4643-b304-0e80dbc15ac7','CDMX','active'),
+(39,'40b9ec2a-cb43-4dbb-b836-5accb62e7c20','PODS','disbanded'),
+(40,'bb4a9de5-c924-4923-a0cb-9d1445f1ee5d','OHWO','active'),
+(41,'46358869-dce9-4a01-bfba-ac24fc56f57e','CORE','active'),
+(42,'d9f89a8a-c563-493e-9d64-78e4f9a55d4a','ATL','active'),
+(43,'d6a352fc-b675-40a0-864d-f4fd50aaeea0','CART','deceased'),
+(44,'9494152b-99f6-4adb-9573-f9e084bc813f','CLAB','deceased'),
+(45,'71c621eb-85dc-4bd7-a690-0c68c0e6fb90','DOG','disbanded'),
+(46,'54d0d0f2-16e0-42a0-9fff-79cfa7c4a157','SK8','deceased'),
+(47,'88151292-6c12-4fb8-b2d6-3e64821293b3','AL8','deceased'),
+(48,'a4b23784-0132-4813-b300-f7449cb06493','TRNK','disbanded'),
+(49,'c4f4115f-8856-a0c4-8a65-6a9ed046f509','TRK','deceased'),
+(50,'2a62cb4a-b56f-2a2f-9232-21c7bf2f3ffe','SK8','disbanded');
 --
 -- Data for Name: team_divine_favor; Type: TABLE DATA; Schema: taxa; Owner: -
 --
@@ -1208,7 +1231,15 @@ VALUES
 (16, 'Coffee 2'),
 (17, 'Coffee 3s'),
 (18, 'Flooding'),
-(19, 'Salmon');
+(19, 'Salmon'),
+(20, 'Polarity +'),
+(21, 'Polarity -'),
+(22, '???'),
+(23, 'Sun 90'),
+(24, 'Sun .1'),
+(25, 'Sum Sun'),
+(26, 'Jazz'),
+(27, 'Night');
 
 --
 -- Name: attributes attributes_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -
