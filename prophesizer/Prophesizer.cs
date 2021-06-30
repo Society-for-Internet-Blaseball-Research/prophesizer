@@ -1085,7 +1085,14 @@ namespace SIBR
 			if (response.IsSuccessStatusCode)
 			{
 				string strResponse = await response.Content.ReadAsStringAsync();
-				return JsonSerializer.Deserialize<ChroniclerV2Page<T>>(strResponse, serializerOptions);
+
+				try {
+					return JsonSerializer.Deserialize<ChroniclerV2Page<T>>(strResponse, serializerOptions);
+				} catch (JsonException e) {
+					ConsoleOrWebhook($"JSON Exception in ChroniclerV2Query: {e.Message}.");
+					Console.WriteLine($"  Chronicler response: {strResponse}");
+					return null;	
+				}
 			}
 			else
 			{
@@ -1526,7 +1533,7 @@ namespace SIBR
 				}
 				else
 				{
-					Console.WriteLine($"Processing update for item {item} owned by {item.PlayerId}...");
+					Console.WriteLine($"  Processing update for item {item} owned by {item.PlayerId}...");
 
 					// Update the old record
 					NpgsqlCommand update = new NpgsqlCommand(@"update data.player_items set valid_until=@timestamp where player_id=@pid and item_id=@iid and valid_until is null", psqlConnection);
