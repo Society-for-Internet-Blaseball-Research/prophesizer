@@ -1,7 +1,5 @@
--- LAST UPDATE: 6/28/2021:x
--- adding taxa.team_url_slugs (for Artists/Crabs)
--- adding current_team_status column for taxa.team_additional_info (deal with deceased vs disbanded vs tournament)
--- adding additional weathers in taxa
+-- LAST UPDATE: 6/30/2021:x
+-- Cleaned up taxa.teams_additional_info (added Squirrels)
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -1073,8 +1071,10 @@ VALUES
 (46,'54d0d0f2-16e0-42a0-9fff-79cfa7c4a157','SK8','deceased'),
 (47,'88151292-6c12-4fb8-b2d6-3e64821293b3','AL8','deceased'),
 (48,'a4b23784-0132-4813-b300-f7449cb06493','TRNK','disbanded'),
-(49,'c4f4115f-8856-a0c4-8a65-6a9ed046f509','TRK','deceased'),
-(50,'2a62cb4a-b56f-2a2f-9232-21c7bf2f3ffe','SK8','disbanded');
+(49,'c19bb50b-9a22-4dd2-8200-bce639b1b239','TRK','deceased'),
+(50,'2a62cb4a-b56f-2a2f-9232-21c7bf2f3ffe','SK8','disbanded'),
+(51,'3a094991-4cbc-4786-b74c-688876d243f4','SQRL','deceased');
+
 --
 -- Data for Name: team_divine_favor; Type: TABLE DATA; Schema: taxa; Owner: -
 --

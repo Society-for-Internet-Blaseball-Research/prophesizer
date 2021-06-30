@@ -1,5 +1,5 @@
--- LAST UPDATE: 6/28/2021x
--- teams_info_expanded_all now pulling team_current_status from taxa.team_additional_info
+-- LAST UPDATE: 6/30/2021:x
+-- Create unique index for games_info_expanded_all_id to allow concurrent refresh
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
@@ -4072,3 +4072,4 @@ CREATE UNIQUE INDEX ON data.running_stats_team_playoffs_season (team_id, season)
 CREATE UNIQUE INDEX ON data.running_stats_player_lifetime (player_id);
 CREATE UNIQUE INDEX ON data.running_stats_player_playoffs_lifetime (player_id);
 CREATE UNIQUE INDEX ON data.teams_info_expanded_all (team_id, valid_from);
+CREATE UNIQUE INDEX ON data.games_info_expanded_all (games_info_expanded_all_id);
