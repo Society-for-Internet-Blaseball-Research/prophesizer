@@ -1086,13 +1086,37 @@ namespace SIBR
 			{
 				string strResponse = await response.Content.ReadAsStringAsync();
 
-				try {
-					return JsonSerializer.Deserialize<ChroniclerV2Page<T>>(strResponse, serializerOptions);
-				} catch (JsonException e) {
-					ConsoleOrWebhook($"JSON Exception in ChroniclerV2Query: {e.Message}.");
-					Console.WriteLine($"  Chronicler response: {strResponse}");
-					return null;	
+				using JsonDocument json = JsonDocument.Parse(strResponse);
+
+				JsonElement root = json.RootElement;
+				JsonElement nextPageElement = root.GetProperty("nextPage");
+				JsonElement itemsElement = root.GetProperty("items");
+
+				ChroniclerV2Page<T> page = new ChroniclerV2Page<T>();
+				page.NextPage = nextPageElement.ToString();
+
+				List<ChroniclerItem<T>> validItems = new List<ChroniclerItem<T>>();
+
+				foreach (JsonElement item in itemsElement.EnumerateArray())
+				{
+					try
+					{
+						ChroniclerItem<T> obj = JsonSerializer.Deserialize<ChroniclerItem<T>>(item.GetRawText(), serializerOptions);
+						validItems.Add(obj);
+					}
+					catch (JsonException e)
+					{
+						ConsoleOrWebhook(
+							$"Exception: ChroniclerV2Query deserialization failed:\n" +
+							$"```{JsonSerializer.Serialize(item, new JsonSerializerOptions { WriteIndented = true })}```"
+						);
+						Console.WriteLine($"Exception message: ${e.Message}");
+					}
 				}
+
+				page.Items = validItems;
+
+				return page;
 			}
 			else
 			{
@@ -1136,8 +1160,18 @@ namespace SIBR
 				{
 					query += $"&page={nextPage}";
 				}
+				
+				ChroniclerV2Page<T> page = null;
 
-				ChroniclerV2Page<T> page = await ChroniclerV2Query<T>(query);
+				try
+				{
+					page = await ChroniclerV2Query<T>(query);
+				}
+				catch (Exception e)
+				{
+					ConsoleOrWebhook($"Exception: ChroniclerV2Query failed while querying `{query}`.");
+					Console.WriteLine($"Exception message: {e.Message}");
+				}
 
 				if (page == null || page.Items.Count() == 0)
 				{
@@ -1150,7 +1184,20 @@ namespace SIBR
 					Console.WriteLine($"  Processing {page.Items.Count()} {type} updates (through {page.Items.Last().ValidFrom}).");
 					lastSeenTime = page.Items.Last().ValidFrom;
 
-					await processFunc(psqlConnection, page.Items);
+					// Create savepoint before upcoming batch of item processing
+					await transaction.SaveAsync(lastSeenTime.ToString());
+
+					try 
+					{
+						await processFunc(psqlConnection, page.Items);
+					}
+					catch (Exception e)
+					{
+						ConsoleOrWebhook($"Exception: Rolling back transaction savepoint while processing items for `{query}`.");
+						Console.WriteLine($"Exception message: {e.Message}");
+						await transaction.RollbackAsync(lastSeenTime.ToString());
+						break;
+					}
 
 					// We're done!
 					if (page.Items.Count() != count)
