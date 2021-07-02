@@ -1198,12 +1198,6 @@ namespace SIBR
 						await transaction.RollbackAsync(lastSeenTime.ToString());
 						break;
 					}
-
-					// We're done!
-					if (page.Items.Count() != count)
-					{
-						break;
-					}
 				}
 			}
 
