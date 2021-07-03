@@ -1,5 +1,5 @@
--- LAST UPDATE: 6/30/2021:x
--- Create unique index for games_info_expanded_all_id to allow concurrent refresh
+-- LAST UPDATE: 7/3/2021:x
+-- item_ids array added to players_info_expanded_all
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
@@ -948,7 +948,7 @@ case
 	when p.pitching_rating in (0,-1) THEN data.rating_to_star(data.pitching_rating_raw(unthwackability, ruthlessness, overpowerment, shakespearianism, coldness))
 	else data.rating_to_star(p.pitching_rating)
 end as pitching_stars
-,items, durabilities, healths
+,items, item_ids, durabilities, healths
 ,item_batting_rating, item_defense_rating, item_baserunning_rating, item_pitching_rating
 FROM 
 (
@@ -988,6 +988,7 @@ LEFT JOIN
 (
 	SELECT ts.player_id, 
 	array_agg(NAME ORDER BY NAME) AS items, 
+	array_agg(item_id ORDER BY NAME) as item_ids,
 	array_agg(durability order by NAME) AS durabilities, 
 	array_agg(health ORDER BY NAME) AS healths,
 	ts.timestampd AS valid_from,
