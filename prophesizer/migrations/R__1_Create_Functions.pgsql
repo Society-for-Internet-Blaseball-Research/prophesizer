@@ -1,5 +1,5 @@
--- LAST UPDATE: 6/28/2021:x
--- another attempt to fix crabs-2 and artists-2
+-- LAST UPDATE: 7/3/2021:x
+-- teams_from_timestamp table fields cleaned up
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;
@@ -465,8 +465,13 @@ CREATE FUNCTION data.player_slug_creation() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-	new.url_slug = replace(regexp_replace(lower(unaccent(replace(new.player_name,',',' comma'))), '[^A-Za-z'' ]', '','g'),' ','-');
-	RETURN new;
+	
+	update data.players set url_slug = 'pitching-machine-2' WHERE player_id = '5d063a91-31b3-4688-97a7-e34a7181da30';
+	update data.players set url_slug = replace(regexp_replace(lower(unaccent(replace(new.player_name,',',' comma'))), '[^A-Za-z'' ]', '','g'),' ','-')
+		WHERE coalesce(url_slug,'') = '';
+		
+	return new;
+
 END;
 $$;
 --
@@ -912,7 +917,7 @@ $$;
 --
 -- Name: teams_from_timestamp(timestamp without time zone); Type: FUNCTION; Schema: data; Owner: -
 --
-CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(teams_info_expanded_all_id bigint, team_id character varying, location text, nickname text, full_name text, team_abbreviation character varying, url_slug character varying, current_team_status text, valid_from timestamp without time zone, valid_until timestamp without time zone, gameday_from integer, season_from integer, tournament_from integer, phase_type_from character varying, team_main_color character varying, team_secondary_color character varying, team_slogan character varying, team_emoji character varying, division character varying, division_id character varying, league character varying, league_id character varying, tournament_name character varying, modifications character varying[], stadium_id character varying, stadium_name text, stadium_nickname text)
+CREATE FUNCTION data.teams_from_timestamp(in_timestamp timestamp without time zone) RETURNS TABLE(teams_info_expanded_all_id bigint, team_id character varying, location text, nickname text, full_name text, team_abbreviation character varying, url_slug character varying, team_current_status character varying, valid_from timestamp without time zone, valid_until timestamp without time zone, gameday_from integer, season_from integer, tournament_from integer, phase_type_from character varying, team_main_color character varying, team_secondary_color character varying, team_slogan character varying, team_emoji character varying, division character varying, division_id character varying, league character varying, league_id character varying, tournament_name character varying, modifications character varying[], stadium_id character varying, stadium_name text, stadium_nickname text)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -937,7 +942,7 @@ $$;
 --
 -- Name: players player_insert; Type: TRIGGER; Schema: data; Owner: -
 --
-CREATE TRIGGER player_insert BEFORE INSERT ON data.players FOR EACH ROW EXECUTE FUNCTION data.player_slug_creation();
+CREATE TRIGGER player_insert AFTER INSERT ON data.players FOR EACH ROW EXECUTE FUNCTION data.player_slug_creation();
 --
 -- Name: teams team_insert; Type: TRIGGER; Schema: data; Owner: -
 --

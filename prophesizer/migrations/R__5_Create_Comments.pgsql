@@ -1,5 +1,4 @@
--- LAST UPDATE: 6/28/2021x
--- Changes to taxa.team_additional_info, taxa.team_url_slugs
+-- LAST UPDATE: 7/3/2021x
 
 --Public schema
 COMMENT ON table public.changelog IS 'Used by Prophesizer to keep track of versioining and migration scripts.  Should be truncated (As well as dropping data and taxa schemas) before a full database refresh.';
