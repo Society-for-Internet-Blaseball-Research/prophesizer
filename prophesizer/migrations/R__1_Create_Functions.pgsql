@@ -1,5 +1,4 @@
--- LAST UPDATE: 7/3/2021:x
--- teams_from_timestamp table fields cleaned up
+-- LAST UPDATE: 7/8/2021x
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;

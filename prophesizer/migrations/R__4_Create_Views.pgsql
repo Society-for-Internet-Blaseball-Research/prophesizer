@@ -1,5 +1,5 @@
--- LAST UPDATE: 7/3/2021:x
--- item_ids array added to players_info_expanded_all
+-- LAST UPDATE: 7/8/2021:x
+-- filtering out runners with empty string ids at all_events
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
@@ -3366,6 +3366,7 @@ CREATE MATERIALIZED VIEW data.running_stats_all_events AS
    FROM ((data.game_event_base_runners geb
      JOIN data.game_events ge ON ((geb.game_event_id = ge.id)))
      JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+   WHERE coalesce(geb.runner_id,'') <> ''
   WITH NO DATA;
   
 --
