@@ -1,5 +1,5 @@
--- LAST UPDATE: 7/3/2021:x
--- Added newest pre-history teams
+-- LAST UPDATE: 7/8/2021:x
+-- Added more pre-history teams
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -1068,16 +1068,23 @@ VALUES
 (43,'d6a352fc-b675-40a0-864d-f4fd50aaeea0','CART','deceased'),
 (44,'9494152b-99f6-4adb-9573-f9e084bc813f','CLAB','deceased'),
 (45,'71c621eb-85dc-4bd7-a690-0c68c0e6fb90','DOG','disbanded'),
-(46,'54d0d0f2-16e0-42a0-9fff-79cfa7c4a157','SK8','deceased'),
+(46,'54d0d0f2-16e0-42a0-9fff-79cfa7c4a157','ANT','deceased'),
 (47,'88151292-6c12-4fb8-b2d6-3e64821293b3','AL8','deceased'),
-(48,'a4b23784-0132-4813-b300-f7449cb06493','TRNK','disbanded'),
+(48,'a4b23784-0132-4813-b300-f7449cb06493','PHO','disbanded'),
 (49,'c19bb50b-9a22-4dd2-8200-bce639b1b239','TRK','deceased'),
-(50,'2a62cb4a-b56f-2a2f-9232-21c7bf2f3ffe','SK8','disbanded'),
-(51,'3a094991-4cbc-4786-b74c-688876d243f4','SQRL','deceased'),
+(50,'939db13f-79c9-41c5-9a15-b340b1bea875','BBB','disbanded'),
+(51,'3a094991-4cbc-4786-b74c-688876d243f4','RUN','deceased'),
 (52,'2e22beba-8e36-42ba-a8bf-975683c52b5f','CAR','deceased'),
 (53,'b6b5df8f-5602-4883-b47d-07e77ed9d5af','LAR','deceased'),
 (54,'00245773-6f25-43b1-a863-42b4068888f0','LPL','disbanded'),
-(55,'1e04e5cc-80a6-41c0-af0d-7292817eed79','LOU','deceased');
+(55,'1e04e5cc-80a6-41c0-af0d-7292817eed79','LOU','deceased'),
+(56,'d0762a7e-004b-48a9-a832-a993982b305b','KELP','deceased'),
+(57,'3543229a-668c-4ac9-b64a-588422481f12','FINS','disbanded'),
+(58,'74966fbd-5d77-48b1-8075-9bf197583775','RHO','disbanded'),
+(59,'55c9fee3-79c8-4467-8dfb-ff1e340aae8c','COW','deceased'),
+(60,'53d473fb-ffee-4fd3-aa1c-671228adc592','AUB','disbanded'),
+(61,'1a51664e-efec-45fa-b0ba-06d04c344628','PSY','deceased'),
+(62,'cbd44c06-231a-4d1a-bb7d-4170b06e566a','HRT','deceased');
 
 --
 -- Data for Name: team_divine_favor; Type: TABLE DATA; Schema: taxa; Owner: -

@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/3/2021x
+-- LAST UPDATE: 7/8/2021x
 
 --Public schema
 COMMENT ON table public.changelog IS 'Used by Prophesizer to keep track of versioining and migration scripts.  Should be truncated (As well as dropping data and taxa schemas) before a full database refresh.';
@@ -31,5 +31,5 @@ COMMENT ON table taxa.modifications IS 'Manually pulled on occasion from main.js
 COMMENT on table taxa.player_incinerations_unrecorded IS 'Manually input data for pre-dB player incinerations.';
 COMMENT ON table taxa.player_url_slugs IS 'Manually created unique player url slugs for initial Wyatt Masoning.';
 COMMENT ON table taxa.position_types IS 'Used to label position_type text on players_info_expanded_all.';
-COMMENT ON table taxa.team_additional_info IS 'Data currently not parseable by dB team object. Team short names created by SIBR poll to teams.  Last update: 6/25/2021';
+COMMENT ON table taxa.team_additional_info IS 'Data currently not parseable by dB team object. Team short names created by SIBR poll to teams.  Last update: 7/4/2021';
 COMMENT ON table taxa.team_url_slugs IS 'Manually created to differentiate between multiple Artists/Crabs teams.  Last update: 6/25/2021';
