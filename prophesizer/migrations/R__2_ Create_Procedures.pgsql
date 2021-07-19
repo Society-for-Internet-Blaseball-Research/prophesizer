@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/13/2021 single-game-views
+-- LAST UPDATE: 7/19/2021 game-pitching-and-weather
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();

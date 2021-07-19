@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/8/2021x
+-- LAST UPDATE: 7/19/2021 game-pitching-and-weather
 
 --Public schema
 COMMENT ON table public.changelog IS 'Used by Prophesizer to keep track of versioining and migration scripts.  Should be truncated (As well as dropping data and taxa schemas) before a full database refresh.';

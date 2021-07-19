@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/13/2021 single-game-views
+-- LAST UPDATE: 7/19/2021 game-pitching-and-weather
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -1248,8 +1248,10 @@ VALUES
 (23, 'Sun 90'),
 (24, 'Sun .1'),
 (25, 'Sum Sun'),
-(26, 'Jazz'),
-(27, 'Night');
+(26, '???'),
+(27, '???'),
+(28, 'Jazz'),
+(29, 'Night');
 
 --
 -- Name: attributes attributes_pkey; Type: CONSTRAINT; Schema: taxa; Owner: -

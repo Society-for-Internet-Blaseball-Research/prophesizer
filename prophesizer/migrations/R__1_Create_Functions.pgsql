@@ -1,4 +1,4 @@
-﻿-- LAST UPDATE: 7/13/2021 single-game-views
+﻿-- LAST UPDATE: 7/19/2021 game-pitching-and-weather
 
 DROP FUNCTION IF EXISTS data.reblase_gameeventid(in_game_event_id bigint) CASCADE;
 DROP FUNCTION IF EXISTS data.gamephase_from_timestamp(in_timestamp timestamp without time zone) CASCADE;

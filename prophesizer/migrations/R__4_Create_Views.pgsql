@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/13/2021 single-game-views
+-- LAST UPDATE: 7/19/2021 game-pitching-and-weather
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
@@ -2779,11 +2779,11 @@ CREATE MATERIALIZED VIEW data.pitching_stats_all_appearances AS
     sum(xe.plate_appearance) AS batters_faced,
     ga.weather AS weather_id,
     ga.is_postseason
-   FROM ((data.game_events ge
+   FROM data.game_events ge
+     JOIN taxa.event_types xe ON (ge.event_type = xe.event_type)
      JOIN data.teams_info_expanded_all t on (ge.pitcher_team_id = t.team_id and t.valid_until is null)
-     JOIN taxa.event_types xe ON ((ge.event_type = xe.event_type)))
-     JOIN data.players_info_expanded_tourney p ON ge.pitcher_id::text = p.player_id::text AND p.valid_until IS NULL
-     JOIN data.games ga ON (((ge.game_id)::text = (ga.game_id)::text)))
+     JOIN data.players_info_expanded_all p ON (ge.pitcher_id::text = p.player_id::text AND p.valid_until IS NULL)
+     JOIN data.games ga ON ((ge.game_id)::text = (ga.game_id)::text)
   GROUP BY ge.season, ge.day, ge.game_id, ge.pitcher_id, p.player_name, ga.winning_pitcher_id, ga.losing_pitcher_id, ge.pitcher_team_id, ge.top_of_inning, ga.weather, ga.is_postseason, t.nickname, t.valid_from, t.valid_until
   HAVING sum(xe.plate_appearance) > 0 
   WITH NO DATA;
