@@ -28,6 +28,7 @@ namespace Cauldron
         public string mainColor { get; set; }
         public string slogan { get; set; }
         public string shorthand { get; set; }
+        public bool deceased { get; set; } 
         public int CompareTo(Team other)
         {
             return nickname.CompareTo(other.nickname);

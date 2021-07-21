@@ -382,7 +382,8 @@ namespace Cauldron
 					newStrikes = m_currEvent.totalStrikes - m_oldState.atBatStrikes;
 				}
 				else if (newState.lastUpdate.Contains("draws a walk") 
-					|| newState.lastUpdate.Contains("walks to first"))
+					|| newState.lastUpdate.Contains("walks to first")
+					|| newState.lastUpdate.Contains("intentionally walked"))
 				{
 					m_currEvent.totalBalls = newState.BatterTeamBalls;
 					m_currEvent.isWalk = true;
@@ -390,6 +391,10 @@ namespace Cauldron
 					if (newState.lastUpdate.Contains("charms"))
 					{
 						m_currEvent.eventType = GameEventType.CHARM_WALK;
+					}
+					else if(newState.lastUpdate.Contains("intentionally walked"))
+					{
+						m_currEvent.eventType = GameEventType.INTENTIONAL_WALK;
 					}
 					else if(newState.lastUpdate.Contains("strikes out thinking"))
 					{
@@ -464,7 +469,8 @@ namespace Cauldron
 					}
 				}
 				// We can know for sure that the last pitch was a ball
-				else if (newState.lastUpdate.Contains("walk"))
+				// - Exclude intentional walks as no balls were thrown
+				else if (newState.lastUpdate.Contains("walk") && !(newState.lastUpdate.Contains("intentional")))
 				{
 					m_currEvent.pitchesList.Add('B');
 					newBalls -= 1;
@@ -1000,6 +1006,12 @@ namespace Cauldron
 			if(newState.lastUpdate.Contains("is Elsewhere"))
 			{
 				m_currEvent.eventType = GameEventType.ELSEWHERE_ATBAT;
+				return true;
+			}
+			
+			if(newState.lastUpdate.Contains("entered the Tunnels") && newState.lastUpdate.Contains("stole a Run"))
+			{
+				m_currEvent.eventType = GameEventType.TUNNELS_STOLEN_RUN;
 				return true;
 			}
 
@@ -1680,6 +1692,7 @@ namespace Cauldron
 				|| m_currEvent.eventType == GameEventType.IMMATERIA_SWEPT
 				|| m_currEvent.eventType == GameEventType.SECRET_BASE_ENTER
 				|| m_currEvent.eventType == GameEventType.SECRET_BASE_EXIT
+				|| m_currEvent.eventType == GameEventType.TUNNELS_STOLEN_RUN
 				|| m_inningState == InningState.PlayEnded)
 			{
 				EmitEvent(newState, timeStamp);

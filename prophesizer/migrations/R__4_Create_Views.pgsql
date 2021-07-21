@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/19/2021 game-pitching-and-weather
+-- LAST UPDATE: 7/21/2021 deceased-teams-and-event-types
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;
@@ -1468,7 +1468,7 @@ CREATE MATERIALIZED VIEW data.batting_stats_all_events AS
 		ELSE 0
 	END AS home_run,
 	CASE
-		WHEN (ge.event_type = ANY (ARRAY['WALK', 'CHARM_WALK'])) THEN 1
+		WHEN (ge.event_type = ANY (ARRAY['WALK', 'CHARM_WALK', 'INTENTIONAL_WALK'])) THEN 1
 		ELSE 0
 	END AS walk,
 	CASE
@@ -2762,7 +2762,7 @@ CREATE MATERIALIZED VIEW data.pitching_stats_all_appearances AS
         END) AS strikeouts,
     sum(
         CASE
-            WHEN (ge.event_type = ANY (ARRAY['WALK'::text, 'CHARM_WALK'::text])) THEN 1
+            WHEN (ge.event_type = ANY (ARRAY['WALK'::text, 'CHARM_WALK'::text, 'INTENTIONAL_WALK'::text])) THEN 1
             ELSE 0
         END) AS walks,
     sum(

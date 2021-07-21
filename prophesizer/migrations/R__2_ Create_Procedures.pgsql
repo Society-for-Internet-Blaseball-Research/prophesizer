@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/19/2021 game-pitching-and-weather
+-- LAST UPDATE: 7/21/2021 deceased-teams-and-event-types
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();

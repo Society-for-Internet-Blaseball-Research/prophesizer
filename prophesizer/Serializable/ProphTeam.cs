@@ -45,6 +45,7 @@ namespace prophesizer.Serializable
 		[DbAlias("stadium_id")]
 		[DbNullValue("")]
 		public string Stadium { get; set; }
+		public bool Deceased { get; set; } = false;
 
 
 		// Tarot card index from S11 election
@@ -86,6 +87,7 @@ namespace prophesizer.Serializable
 			sb.Append(SecondaryColor);
 			sb.Append(Emoji);
 			sb.Append(Shorthand);
+			sb.Append(Deceased);
 
 			// Convert the input string to a byte array and compute the hash.
 			byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));

@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/19/2021 game-pitching-and-weather
+-- LAST UPDATE: 7/21/2021 deceased-teams-and-event-types
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -715,8 +715,9 @@ VALUES
 (28, 'UNKNOWN',0,0,0,0,0),
 (29, 'UNKNOWN_OUT',0,0,0,0,1),
 (30, 'WALK',1,0,0,0,0),
-(31, 'WILD_PITCH',0,0,0,0,0);
-
+(31, 'WILD_PITCH',0,0,0,0,0),
+(32, 'INTENTIONAL_WALK',1,0,0,0,0),
+(33, 'TUNNELS_STOLEN_RUN',0,0,0,0,0);
 
 --
 -- Data for Name: leagues; Type: TABLE DATA; Schema: taxa; Owner: -
