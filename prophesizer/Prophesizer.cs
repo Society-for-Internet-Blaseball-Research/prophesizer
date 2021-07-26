@@ -1459,7 +1459,7 @@ namespace SIBR
 						foreach (var mod in goneMods)
 						{
 							Console.WriteLine($"    Found a lack of {mod.Key}:{mod.Value} for {x.Data.Nickname} at {x.ValidFrom}!");
-							NpgsqlCommand upd = new NpgsqlCommand(@"update data.stadium_modifications set valid_until=@timestamp where stadium_id=@sid and modification=@mod and level=@lev", psqlConnection);
+							NpgsqlCommand upd = new NpgsqlCommand(@"update data.stadium_modifications set valid_until=@timestamp where stadium_id=@sid and modification=@mod and level=@lev and valid_until is null", psqlConnection);
 							upd.Parameters.AddWithValue("timestamp", x.ValidFrom);
 							upd.Parameters.AddWithValue("sid", x.Data.Id);
 							upd.Parameters.AddWithValue("mod", mod.Key);
