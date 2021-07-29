@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/21/2021 deceased-teams-and-event-types
+-- LAST UPDATE: 7/29/2021 official-team-abbreviations
 
 --Public schema
 COMMENT ON table public.changelog IS 'Used by Prophesizer to keep track of versioining and migration scripts.  Should be truncated (As well as dropping data and taxa schemas) before a full database refresh.';
