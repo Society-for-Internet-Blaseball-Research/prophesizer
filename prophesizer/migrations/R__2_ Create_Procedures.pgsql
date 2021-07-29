@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/21/2021 deceased-teams-and-event-types
+-- LAST UPDATE: 7/26/2021
  
 DROP PROCEDURE IF EXISTS data.wipe_hourly();
 DROP PROCEDURE IF EXISTS data.wipe_events();

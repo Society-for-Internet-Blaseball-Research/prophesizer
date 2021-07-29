@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/21/2021 deceased-teams-and-event-types
+-- LAST UPDATE: 7/26/2021
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
@@ -1044,7 +1044,7 @@ VALUES
 (19,'d2634113-b650-47b9-ad95-673f8e28e687',NULL,'tournament'),
 (20,'b024e975-1c4a-4575-8936-a3754a08806a','STK','active'),
 (21,'b72f3061-f573-40d7-832a-5ad475bd7909','LVRS','active'),
-(22,'979aee4a-6d80-4863-bf1c-ee1a78e06024','FRI','active'),
+(22,'979aee4a-6d80-4863-bf1c-ee1a78e06024','FRI','deceased'),
 (23,'d8f82163-2e74-496b-8e4b-2ab35b2d3ff1',NULL,'tournament'),
 (24,'a7592bd7-1d3c-4ffb-8b3a-0b1e4bc321fd',NULL,'tournament'),
 (25,'9e42c12a-7561-42a2-b2d0-7cf81a817a5e',NULL,'tournament'),
@@ -1057,7 +1057,7 @@ VALUES
 (32,'f02aeae2-5e6a-4098-9842-02d2273f25c7','HELL','active'),
 (33,'ca3f1c8c-c025-4d8e-8eef-5be6accbeb16','CHI','active'),
 (34,'c6c01051-cdd4-47d6-8a98-bb5b754f937f','STAR','disbanded'),
-(35,'adc5b394-8f76-416d-9ce9-813706877b84','KCBM','active'),
+(35,'adc5b394-8f76-416d-9ce9-813706877b84','KCBM','deceased'),
 (36,'747b8e4a-7e50-4638-a973-ea7950a3e739','TGRS','active'),
 (37,'9debc64f-74b7-4ae1-a4d6-fce0144b6ea5','SPY','active'),
 (38,'57ec08cc-0411-4643-b304-0e80dbc15ac7','CDMX','active'),
@@ -1074,7 +1074,7 @@ VALUES
 (49,'c19bb50b-9a22-4dd2-8200-bce639b1b239','TRK','deceased'),
 (50,'939db13f-79c9-41c5-9a15-b340b1bea875','BBB','disbanded'),
 (51,'3a094991-4cbc-4786-b74c-688876d243f4','RUN','deceased'),
-(52,'2e22beba-8e36-42ba-a8bf-975683c52b5f','CAR','deceased'),
+(52,'2e22beba-8e36-42ba-a8bf-975683c52b5f','CAR','active'),
 (53,'b6b5df8f-5602-4883-b47d-07e77ed9d5af','LAR','deceased'),
 (54,'00245773-6f25-43b1-a863-42b4068888f0','LPL','disbanded'),
 (55,'1e04e5cc-80a6-41c0-af0d-7292817eed79','LOU','deceased'),
@@ -1084,7 +1084,19 @@ VALUES
 (59,'55c9fee3-79c8-4467-8dfb-ff1e340aae8c','COW','deceased'),
 (60,'53d473fb-ffee-4fd3-aa1c-671228adc592','AUB','disbanded'),
 (61,'1a51664e-efec-45fa-b0ba-06d04c344628','PSY','deceased'),
-(62,'cbd44c06-231a-4d1a-bb7d-4170b06e566a','HRT','deceased');
+(62,'cbd44c06-231a-4d1a-bb7d-4170b06e566a','HRT','deceased'),
+(63,'4cd14d96-f817-41a3-af6c-2d3ed0dd20b7','SALT','deceased'),
+(64,'258f6389-aac1-43d2-b30a-4b4dde90d5eb','KOL','deceased'),
+(65,'774762ee-c234-4c57-90a1-e1e69db3f6a7','SPP','disbanded'),
+(66,'67c0a873-ef6d-4a85-8293-af638edf3c9f','BSN','disbanded'),
+(67,'280c587b-e8f6-4a7e-a8ce-fd2fa2fa3e70','RisR','disbanded'),
+(68,'698cfc6d-e95e-4391-b754-b87337e4d2a9','VauL','disbanded'),
+(69,'b47df036-3aa4-4b98-8e9e-fe1d3ff1894b','PAW','active'),
+(70,'26f947db-4e2a-41a5-896c-02cf8eb47af0','LNX','disbanded'),
+(71,'7bc12507-1a84-4921-9338-c1888d56dcd7','FROG','disbanded'),
+(72,'8e50d878-3dcd-4c27-9f1c-8d8f20f17077','OTTR','disbanded'),
+(73,'cfd20759-5f9c-4596-9493-2669b6daf396','BIKE','disbanded'),
+(74,'4c192065-65d8-4010-8145-395f82d24ddf','GHH','deceased');
 
 --
 -- Data for Name: team_divine_favor; Type: TABLE DATA; Schema: taxa; Owner: -
@@ -1249,8 +1261,8 @@ VALUES
 (23, 'Sun 90'),
 (24, 'Sun .1'),
 (25, 'Sum Sun'),
-(26, '???'),
-(27, '???'),
+(26, 'Supernova Eclipse'),
+(27, 'Black Hole (Black Hole)'),
 (28, 'Jazz'),
 (29, 'Night');
 
