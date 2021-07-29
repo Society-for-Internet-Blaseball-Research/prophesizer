@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/21/2021 deceased-teams-and-event-types
+-- LAST UPDATE: 7/29/2021 official-team-abbreviations
 
 DROP VIEW IF EXISTS DATA.team_seasonal_standings CASCADE;
 DROP VIEW IF EXISTS DATA.ref_leaderboard_lifetime_batting CASCADE;

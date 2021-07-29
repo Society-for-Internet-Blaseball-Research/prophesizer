@@ -1,4 +1,4 @@
--- LAST UPDATE: 7/21/2021 deceased-teams-and-event-types
+-- LAST UPDATE: 7/29/2021 official-team-abbreviations
 
 DROP TABLE IF EXISTS taxa.weather CASCADE;
 DROP SEQUENCE IF EXISTS taxa.vibe_to_arrows_vibe_to_arrow_id_seq CASCADE;
