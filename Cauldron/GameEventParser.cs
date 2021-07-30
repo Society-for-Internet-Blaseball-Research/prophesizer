@@ -544,8 +544,9 @@ namespace Cauldron
 				m_currEvent.outsOnPlay = Math.Max(0, newState.halfInningOuts - m_oldState.halfInningOuts);
 			}
 
-			// Types of outs
-			if (newState.lastUpdate.Contains("out") || 
+			// Types of outs (but not Stouts)
+			if (newState.lastUpdate.Contains(" out ") || 
+				newState.lastUpdate.Contains("flyout") ||
 				newState.lastUpdate.Contains("sacrifice") || 
 				newState.lastUpdate.Contains("hit into a double play") ||
 				newState.lastUpdate.Contains("tags up"))
