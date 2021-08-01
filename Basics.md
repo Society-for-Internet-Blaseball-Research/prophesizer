@@ -118,6 +118,28 @@ At this point Prophesizer will refresh the materialized views in the DB if neces
     * If so, call `data.refresh_materialized_views_concurrently()`
     * If now, call `data.refresh_materialized_views()` which must be done at least once initially
 
+## About Migrations
+
+Migrations are just `.pgsql` files full of SQL code that manipulate the DB to get it into the state we need.
+They come in two varieties: Versioned and Repeatable.
+This text is stolen from [README.md](README.md), but the most important rule is **versioned migrations should not be changed once checked in!** If a DB believes it has been updated to 3.0.0, but the meaning of 3.0.0 changes afterward, there is no recovery path to get that DB into the proper state. If the 3.0.0 migration has bugs or issues, you must add a 3.0.1 migration that fixes those bugs, and any DBs still on 3.0.0 will know they must migrate. Once a given version has been established, you can't change its definition later.
+
+### Versioned Migration Files
+
+* Versioned migrations start with a V, such as V_2_8_1__Unaccent.pgsql.
+* The filename denotes the version number (2.8.1), then (after a __ separator) a description of the schema change.
+* Currently the DB schema version is being kept in sync with the Prophesizer version (though not every Prophesizer change involves a schema change).
+* Versioned migrations are applied in version order and must be used when tables change.
+* The SQL code in the file must alter the tables in such a way that data is not lost, so that DB schema migrations can happen without having to completely drop the DB.
+* Old migration files should not be modified after they've been released; they will not successfully migrate because their checksums won't match (and if you think about it, you can't go back and change what version 2.8.0 means at the time you're checking in version 2.8.5)
+
+### Repeatable Migration Files
+
+* Repeatable migrations start with an R, such as `R__4_Create_Views.pgsql`. The filename only contains a description (after the `__` separator).
+* They are applied in alphabetical order - Prophesizer numbers the descriptions to enforce the correct dependencies.
+* Repeatable migrations are useful for elements of the database that can simply be dropped and re-created, such as Functions, Procedures, and Views.
+* Prophesizer also uses a repeatable migration for the `taxa` schema which consists only of taxonomy data that always comes from these files.
+
 # Cauldron
 
 At various points, Prophesizer creates a `Cauldron.Processor` object and send updates into it over time by calling `ProcessGameObject`.
