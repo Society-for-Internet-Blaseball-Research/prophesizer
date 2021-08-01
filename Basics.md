@@ -5,7 +5,7 @@ This document is an attempt to describe in simple-ish terms what happens when Pr
 ## Startup
 
 * Connects to the DB via the PSQL_CONNECTION_STRING environment variable
-* Uses [Evolve](https://evolve-db.netlify.app/) to migrate the DB to the latest version (see About Migrations)
+* Uses [Evolve](https://evolve-db.netlify.app/) to migrate the DB to the latest version (see [About Migrations](#about-migrations))
 * Enters a loop that runs `Poll` every minute, which does:
 
 ## Prophesizer.Poll
@@ -22,7 +22,8 @@ This document is an attempt to describe in simple-ish terms what happens when Pr
 ## Non Game Event Data
 
 All of these data types use Chronicler's v2 api to fetch all versions of data of this type.
-They all use utility functions to do the common logic of "take this new version of an entity, check to see if a record exists with this ID, if so close the `valid_until` timestamp, and add the new record with `valid_from` equalling now.
+They all use utility functions to do the common logic of "take this new version of an entity, check to see if a record exists with this ID, if so close the `valid_until` timestamp, and add the new record with `valid_from` equalling now."
+
 They also use `data.chronicler_meta` to only pull "new" records from Chronicler and update that table once data is stored.
 
 ### Leagues, Subleagues, and Divisions
@@ -116,7 +117,7 @@ At this point Prophesizer will refresh the materialized views in the DB if neces
   * If all games for today are finished, or there are zero games but the season has changed, or its the Election phase:
     * Use some SQL trickery to see if the matviews are already populated
     * If so, call `data.refresh_materialized_views_concurrently()`
-    * If now, call `data.refresh_materialized_views()` which must be done at least once initially
+    * If not, call `data.refresh_materialized_views()` which must be done at least once initially
 
 ## About Migrations
 
@@ -159,7 +160,7 @@ Incoming game updates are deserialized from JSON into C# objects and go through 
   * If we queue up 5 updates without finding the "next" one we're waiting for, we give up and just process the queue
   * If we find the next update in time, we process it, and then work on the queued updates
 
-At all times Cauldron is working on building a Game Event by adding more and more stuff to it, until the time that the event is complete and is emitted. This start with the Inning State Machine.
+At all times Cauldron is working on building a Game Event by adding more and more stuff to it, until the time that the event is complete and is emitted. This starts with the Inning State Machine:
 
 ## Inning State Machine
 
