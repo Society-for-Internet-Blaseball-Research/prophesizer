@@ -105,7 +105,7 @@ This portion exists to do the per-minute gradual updating of games as play goes 
 ### DB Patches
 
 * Patch files from the `patch` directory are MD5-hashed and compared to entries in the `data.applied_patches` table
-* If a patch file is present that is not applied, the SQL code in that file will be run. This is used for manually cleanup and patching of Weird Cases like Thomas England / Sixpack Dogwalker
+* If a patch file is present that is not applied, the SQL code in that file will be run. This is used for manual cleanup and patching of Weird Cases like Thomas England / Sixpack Dogwalker
 * Once a patch is applied, it's added to `applied_patches` and shouldn't be applied again unless it changes.
 
 ### Refresh Matviews
@@ -215,7 +215,7 @@ For each update, the following happens in order:
   * > `HIT_BY_PITCH_UNSTABLE|hits .+ with a pitch!.+ is now Unstable!`
   * This means the pipe character can't be used in the regexes, I know. If it's a problem, go change the delimiter :D
   * The first line of `simple-outcomes.cfg` is a version number.
-  * Whenever Cauldron processes a game update it direclty grabs the `simple-outcomes.cfg` from the main (`future-perfect`) branch of the Prophesizer repo and uses that file if the version number is greater than the local file. This lets us theoretically add Outcomes directly during the season without having to redeploy Prophesizer every time.
+  * Whenever Cauldron processes a game update it directly grabs the `simple-outcomes.cfg` from the main (`future-perfect`) branch of the Prophesizer repo and uses that file if the version number is greater than the local file. This lets us theoretically add Outcomes directly during the season without having to redeploy Prophesizer every time.
   * But it is kind of hacky
 * Original text of the update is added to the event for reference
 * If we've concluded that this event is "done", emit it!
