@@ -1975,7 +1975,7 @@ namespace SIBR
 			return insertGameStatement;
 		}
 
-		private NpgsqlCommand UpdateGameCommand(NpgsqlConnection psqlConnection, Game game, string winPitcher, string losePitcher)
+		private NpgsqlCommand UpdateGameCommand(NpgsqlConnection psqlConnection, Game game, string? winPitcher, string? losePitcher)
 		{
 			var updateGameStatement = new NpgsqlCommand(@"
             UPDATE data.games SET
@@ -2014,13 +2014,13 @@ namespace SIBR
 			updateGameStatement.Parameters.AddWithValue("statsheet_id", game.statsheet);
 			updateGameStatement.Parameters.AddWithValue("tournament", game.tournament);
 			updateGameStatement.Parameters.AddWithValue("outcomes", game.outcomes);
-			updateGameStatement.Parameters.AddWithValue("winPitcher", winPitcher);
-			updateGameStatement.Parameters.AddWithValue("losePitcher", losePitcher);
+			updateGameStatement.Parameters.AddWithValue("winPitcher", string.IsNullOrEmpty(winPitcher) ? (object)DBNull.Value : winPitcher);
+			updateGameStatement.Parameters.AddWithValue("losePitcher", string.IsNullOrEmpty(losePitcher) ? (object)DBNull.Value : losePitcher);
 
 			return updateGameStatement;
 		}
 
-		private async Task PersistPitcherResults(NpgsqlConnection psqlConnection, string gameId, string winPitcher, string losePitcher, GameEvent lastEvent)
+		private async Task PersistPitcherResults(NpgsqlConnection psqlConnection, string gameId, string? winPitcher, string? losePitcher, GameEvent lastEvent)
 		{
 			var game = await GetGameById(gameId);
 

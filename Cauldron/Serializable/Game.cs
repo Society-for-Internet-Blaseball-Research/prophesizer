@@ -51,10 +51,10 @@ namespace Cauldron
 		public int? awayStrikes { get; set; }
 		public int atBatBalls { get; set; }
 		public int atBatStrikes { get; set; }
-		public string homePitcher { get; set; }
-		public string homePitcherName { get; set; }
-		public string awayPitcher { get; set; }
-		public string awayPitcherName { get; set; }
+		public string? homePitcher { get; set; }
+		public string? homePitcherName { get; set; }
+		public string? awayPitcher { get; set; }
+		public string? awayPitcherName { get; set; }
 		public string homeBatter { get; set; }
 		public string homeBatterName { get; set; }
 		public string awayBatter { get; set; }
